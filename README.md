@@ -1,75 +1,38 @@
-# React + TypeScript + Vite
+<p align="center">
+  <img src="public/favicon.svg" alt="intabpdf logo" width="96" height="96">
+</p>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<h1 align="center">intabpdf</h1>
 
-Currently, two official plugins are available:
+<p align="center">
+  Privacy-first PDF tools that run entirely on your device.<br>
+  No account. No uploads. No tracking. No ads.
+</p>
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+<p align="center">
+  A community project by <a href="https://github.com/intabtools">intabtools</a>, made by students, for everyone.
+</p>
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Why InTab PDF
 
-## Expanding the ESLint configuration
+Most online PDF tools make you upload your documents to someone else's server. intabpdf doesn't.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Everything runs locally.
+- No backend.
+- No account, no tracking, no ads.
+- Open source and community driven.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Privacy rules for contributors
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+The privacy promise is the core of this project. Pull requests that break it will not be merged.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- No network requests that send user files or data anywhere.
+- No analytics, telemetry, tracking or ads and no third-party scripts that do any of these.
+- No accounts or sign-in.
+- Check the licence of any new dependency before adding it (some PDF libraries are AGPL, which affects how the app can be distributed).
 
-```
+## License
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+See [LICENSE](LICENSE).
