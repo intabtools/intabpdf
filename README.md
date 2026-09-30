@@ -2,7 +2,7 @@
   <img src="public/favicon.svg" alt="intabpdf logo" width="96" height="96">
 </p>
 
-<h1 align="center">intabpdf</h1>
+<h1 align="center">InTab PDF</h1>
 
 <p align="center">
   Privacy-first PDF tools that run entirely on your device.<br>
