@@ -2,6 +2,8 @@
 
 Each tool lives in its own folder. This way two people can build two different tools without touching the same files.
 
+No tool exists yet. When the Merge tool is ready, it will become the reference to copy from. Until then, this page shows the idea using a small `rotate` tool as an example.
+
 ## The steps
 
 ```mermaid
@@ -13,11 +15,9 @@ flowchart LR
     E --> F["6. Check and open PR"]
 ```
 
-We will use a tool called `rotate` as the example. Use the Merge tool as your reference when it is ready.
-
 ## Step 1: Write the logic in `core`
 
-Create `src/core/rotate.ts`. It must be a pure function. Bytes in, bytes out.
+Create `src/core/rotate.ts`. It should be a pure function: bytes in, bytes out.
 
 ```ts
 // src/core/rotate.ts
@@ -48,15 +48,15 @@ describe("rotatePages", () => {
 });
 ```
 
-Rules for this step:
+Good things to remember for this step:
 
 - No React, no `window`, no `document`, no platform code.
 - Do not change the input array. Return a new one.
-- Throw an `Error` with a clear message that a normal user can understand.
+- Throw an `Error` with a message that a normal user can understand.
 
 ## Step 2: Create the worker
 
-Create `src/tools/rotate/rotate.worker.ts`. Keep it thin. It only receives, calls `core` and replies.
+Create `src/tools/rotate/rotate.worker.ts`. Keep it thin. It only receives a message, calls `core` and replies.
 
 ```ts
 // src/tools/rotate/rotate.worker.ts
@@ -75,12 +75,12 @@ self.onmessage = async (e: MessageEvent) => {
 
 ## Step 3: Create the page
 
-Create `src/tools/rotate/RotatePage.tsx`. Use the shared `ToolLayout`, `DropZone` and hooks. The page handles only the screen: choosing files, showing progress, showing errors and a download button.
+Create `src/tools/rotate/RotatePage.tsx`. Use the shared `ToolLayout`, `DropZone` and hooks once they exist. The page only handles the screen: choosing files, showing progress, showing errors and a download button.
 
 ## Step 4: Create the tool definition
 
 ```ts
-// src/tools/rotate/index.ts (proposed)
+// src/tools/rotate/index.ts (an idea, not final)
 import { RotateCw } from "lucide-react";
 import type { ToolDefinition } from "../types";
 
@@ -108,7 +108,7 @@ The home grid and the route are created automatically.
 
 ## Step 6: Check and open a pull request
 
-Run these commands:
+Run these commands (whatever is available at the moment):
 
 ```bash
 npm run lint
@@ -116,43 +116,41 @@ npm run build
 npm test
 ```
 
-Then go through the checklist below and open the PR.
+Then look at the checklist below and open your PR. Do not worry if you miss something. We will help in the review.
 
-## Final checklist
+## Checklist
 
 **Code**
 
 - [ ] PDF logic is in `core/`, not in the component
-- [ ] `core` function has tests: normal file, empty file, corrupt file, encrypted file
+- [ ] The `core` function has a test for a normal file and a bad file (empty, corrupt or password protected)
 - [ ] Heavy work runs in a worker
 - [ ] The tool does not import from another tool
-- [ ] The tool is lazy loaded
 
 **Privacy**
 
 - [ ] No network calls, no analytics, no remote fonts or scripts
-- [ ] No file data is saved anywhere after the user closes the tool
+- [ ] No file data is saved after the user closes the tool
 
 **User experience**
 
 - [ ] Shows progress for slow jobs
-- [ ] Shows a clear error message when something fails
+- [ ] Shows a clear message when something fails
 - [ ] Works on a small mobile screen
-- [ ] Works with keyboard only, and inputs and buttons have labels
-- [ ] Tested with a large PDF (50 MB or more if you can)
+- [ ] Buttons and inputs have labels and work with the keyboard
+- [ ] Tried with a big PDF if you can
 
 **Project**
 
-- [ ] New dependency (if any) passed the [dependency checklist](dependencies.md)
+- [ ] New library (if any) is checked with the [dependency checklist](dependencies.md)
 - [ ] Commit messages follow the [convention](commit-conventions.md)
-- [ ] Tool is added to the roadmap or docs if needed
 
 ## Common mistakes
 
 | Mistake | Fix |
 |---|---|
 | Calling `pdf-lib` directly inside the page | Move it to `core` and call it from the worker |
-| Using `window` or `document` in `core` | Remove it. `core` must run in Node tests too |
+| Using `window` or `document` in `core` | Remove it. `core` should also run in Node tests |
 | Copying code from another tool | Move the shared code to `core`, `components` or `hooks` |
 | Forgetting to transfer the buffer | Pass `[result.buffer]` as the second argument to `postMessage` |
-| Loading the full PDF library in the main bundle | Use dynamic `import()` for the page |
+| Loading the full PDF library in the main bundle | Use a dynamic `import()` for the page |

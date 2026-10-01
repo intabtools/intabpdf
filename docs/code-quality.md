@@ -1,56 +1,48 @@
 # Code quality
 
-This page explains how we keep the code clean, safe and easy to maintain. Every contributor and maintainer should read it.
+This page shares some simple habits to keep our code clean and easy to understand. These are friendly tips, not exam rules. Nobody will reject your PR only because a tip was missed. We will just help you in the review.
 
-## Our quality tools
+## Tools we use or plan to use
 
-| Tool | What it checks | Command |
-|---|---|---|
-| TypeScript (strict) | Types and mistakes before running | `npm run build` |
-| ESLint | Bad patterns and import rules | `npm run lint` |
-| Prettier | Code formatting | Format on save |
-| Vitest | Unit tests for `core` | `npm test` |
-| CI (planned) | Runs all of the above on every PR | GitHub Actions |
+| Tool | What it helps with | Command | Status |
+|---|---|---|---|
+| TypeScript (strict) | Catches mistakes before running | `npm run build` | Use now |
+| ESLint | Finds bad patterns | `npm run lint` | Use now |
+| Prettier | Keeps formatting same for everyone | Format on save | Use now |
+| Vitest | Tests for `core` | `npm test` | Use now |
+| GitHub Actions (CI) | Runs the checks on every PR | automatic | Planned for later |
 
-A PR should not be merged if any of these fail.
+Once CI is ready, we would like all checks to pass before a PR is merged. Until then, please just run the checks on your own computer.
 
-```mermaid
-flowchart LR
-    A["Write code"] --> B["Lint"]
-    B --> C["Type-check and build"]
-    C --> D["Unit tests"]
-    D --> E["Open PR"]
-    E --> F["CI runs the same checks"]
-    F --> G["Review"]
-```
-
-## Coding standards
+## Habits that help
 
 ### TypeScript
 
 - Keep `strict` mode on.
-- Do not use `any`. If you really need it, use `unknown` and check the type, or add a comment saying why.
+- Try not to use `any`. If you really need it, use `unknown` and check the type, or leave a small comment about why.
 - Give public functions clear input and output types.
-- Prefer small types and plain objects over big classes.
+- Plain objects and small types are usually simpler than big classes.
 
 ### Functions and files
 
-- One function should do one job. If you need the word "and" to explain it, split it.
-- Keep files under about 300 lines. If a file grows more, split it.
+- One function should do one job. If you need the word "and" to explain it, maybe split it.
+- If a file becomes very long (more than 300 lines or so), think about splitting it.
 - Use clear names. `mergePdfs` is better than `doStuff`.
-- Do not leave dead code, commented-out code or unused files. Git already keeps history.
+- Please remove dead code and commented-out code. Git already keeps the history.
 - Comments should explain **why**, not **what**. The code already shows what.
 
-### The `core` folder (extra strict)
+### The `core` folder
 
-- Functions are pure. Same input gives same output.
+This folder needs a little extra care, because everything depends on it.
+
+- Functions are pure: same input gives same output.
 - Never change the input array. Return a new one.
 - No `window`, `document`, `localStorage`, `fetch`, or imports from Tauri or Capacitor.
 - Throw an `Error` with a message that a normal person can understand, like `"This PDF is password protected."`.
 
-### Enforce boundaries with ESLint
+### Automatic boundary checks (later)
 
-Do not depend only on reviewers to remember the rules. Let ESLint fail the build. Example for `eslint.config.js` (proposed):
+When the project grows, we can let ESLint check the folder rules for us, so nobody has to remember them. Here is an idea for `eslint.config.js`:
 
 ```js
 {
@@ -68,83 +60,81 @@ Do not depend only on reviewers to remember the rules. Let ESLint fail the build
 },
 ```
 
-You can add a similar rule so that files inside `src/tools/a/` cannot import from `src/tools/b/`. The plugin `eslint-plugin-boundaries` can help.
+The plugin `eslint-plugin-boundaries` can also stop one tool from importing another tool.
 
 ## Testing
 
-### What to test
-
-All logic in `core` must have tests. Test the normal case and the bad cases.
+All logic in `core` should have tests. Try the normal case and a few bad cases.
 
 | Case | Why it matters |
 |---|---|
 | Normal PDF | The main use |
-| One page and many pages | Edge sizes |
-| Empty or zero-byte file | Users do select wrong files |
-| Corrupt file | Must fail with a clear message, not crash |
+| One page and many pages | Different sizes |
+| Empty or zero-byte file | People do select the wrong file sometimes |
+| Corrupt file | Should show a clear message, not crash |
 | Password protected PDF | Very common in real life |
 | Large file | Checks speed and memory |
 
-### Test files
+Some small tips:
 
-- Keep tiny sample PDFs in `src/core/__fixtures__/`. Each should be a few KB.
-- Do not commit real personal documents. Create sample files yourself.
-- Tests must run without internet.
-
-### UI testing
-
-For now, test every tool by hand before the PR: a normal file, a big file and a bad file. Add automatic UI tests later when the project is bigger.
+- Keep tiny sample PDFs in `src/core/__fixtures__/`. A few KB each is enough.
+- Please do not commit real personal documents. Make your own sample files.
+- Tests should run without internet.
+- For screens, test by hand for now: a normal file, a big file and a bad file. We can add automatic screen tests later.
 
 ## Error handling
 
 - `core` throws clear errors.
 - The worker catches them and sends `{ ok: false, error }`.
 - The page shows the message in simple words and lets the user try again.
-- Never show a blank screen or a raw stack trace to the user.
+- Please never show a blank screen or a raw error trace to the user.
+- Avoid empty `catch {}` blocks. If something fails, someone should know.
 
-## Performance
+## Performance tips
 
-| Rule | Reason |
+| Tip | Reason |
 |---|---|
-| Heavy work goes in a Web Worker | Screen stays responsive |
+| Put heavy work in a Web Worker | The screen stays responsive |
 | Send buffers as transferable | No extra copy of big files |
 | Lazy load each tool page | Faster first load |
 | Lazy load big libraries inside the tool that needs them | Smaller main bundle |
 | Release memory: revoke object URLs, drop references to big arrays | Prevents crashes on phones |
-| Process page by page when possible | Lower memory use |
+| Process page by page when possible | Uses less memory |
 
-Check the bundle size in the `npm run build` output. If the main bundle grows a lot in one PR, ask why.
+Have a look at the bundle size in the `npm run build` output. If it grows a lot in one PR, just ask why.
 
 ## Accessibility
 
+We want everyone to be able to use InTab PDF.
+
 - Every input and button has a label.
-- The whole tool works with keyboard only.
-- Colour contrast is readable in both light and dark theme.
-- Do not depend on colour alone to show errors or status.
+- The whole tool works with the keyboard only.
+- Colours are readable in both light and dark theme.
+- Do not use only colour to show errors or status.
 - Respect `prefers-reduced-motion`.
 
 ## Privacy in code
 
-See [Privacy rules](privacy.md). In short: no `fetch`, no analytics, no remote scripts, no storing files.
+See [Privacy rules](privacy.md). In short: no `fetch`, no analytics, no remote scripts, no storing of files.
 
-## Definition of done
+## When is a task done?
 
-A task is done only when all of these are true:
+Here is a simple way to check before you open a PR:
 
-- [ ] Code follows the [architecture rules](architecture.md#the-rules)
-- [ ] `npm run lint`, `npm run build` and `npm test` pass
+- [ ] It follows the [architecture rules](architecture.md#the-simple-rules)
+- [ ] The available checks pass
 - [ ] New `core` logic has tests
-- [ ] Tested by hand on desktop and a small mobile screen
+- [ ] You tried it on desktop and on a small mobile screen
 - [ ] No privacy rule is broken
-- [ ] Docs are updated if structure or behaviour changed
-- [ ] PR is small and has a clear description
+- [ ] Docs are updated if something changed
+- [ ] The PR is small and has a clear description
 
-## Code smells we reject
+## Things to avoid, if possible
 
 - PDF logic inside a React component
-- A tool importing another tool
+- One tool importing another tool
 - `if (isTauri)` or `if (isAndroid)` outside `platform/`
 - Copy-pasted code between tools
-- A new dependency added with no reason
-- Huge PRs that change many unrelated things
-- Silent failures (`catch {}` with nothing inside)
+- A new library with no reason
+- Very big PRs that change many unrelated things
+- Silent failures

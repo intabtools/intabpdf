@@ -1,6 +1,8 @@
 # Architecture
 
-InTab PDF runs fully on the user's device. There is no server, no database and no login. All PDF work happens in the browser (or inside the Tauri and Capacitor shells).
+This page explains how we plan to arrange the code. It is a plan to keep things simple as the project grows, not a strict law. If you feel something should change, please open an issue and tell us.
+
+InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Tauri and Capacitor apps later.
 
 ## The big picture
 
@@ -13,9 +15,9 @@ flowchart TD
     Workers --> Core["core (PDF logic)"]
 ```
 
-Arrows show who is allowed to import whom. Dependencies go in **one direction only**. `core` is at the bottom and imports nothing from the app.
+The arrows show who can use whom. Code flows in **one direction only**. `core` sits at the bottom and knows nothing about the rest of the app.
 
-## How one operation flows
+## How one job flows
 
 This is what happens when a user merges two PDFs.
 
@@ -38,32 +40,32 @@ sequenceDiagram
     A-->>U: File saved on device
 ```
 
-Notice that the page never does PDF work itself. The worker does it, and the worker only calls `core`.
+The page never does PDF work itself. The worker does it, and the worker only calls `core`.
 
-## The rules
+## The simple rules
 
-These rules keep the project modular. Reviewers will check them.
+These few rules keep the project easy to work on when many people join. Each one has a reason, so they are easy to remember.
 
-1. `core` imports nothing from the rest of the app.
-2. `core` has no platform checks and no file paths. Bytes in, bytes out.
-3. Platform-specific code lives only in `platform/` and the native shells.
-4. PDF logic never lives inside a React component.
-5. One tool never imports another tool. If two tools need the same code, move it to `core`, `components` or `hooks`.
-6. Routing uses `HashRouter`, so the app works on static hosting, Tauri and Capacitor without any server settings.
-7. No native PDF code in Rust or Kotlin. One TypeScript version keeps all platforms the same.
+1. **`core` imports nothing from the rest of the app.** This way we can test it easily and reuse it anywhere.
+2. **`core` has no platform checks and no file paths.** Bytes in, bytes out.
+3. **Platform-specific code lives only in `platform/`** and the native shells.
+4. **PDF logic never lives inside a React component.**
+5. **One tool does not import another tool.** If two tools need the same code, move it to `core`, `components` or `hooks`.
+6. **Use `HashRouter`,** so the app works on static hosting, Tauri and Capacitor without server settings.
+7. **No native PDF code in Rust or Kotlin.** One TypeScript version keeps all platforms the same.
 
-Rules 1, 2 and 5 should be enforced by ESLint so they fail in CI. See [Code quality](code-quality.md#enforce-boundaries-with-eslint).
+Later, when the project is bigger, we may add ESLint rules so that mistakes with rules 1, 2 and 5 are caught automatically. See [Code quality](code-quality.md).
 
 ## Web Workers
 
-Heavy work runs in a Web Worker so the screen does not freeze on big PDFs or slow phones.
+Heavy work runs in a Web Worker, so the screen does not freeze on big PDFs or slow phones.
 
 - The worker file (`<tool>.worker.ts`) is a thin wrapper. It receives a message, calls the `core` function and sends back the result.
-- Send `ArrayBuffer`s as **transferable** objects. This avoids copying large files in memory.
-- Use the same message shape in every tool, so shared hooks can work with any worker.
+- Send `ArrayBuffer`s as **transferable** objects. This avoids copying big files in memory.
+- Try to use the same message shape in every tool, so shared hooks can work with any worker.
 
 ```ts
-// Proposed shape. Change it when the first tool is built.
+// An idea for the message shape. We will change it when the first tool is built.
 type WorkerRequest<T> = { id: string; payload: T };
 
 type WorkerResponse<R> =
@@ -75,10 +77,10 @@ type WorkerResponse<R> =
 
 ## Platform adapter
 
-`platform/` hides the difference between browser, Tauri and Capacitor. Tools only call this interface and never check which platform they are on.
+`platform/` hides the difference between browser, Tauri and Capacitor. Tools only talk to this interface and never check which platform they are on.
 
 ```ts
-// src/platform/types.ts (proposed)
+// src/platform/types.ts (an idea, not final)
 export interface PlatformAdapter {
   pickFiles(opts: { accept: string[]; multiple: boolean }): Promise<File[]>;
   saveFile(bytes: Uint8Array, suggestedName: string): Promise<void>;
@@ -86,11 +88,11 @@ export interface PlatformAdapter {
 }
 ```
 
-`platform/index.ts` detects the runtime and exports the right implementation.
+`platform/index.ts` finds out where the app is running and gives the right version.
 
 ## Tool registry
 
-`tools/registry.ts` is the only list of tools. The home grid and the routes are both created from it. So adding a new tool never needs a change in the router or the home page.
+`tools/registry.ts` is the one list of tools. The home grid and the routes are both made from it, so adding a new tool never needs a change in the router or the home page.
 
 ```mermaid
 flowchart LR

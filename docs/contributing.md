@@ -1,6 +1,16 @@
 # Contributing
 
-Everyone is welcome here: bug reports, docs, design and code, big or small. If you are new, look for issues labelled `good first issue`.
+Welcome, and thank you for being here! Everyone can help: bug reports, ideas, docs, design, testing and code. Big or small, all of it matters.
+
+If you are new, look for issues labelled `good first issue`. Do not worry if you are a beginner. We all started somewhere, and questions are always welcome.
+
+## Ways to help
+
+- Write or fix code
+- Improve these docs (even a small spelling fix is useful)
+- Suggest ideas for tools and screens
+- Test the app on your phone or a different browser and tell us what you see
+- Report bugs
 
 ## Setup
 
@@ -13,64 +23,62 @@ npm run dev
 
 Before writing code, please read [Architecture](architecture.md) and the [Folder guide](folder-guide.md). They are short and will save you time.
 
-## Workflow
+## How to send your change
 
 ```mermaid
 flowchart LR
-    A["Pick an issue"] --> B["Comment: I am working on it"]
-    B --> C["Branch from main"]
-    C --> D["Write code and tests"]
-    D --> E["lint, build, test"]
-    E --> F["Open pull request"]
-    F --> G["Review and changes"]
-    G --> H["Squash merge"]
+    A["Pick an issue"] --> B["Say you are working on it"]
+    B --> C["Make a branch"]
+    C --> D["Write code"]
+    D --> E["Run the checks"]
+    E --> F["Open a pull request"]
+    F --> G["Review"]
+    G --> H["Merge"]
 ```
 
-1. Pick an issue, or open one to describe what you want to do. Comment so others know you are working on it.
-2. Create a branch from `main`. Do not push directly to `main`.
-3. Keep your PR small. **One tool or one fix per PR.**
-4. Before opening the PR, run:
+1. Pick an issue, or open a new one to tell us your idea. Leave a comment so others know you are working on it.
+2. Make a branch from `main`. Please do not push directly to `main`.
+3. Keep your PR small. **One tool or one fix per PR.** Small PRs are easier and faster to review.
+4. Run these checks before you open the PR:
    ```bash
    npm run lint
    npm run build
    npm test
    ```
-5. Open the PR and explain what you changed and why. Add screenshots for UI changes.
-6. Reply to review comments. Do not worry, reviews are normal and everyone gets them.
+   The project is very new, so some of these may not be ready yet. Just run what is available.
+5. Open the PR and tell us what you changed and why. For screen changes, a screenshot helps a lot.
+6. Reply to review comments. Reviews are normal, and everyone gets them, so please do not feel bad.
 
 ### Branch names
 
-Use `area/short-description`. Examples: `core/split-pages`, `ui/dark-theme-dropzone`, `docs/privacy-page`.
+Use `area/short-description`. For example: `core/split-pages`, `ui/dark-theme-dropzone`, `docs/privacy-page`.
 
-## Code standards
+## Simple code guidelines
 
-Short version (full details in [Code quality](code-quality.md)):
+These are friendly guidelines, not a test you can fail. More tips are in [Code quality](code-quality.md).
 
-- TypeScript strict. Avoid `any`.
-- Format with Prettier and ESLint. Turn on format on save, so diffs have no extra whitespace changes.
-- New `core` logic needs tests.
-- PDF logic stays in `core/`. Never inside React components.
-- Make components accessible: labels, keyboard support, good contrast.
+- Use TypeScript and try to avoid `any`.
+- Turn on Prettier format on save, so your changes stay clean.
+- Keep PDF logic in `core/`, and keep it out of React components.
+- Add a test for new `core` logic if you can.
+- Make buttons and inputs easy to use: labels, keyboard support and readable colours.
 
-## Privacy rules
+## Privacy rule
 
-This is the most important rule of the project. PRs that break it will not be merged. Please read [Privacy rules](privacy.md).
+This is the most important rule of the project, so please read [Privacy rules](privacy.md). A PR that breaks it cannot be merged, but we will always explain why and help you fix it.
 
 ## Adding a library
 
-Check licence, size and network code first. Follow [Dependencies](dependencies.md) and write the reason in your PR.
+Please check the licence, size and network code first. See [Dependencies](dependencies.md) and write the reason in your PR.
 
-## Pull request checklist
+## Quick PR checklist
 
-- [ ] PR is small and focused
-- [ ] `npm run lint`, `npm run build` and `npm test` pass
-- [ ] Tests added for new `core` logic
+- [ ] The PR is small and focused
+- [ ] The available checks pass
 - [ ] No privacy rule is broken
-- [ ] New dependencies are checked
-- [ ] Commit messages follow the [convention](commit-conventions.md)
-- [ ] Docs updated if something changed
-- [ ] Tested on a small mobile screen
+- [ ] New libraries (if any) are checked
+- [ ] Docs are updated if something changed
 
 ## Need help?
 
-Ask in the issue or the PR. Nobody expects you to know everything. A question is always better than a wrong guess.
+Ask in the issue or in the PR. A question is always better than a wrong guess, and nobody will judge you for asking.
