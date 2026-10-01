@@ -29,6 +29,15 @@ Most online PDF tools ask you to upload your files to a server. We do not think 
 - No backend, no account, no tracking, no ads.
 - Open source and community driven.
 
+## How we build
+
+We are a group of students, so the code must be easy for everyone to read and change. We follow four simple goals.
+
+- **Simple.** The plain way is the best way. No clever tricks.
+- **Modular.** One tool, one folder. Tools do not depend on each other.
+- **Explainable.** You should be able to say what a file does in one or two sentences.
+- **Maintainable.** Small PRs, tests for PDF logic, and docs that match the code.
+
 ## Platforms
 
 | Platform | Technology | Status |

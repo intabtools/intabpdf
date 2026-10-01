@@ -50,6 +50,7 @@ describe("rotatePages", () => {
 
 Good things to remember for this step:
 
+- Add a one or two line comment at the top of the file saying what it does.
 - No React, no `window`, no `document`, no platform code.
 - Do not change the input array. Return a new one.
 - Throw an `Error` with a message that a normal user can understand.

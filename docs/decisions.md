@@ -83,3 +83,33 @@ Context: The project has just started and the team is a few students. Too many r
 Decision: Start with a few simple rules (the privacy promise and the folder rules in [Architecture](architecture.md)). Treat other guidelines as tips. Add ESLint boundary checks and CI later, when the codebase and the team are bigger.
 
 Consequences: Easier for newcomers to join and send their first PR. Reviewers need to watch the folder rules by hand for now.
+
+## 008: Keep `pages/`, drop the global `workers/` folder
+
+Status: accepted
+
+Context: The repo started with `src/pages/` and `src/workers/` folders. They group files by type, which clashes with decision 003 (everything for one tool lives in its own folder). We also need a place for screens that are not tools, like Home and Donate.
+
+Decision: Keep `src/pages/` only for non-tool screens. Remove `src/workers/`: each tool keeps its worker in `src/tools/<name>/`, shared message types go in `src/tools/types.ts` and the shared hook goes in `src/hooks/`. Global CSS moves to `src/styles/`.
+
+Consequences: One place to look for everything about a tool, and fewer merge conflicts. Contributors must not put tool pages in `pages/`. Reviewers need to watch for this by hand for now (see decision 007).
+
+## 009: Keep types next to the code that uses them
+
+Status: accepted
+
+Context: A global `src/types/` folder becomes a dumping ground over time. It also lets `core` depend on files outside `core`, which breaks the architecture rules.
+
+Decision: There is no global types folder. A type stays in the file that uses it. Types shared inside a folder go in that folder's `types.ts`, for example `core/types.ts`, `platform/types.ts` and `tools/types.ts`.
+
+Consequences: A file can be understood without searching the project, and `core` stays independent. If a type is needed in many folders, we move it to the lowest folder that all of them are allowed to import from.
+
+## 010: Simple and explainable code comes first
+
+Status: accepted
+
+Context: This is a group project of students with different levels, and it is at a very early stage.
+
+Decision: Our four goals are simple, modular, explainable and maintainable. When two solutions work, we choose the one that is easier to explain. We build only what is needed now.
+
+Consequences: Code may look plainer, but anyone can read it, review it and take it over. Reviewers can ask for a simpler version of a PR.

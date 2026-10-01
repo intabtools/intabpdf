@@ -4,18 +4,33 @@ This page explains how we plan to arrange the code. It is a plan to keep things 
 
 InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Tauri and Capacitor apps later.
 
+## What we want from this code
+
+Every rule on this page comes from four goals.
+
+| Goal | What it means for us |
+|---|---|
+| Simple | Choose the plain way. No clever tricks and no extra layers. A new student should understand a file in a few minutes. |
+| Modular | One tool lives in one folder. Tools do not depend on each other. Shared things go to `core`, `components` or `hooks`. |
+| Explainable | You can say what a file does, and why it is there, in one or two sentences. Names are clear and comments explain the why. |
+| Maintainable | PRs are small, `core` has tests, and docs are updated along with the code. Anyone in the group can take over any part. |
+
+The project is at a very early stage, so please do not build for the future. Build only what is needed now, and keep it simple. When a real need comes, we will improve it together.
+
 ## The big picture
 
 ```mermaid
 flowchart TD
-    Tools["tools (one folder per tool)"] --> Components["components (shared UI)"]
+    Pages["pages (home, donate, about)"] --> Components["components (shared UI)"]
+    Pages --> Registry["tools/registry"]
+    Tools["tools (one folder per tool)"] --> Components
     Tools --> Hooks["hooks (shared React hooks)"]
     Tools --> Platform["platform (open, save, share)"]
     Tools --> Workers["tool workers"]
     Workers --> Core["core (PDF logic)"]
 ```
 
-The arrows show who can use whom. Code flows in **one direction only**. `core` sits at the bottom and knows nothing about the rest of the app.
+The arrows show who can use whom. Code flows in **one direction only**. `core` sits at the bottom and knows nothing about the rest of the app. `pages` are the non-tool screens: they may use `components` and read the tool list, but they never contain PDF logic.
 
 ## How one job flows
 
@@ -60,7 +75,8 @@ Later, when the project is bigger, we may add ESLint rules so that mistakes with
 
 Heavy work runs in a Web Worker, so the screen does not freeze on big PDFs or slow phones.
 
-- The worker file (`<tool>.worker.ts`) is a thin wrapper. It receives a message, calls the `core` function and sends back the result.
+- The worker file (`<tool>.worker.ts`) lives **inside its tool folder** (`src/tools/<name>/`). There is no global `src/workers/` folder. It is a thin wrapper: it receives a message, calls the `core` function and sends back the result.
+- The shared message types live in `src/tools/types.ts`, and the shared `useWorker` hook lives in `src/hooks/`.
 - Send `ArrayBuffer`s as **transferable** objects. This avoids copying big files in memory.
 - Try to use the same message shape in every tool, so shared hooks can work with any worker.
 
@@ -92,7 +108,7 @@ export interface PlatformAdapter {
 
 ## Tool registry
 
-`tools/registry.ts` is the one list of tools. The home grid and the routes are both made from it, so adding a new tool never needs a change in the router or the home page.
+`tools/registry.ts` is the one list of tools. The home grid (`pages/HomePage.tsx`) and the routes in `App.tsx` are both made from it, so adding a new tool never needs a change in the router or the home page.
 
 ```mermaid
 flowchart LR
@@ -102,6 +118,18 @@ flowchart LR
     R --> Home["Home grid"]
     R --> Routes["Routes"]
 ```
+
+## Words used in these docs
+
+| Word | Simple meaning |
+|---|---|
+| Web Worker | A background thread in the browser. Heavy work runs here so the screen does not hang. |
+| Bundle | The final JavaScript files that Vite builds for the app. |
+| Lazy loading | Loading a page or library only when the user opens it. We use dynamic `import()` for this. |
+| Adapter | A small layer that gives the same functions on different platforms. `platform/` is our adapter. |
+| Registry | One list of all tools. The home screen and the routes are made from it. |
+| Transferable | Moving a buffer to a worker without copying it. This saves memory. |
+| CSP | Content-Security-Policy. A browser rule that blocks network requests we did not allow. |
 
 ## See also
 

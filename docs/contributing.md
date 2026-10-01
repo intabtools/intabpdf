@@ -12,6 +12,17 @@ If you are new, look for issues labelled `good first issue`. Do not worry if you
 - Test the app on your phone or a different browser and tell us what you see
 - Report bugs
 
+## Working together
+
+We are a group, so a few small habits make life easy for everyone.
+
+- Comment on the issue when you start, so two people do not do the same work.
+- Before a big change (a new folder, a new library, a change in a rule), open an issue or discuss in the group first.
+- Every PR is reviewed by at least one other person. Reviewing is also a good way to learn the code.
+- Explain your PR in simple words. If a teammate cannot follow it, we simplify it together.
+- Pull the latest `main` often, so your branch does not fall far behind.
+- Keep it simple. The project is very new, so please build only what is needed now.
+
 ## Setup
 
 ```bash
@@ -60,6 +71,8 @@ These are friendly guidelines, not a test you can fail. More tips are in [Code q
 - Use TypeScript and try to avoid `any`.
 - Turn on Prettier format on save, so your changes stay clean.
 - Keep PDF logic in `core/`, and keep it out of React components.
+- Keep each tool inside its own folder in `src/tools/`.
+- Keep code simple and add a short comment at the top of new files saying what they do.
 - Add a test for new `core` logic if you can.
 - Make buttons and inputs easy to use: labels, keyboard support and readable colours.
 

@@ -41,7 +41,7 @@ Look at the most important things first. If privacy or structure has a problem, 
 2. **Structure.** Is the code in the right folder? See the [folder guide](folder-guide.md). Does `core` stay clean? Does any tool import another tool? Is there any platform check outside `platform/`?
 3. **Does it work?** Does it do what the issue asked? Try the branch with a normal file, a bad file and a large file.
 4. **Tests.** Does new `core` logic have tests, including bad inputs?
-5. **Readability and user experience.** Clear names, simple code, good error messages, works on a small screen and with the keyboard. See [Code quality](code-quality.md).
+5. **Readability and user experience.** Can another student understand this in a few minutes? Clear names, simple code, a short comment at the top of new files, good error messages, works on a small screen and with the keyboard. See [Code quality](code-quality.md).
 6. **New libraries.** Check licence, size and network code. See [Dependencies](dependencies.md).
 7. **Docs and commits.** Are the docs updated? Is the commit message in the right format? (You can fix the message while squash merging.)
 
@@ -122,6 +122,7 @@ These habits matter more than any single feature.
 9. **Fix flaky tests quickly,** so people do not learn to ignore failing checks.
 10. **Try it on a weak device.** If it works on a low-end Android phone, it works everywhere.
 11. **Do not depend on one person.** Share repository access and write things down.
+12. **Keep it simple.** Do not accept code built "for the future". Ask for the plain version that solves today's need.
 
 ### Monthly check
 

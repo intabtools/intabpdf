@@ -8,11 +8,23 @@ This page shares some simple habits to keep our code clean and easy to understan
 |---|---|---|---|
 | TypeScript (strict) | Catches mistakes before running | `npm run build` | Use now |
 | ESLint | Finds bad patterns | `npm run lint` | Use now |
-| Prettier | Keeps formatting same for everyone | Format on save | Use now |
-| Vitest | Tests for `core` | `npm test` | Use now |
+| Prettier | Keeps formatting same for everyone | Format on save | Recommended, config to be added soon |
+| Vitest | Tests for `core` | `npm test` | To be added with the first `core` function |
 | GitHub Actions (CI) | Runs the checks on every PR | automatic | Planned for later |
 
 Once CI is ready, we would like all checks to pass before a PR is merged. Until then, please just run the checks on your own computer.
+
+## Keep it simple and easy to explain
+
+This is a group project. Code that only one person understands is a problem for everyone. So we prefer plain code to clever code.
+
+- Start each file in `core/` and each tool's `index.ts` with a short comment (one to three lines) saying what it does.
+- If you cannot explain a function in one sentence, split it.
+- A simple `for` loop that everyone understands is better than a clever one-liner.
+- Do not add a new layer, class or helper "for later". Wait until two tools really need it.
+- Name things by what they do: `rotatePages`, not `process`.
+- In your PR description write three things: what you changed, why, and how to test it.
+- If a teammate cannot follow your PR in a few minutes, that is a sign to simplify it or add a comment. It is not a problem with the teammate.
 
 ## Habits that help
 
