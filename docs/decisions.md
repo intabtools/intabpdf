@@ -44,15 +44,15 @@ Decision: Each tool lives in `src/tools/<name>/` and is listed in `tools/registr
 
 Consequences: People can build tools in parallel. The home grid and routes are made from the registry.
 
-## 004: HashRouter
+## 004: BrowserRouter and HashRouter
 
 Status: accepted
 
 Context: Static hosting, Tauri and Capacitor have no server to rewrite URLs.
 
-Decision: Use `HashRouter`.
+Decision: Use `BrowserRouter` and `HashRouter`.
 
-Consequences: Works everywhere without extra setup. URLs contain a `#`.
+Consequences: Works everywhere without extra setup.
 
 ## 005: Commit format `area: description`
 
