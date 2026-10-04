@@ -48,7 +48,7 @@ intabpdf/
 └── docs/                These documents
 ```
 
-> **Note:** `core/`, `platform/`, `components/`, `pages/` and `assets/` already exist in the repo. `tools/`, `hooks/` and `styles/` are added with the first tool. The old `src/workers/` folder is **not** part of the plan: each tool keeps its own worker inside its tool folder (see [Architecture](architecture.md#web-workers)). Starter files from the Vite template, like `src/App.css`, are removed when the first tool is built.
+> **Note:** `core/`, `platform/`, `components/`, `pages/` and `assets/` already exist in the repo. `tools/`, `hooks/` and `styles/` are added with the first tool. The old `src/workers/` folder is **not** part of the plan: each tool keeps its own worker inside its tool folder (see [Architecture](architecture.md#web-workers)).
 
 ## Folder by folder
 
