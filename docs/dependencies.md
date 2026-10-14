@@ -38,6 +38,10 @@ Please check the current licence and how active the project is before choosing. 
 | `pdfjs-dist` | Draw pages on canvas, extract text | Mozilla PDF.js. Bundle its worker file locally, so nothing loads from a CDN |
 | MuPDF (WASM builds) | Fast rendering and compression | Has been AGPL in the past, so check carefully |
 
+## Desktop tooling
+
+`electron` and `electron-builder` are used for the desktop app. Electron comes with Chromium, so please keep it updated for security fixes. Do not turn on Electron features that talk to a server (crash reporter, auto-updater) without a new entry in the [decisions log](decisions.md).
+
 ## Updating dependencies
 
 - Use a `deps:` commit.

@@ -38,7 +38,7 @@ flowchart TD
 Look at the most important things first. If privacy or structure has a problem, there is no need to review style yet.
 
 1. **Privacy.** Search the PR for `fetch(`, `XMLHttpRequest`, `WebSocket`, `sendBeacon`, new `<script>` tags, analytics packages and remote URLs. Anything found needs a clear reason, or the PR cannot be merged.
-2. **Structure.** Is the code in the right folder? See the [folder guide](folder-guide.md). Does `core` stay clean? Does any tool import another tool? Is there any platform check outside `platform/`?
+2. **Structure.** Is the code in the right folder? See the [folder guide](folder-guide.md). Does `core` stay clean? Does any tool import another tool? Is there any platform check outside `platform/`? For changes in `electron/`: are context isolation and sandbox still on, and Node integration still off? Does the preload give the screen only the few functions it needs?
 3. **Does it work?** Does it do what the issue asked? Try the branch with a normal file, a bad file and a large file.
 4. **Tests.** Does new `core` logic have tests, including bad inputs?
 5. **Readability and user experience.** Can another student understand this in a few minutes? Clear names, simple code, a short comment at the top of new files, good error messages, works on a small screen and with the keyboard. See [Code quality](code-quality.md).
@@ -57,7 +57,7 @@ Look at the most important things first. If privacy or structure has a problem, 
 | Rule | Detail |
 |---|---|
 | Checks pass | Lint, build and tests (once CI is set up) |
-| Approvals | 1 approval is enough. For changes to `core/`, `platform/`, `registry.ts`, build config, CI or libraries, please try to get a second maintainer to look, if one is available |
+| Approvals | 1 approval is enough. For changes to `core/`, `platform/`, `electron/`, `registry.ts`, build config, CI or libraries, please try to get a second maintainer to look, if one is available |
 | Merge type | Squash merge. The final commit message follows `area: description` |
 | Your own PR | Please get another person to review it, except for tiny typo fixes |
 | `main` branch | Please do not push directly, even if you are a maintainer |
@@ -131,6 +131,7 @@ Once there is code, a quick look at these is enough:
 - [ ] `npm outdated` and `npm audit`
 - [ ] Library licences are still compatible
 - [ ] Bundle size has no big surprise
+- [ ] Electron and Electron Builder are up to date (Electron comes with Chromium, so security fixes matter)
 - [ ] No `fetch(` or third-party scripts in the code (search the repo)
 - [ ] CI is passing on `main`
 - [ ] Old open PRs have been answered
@@ -162,6 +163,8 @@ Before releasing:
 - [ ] CSP is still strict (no new allowed outside domains)
 - [ ] `npm audit` has no serious open issues
 - [ ] Tried in Chrome, Firefox and Safari if possible
+- [ ] Desktop packages built with `npm run dist` and `npm run dist:win`
+- [ ] Installed on Windows and Linux, and a PDF opened through the operating system (check the file association after install)
 - [ ] Tried on an Android phone, once the Android app exists
 - [ ] Changelog written in simple words
 - [ ] Version bumped with a `release:` commit and tagged
@@ -191,6 +194,8 @@ Please stop and discuss with the team if you see any of these:
 - A PR that adds analytics, "anonymous usage stats" or a remote script
 - A library with an AGPL or unclear licence
 - A change to the CSP that allows a new outside domain
-- PDF logic being written in Rust or Kotlin
+- PDF logic being written in the Electron main process or in Kotlin
+- Electron security settings made weaker (context isolation or sandbox turned off, Node integration turned on)
+- Electron crash reporter, auto-updater or anything else in the shell that talks to a server
 - A giant PR that nobody can review properly
 - The same bug fixed in two places because code was copied

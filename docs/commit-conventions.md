@@ -16,7 +16,7 @@ Do not worry if you get it wrong. We squash merge PRs, so a maintainer can fix t
 | `core:` | PDF processing logic |
 | `ui:` | Components, layout, styling, accessibility |
 | `web:` | Browser app, routing, PWA, service worker |
-| `desktop:` | Tauri side (Rust code, `tauri.conf`) |
+| `desktop:` | Electron side (`electron/` main process and preload, `src/platform/electron.ts`) |
 | `android:` | Capacitor side (native config, plugins) |
 | `build:` | Bundler, compiler config, scripts |
 | `deps:` | Library updates |
@@ -31,9 +31,10 @@ Do not worry if you get it wrong. We squash merge PRs, so a maintainer can fix t
 ```
 core: add page rotation to merge
 ui: fix drag-and-drop highlight in dark theme
-desktop: bump tauri to latest
+desktop: open pdf files passed at launch
 android: request storage permission on file pick
 build: split pdf worker into separate chunk
+build: add windows nsis and zip targets
 deps: update pdf-lib
 ci: run lint on pull requests
 docs: explain offline guarantee

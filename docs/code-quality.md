@@ -49,7 +49,7 @@ This folder needs a little extra care, because everything depends on it.
 
 - Functions are pure: same input gives same output.
 - Never change the input array. Return a new one.
-- No `window`, `document`, `localStorage`, `fetch`, or imports from Tauri or Capacitor.
+- No `window`, `document`, `localStorage`, `fetch`, or imports from Electron or Capacitor.
 - Throw an `Error` with a message that a normal person can understand, like `"This PDF is password protected."`.
 
 ### Automatic boundary checks (later)
@@ -63,7 +63,7 @@ When the project grows, we can let ESLint check the folder rules for us, so nobo
     "no-restricted-imports": ["error", {
       patterns: [
         "react", "react-dom",
-        "@tauri-apps/*", "@capacitor/*",
+        "electron", "@capacitor/*",
         "**/platform/*", "**/components/*", "**/tools/*", "**/hooks/*",
       ],
     }],
@@ -145,8 +145,9 @@ Here is a simple way to check before you open a PR:
 
 - PDF logic inside a React component
 - One tool importing another tool
-- `if (isTauri)` or `if (isAndroid)` outside `platform/`
+- `if (isElectron)` or `if (isAndroid)` outside `platform/`
 - Copy-pasted code between tools
 - A new library with no reason
 - Very big PRs that change many unrelated things
+- PDF logic or extra Node.js code in `electron/`
 - Silent failures

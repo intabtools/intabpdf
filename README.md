@@ -43,7 +43,7 @@ We are a group of students, so the code must be easy for everyone to read and ch
 | Platform | Technology | Status |
 |---|---|---|
 | Web | Vite + React + TypeScript | Just starting |
-| Desktop | Tauri | Planned for later |
+| Desktop | Electron | Foundation added, screens still to come |
 | Android | Capacitor | Planned for later |
 
 ## Quick start
