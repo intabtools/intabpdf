@@ -1,25 +1,46 @@
 {
   "name": "intabpdf",
+  "productName": "InTab PDF",
+  "desktopName": "org.intabtools.intabpdf",
+  "author": "intabtools <intabtools@gmail.com>",
+  "description": "A privacy-first PDF toolkit that processes documents locally on your device.",
+  "homepage": "https://github.com/intabtools/intabpdf",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/intabtools/intabpdf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/intabtools/intabpdf/issues"
+  },
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron": "electron .",
+    "desktop:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && electron . --dev\"",
+    "test:e2e": "playwright test",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/filesystem": "^8.1.4",
     "@capacitor/share": "^8.0.3",
+    "@tailwindcss/vite": "^4.3.3",
     "lucide-react": "^1.55.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
@@ -42,5 +63,49 @@
     "vite": "^8.3.0",
     "vitest": "^5.0.3",
     "wait-on": "^9.5.1"
+  },
+  "build": {
+    "appId": "org.intabtools.intabpdf",
+    "productName": "InTab PDF",
+    "artifactName": "${name}-${version}.${ext}",
+    "publish": null,
+    "directories": {
+      "output": "release/installers"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "electron/icon.ico",
+      "fileAssociations": [
+        {
+          "ext": "pdf",
+          "name": "PDF Document",
+          "description": "PDF document",
+          "role": "Viewer"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm",
+        "tar.gz"
+      ],
+      "category": "Office",
+      "icon": "electron/icons",
+      "synopsis": "Privacy-first PDF toolkit",
+      "mimeTypes": [
+        "application/pdf"
+      ],
+      "syncDesktopName": true
+    }
   }
 }

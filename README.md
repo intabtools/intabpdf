@@ -13,6 +13,20 @@
   A community project by <a href="https://github.com/intabtools">intabtools</a>, made by students, for everyone.
 </p>
 
+<p align="center">
+  <a href="https://github.com/intabtools/intabpdf/actions/workflows/build.yml"><img src="https://github.com/intabtools/intabpdf/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status of main"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB" alt="React">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <img src="https://img.shields.io/badge/Electron-47848F?logo=electron&logoColor=white" alt="Electron">
+  <img src="https://img.shields.io/badge/Capacitor-119EFF?logo=capacitor&logoColor=white" alt="Capacitor">
+  <img src="https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white" alt="Node.js">
+</p>
+
 ---
 
 ## We are just getting started
@@ -43,7 +57,7 @@ We are a group of students, so the code must be easy for everyone to read and ch
 | Platform | Technology | Status |
 |---|---|---|
 | Web | Vite + React + TypeScript | Just starting |
-| Desktop | Tauri | Planned for later |
+| Desktop | Electron | Foundation added, screens still to come |
 | Android | Capacitor | Planned for later |
 
 ## Quick start

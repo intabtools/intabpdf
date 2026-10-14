@@ -26,7 +26,7 @@ Consequences: Strong privacy and no server cost. Speed depends on the user's dev
 
 ## 002: One TypeScript implementation for all platforms
 
-Status: accepted
+Status: replaced by 011 (the desktop shell changed from Tauri to Electron; the one-TypeScript-implementation idea stays)
 
 Context: We plan a web app, a desktop app (Tauri) and an Android app (Capacitor).
 
@@ -46,7 +46,7 @@ Consequences: People can build tools in parallel. The home grid and routes are m
 
 ## 004: BrowserRouter and HashRouter
 
-Status: accepted
+Status: replaced by 012
 
 Context: Static hosting, Tauri and Capacitor have no server to rewrite URLs.
 
@@ -113,3 +113,23 @@ Context: This is a group project of students with different levels, and it is at
 Decision: Our four goals are simple, modular, explainable and maintainable. When two solutions work, we choose the one that is easier to explain. We build only what is needed now.
 
 Consequences: Code may look plainer, but anyone can read it, review it and take it over. Reviewers can ask for a simpler version of a PR.
+
+## 011: Electron instead of Tauri for desktop
+
+Status: accepted (replaces the desktop part of 002)
+
+Context: We planned to use Tauri for the desktop app. Tauri uses the WebView that comes with each operating system. So the app can behave differently on Windows, on Linux and on different versions of the same system. A PDF tool uses workers, canvas and a lot of memory, so we want the same behaviour everywhere.
+
+Decision: Use Electron for desktop. Electron comes with its own Chromium, so every install runs the same engine. It loads the same web build (`dist/`). The main process (`electron/main.cjs`) only sets up the window, opens files and saves files. The preload script (`electron/preload.cjs`) is the only bridge to the React code. Context isolation, sandbox and web security are on. Node integration in the renderer is off. The URLs that can load, and the navigation, are limited. We build the packages with Electron Builder: NSIS and ZIP for Windows, and AppImage, DEB, RPM and TAR.GZ for Linux. There is still no PDF logic in the shell.
+
+Consequences: The app behaves the same on every desktop system. Nobody needs to learn Rust. Windows packages can be built from a Linux machine. The downside is that downloads and memory use are bigger, because Chromium is inside the app. We must update Electron often for security fixes. The main process and preload are sensitive, so we keep them small and review them carefully. macOS packaging is not set up yet. We still need to test the installers and file associations on real Windows and Linux machines.
+
+## 012: Choose the router by platform
+
+Status: accepted (replaces 004)
+
+Context: Decision 004 said "BrowserRouter and HashRouter" but did not say where to use which. In Electron, `BrowserRouter` does not work, because the packaged app opens `file://` URLs and no server rewrites the paths. On the web, `HashRouter` gives URLs like `/#/merge`. These are not nice for sharing and not good for search engines.
+
+Decision: The web build uses `BrowserRouter`. The Electron and Capacitor builds use `HashRouter`. We make this choice in one place inside `src/platform/` (for example an `AppRouter` component). Tools and pages just use normal React Router links and routes. The choice is made at build time, not while the app runs. The Vite `base` setting follows the same choice: `/` for web and `./` for packaged apps.
+
+Consequences: The web gets clean URLs, and the desktop and Android apps have working routes. No platform check is needed outside `platform/`. The web host must serve `index.html` for unknown paths. GitHub Pages needs a `404.html` copy, and Netlify and Cloudflare Pages need a rewrite rule. Clean URLs alone do not give good SEO. We also need a title and description for each page, and maybe pre-rendering of the main pages. We will decide this when the first tools are ready. We now have two build modes (web and packaged), so the Electron and Capacitor scripts must use the packaged one.

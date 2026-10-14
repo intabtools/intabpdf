@@ -25,10 +25,11 @@ flowchart TD
     E --> F["Anyone can verify in the browser Network tab"]
 ```
 
-1. **A strict Content-Security-Policy** in `index.html` and later in `tauri.conf.json`. For example: `default-src 'self'; connect-src 'none'; img-src 'self' data: blob:; worker-src 'self' blob:`. We will adjust it when the first tool is ready.
+1. **A strict Content-Security-Policy** in `index.html`. The desktop app loads the same file, so the same policy applies there also. For example: `default-src 'self'; connect-src 'none'; img-src 'self' data: blob:; worker-src 'self' blob:`. We will adjust it when the first tool is ready.
 2. **Reviewer check.** Reviewers search the PR for `fetch(`, `XMLHttpRequest`, `WebSocket`, `sendBeacon` and new `<script>` tags.
 3. **Library check.** New packages are checked for tracking or network code, not only for the licence.
 4. **Anyone can verify.** Open the browser Network tab, process a file, and see that no request is made.
+5. **Desktop shell check.** The Electron app loads only its own files and blocks navigation to other sites. The main process reads a PDF only to give it to the window. It must never send, log or save the file or its name anywhere else. Electron's crash reporter and auto-updater stay off.
 
 ## What is allowed and what is not
 

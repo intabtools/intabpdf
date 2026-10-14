@@ -2,7 +2,7 @@
 
 This page explains how we plan to arrange the code. It is a plan to keep things simple as the project grows, not a strict law. If you feel something should change, please open an issue and tell us.
 
-InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Tauri and Capacitor apps later.
+InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Electron desktop app and the Capacitor Android app (Android is planned for later).
 
 ## What we want from this code
 
@@ -66,8 +66,8 @@ These few rules keep the project easy to work on when many people join. Each one
 3. **Platform-specific code lives only in `platform/`** and the native shells.
 4. **PDF logic never lives inside a React component.**
 5. **One tool does not import another tool.** If two tools need the same code, move it to `core`, `components` or `hooks`.
-6. **Use `HashRouter`,** so the app works on static hosting, Tauri and Capacitor without server settings.
-7. **No native PDF code in Rust or Kotlin.** One TypeScript version keeps all platforms the same.
+6. **Web uses `BrowserRouter`, packaged apps use `HashRouter`.** Clean URLs are better for web indexing and SEO. Electron and Capacitor load files from the device, and there is no server to rewrite URLs, so they need `HashRouter`. We make this choice in one place, `platform/`, and tools never know which router is used (see [decision 012](decisions.md)).
+7. **No native PDF code in the Electron main process or in Kotlin.** One TypeScript version keeps all platforms the same.
 
 Later, when the project is bigger, we may add ESLint rules so that mistakes with rules 1, 2 and 5 are caught automatically. See [Code quality](code-quality.md).
 
@@ -93,7 +93,7 @@ type WorkerResponse<R> =
 
 ## Platform adapter
 
-`platform/` hides the difference between browser, Tauri and Capacitor. Tools only talk to this interface and never check which platform they are on.
+`platform/` hides the difference between browser, Electron and Capacitor. Tools only talk to this interface and never check which platform they are on.
 
 ```ts
 // src/platform/types.ts (an idea, not final)
@@ -105,6 +105,16 @@ export interface PlatformAdapter {
 ```
 
 `platform/index.ts` finds out where the app is running and gives the right version.
+
+## Native shells
+
+The desktop app is a thin Electron shell around the same web build.
+
+- `electron/main.cjs` is the **main process**. It makes the window, handles app start and quit, and reads the PDF files that the operating system gives to the app.
+- `electron/preload.cjs` is the **preload script**. It is the only bridge between the main process and the React code. It gives the screen only the few functions it needs.
+- `src/platform/electron.ts` is the only React-side file that talks to this bridge.
+
+The main process does only window and file work. **No PDF logic lives there.** Tools never talk to Electron directly. They use the platform adapter. See [Platforms](platforms.md) for the full desktop flow.
 
 ## Tool registry
 
@@ -127,6 +137,10 @@ flowchart LR
 | Bundle | The final JavaScript files that Vite builds for the app. |
 | Lazy loading | Loading a page or library only when the user opens it. We use dynamic `import()` for this. |
 | Adapter | A small layer that gives the same functions on different platforms. `platform/` is our adapter. |
+| Electron | A way to make a desktop app from a web app. It comes with its own Chromium browser, so the app behaves the same on every desktop system. |
+| Main process | The Electron part that runs outside the web page. It makes the window and reads files. It lives in `electron/main.cjs`. |
+| Preload script | A small script that gives the web page a safe and limited bridge to the main process. |
+| IPC | Inter-process communication. The way the main process and the web page send messages to each other. |
 | Registry | One list of all tools. The home screen and the routes are made from it. |
 | Transferable | Moving a buffer to a worker without copying it. This saves memory. |
 | CSP | Content-Security-Policy. A browser rule that blocks network requests we did not allow. |
