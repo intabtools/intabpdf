@@ -144,6 +144,12 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1000,
     height: 700,
+    minWidth: 800,
+    minHeight: 600,
+    autoHideMenuBar: true,
+    title: 'InTab PDF',
+    icon: path.join(__dirname, 'icon.png'),
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -153,7 +159,8 @@ function createWindow() {
       allowRunningInsecureContent: false,
     },
   });
-
+  win.setMenuBarVisibility(false);
+  win.removeMenu();
   const wc = win.webContents;
   // Reset readiness if the frontend reloads.
   wc.on('did-start-loading', () => {

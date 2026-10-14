@@ -19,14 +19,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:desktop": "tsc -b && vite build --mode desktop",
     "lint": "eslint .",
     "preview": "vite preview",
     "electron": "electron .",
     "desktop:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && electron . --dev\"",
     "test:e2e": "playwright test",
-    "dist": "npm run build && electron-builder",
-    "dist:win": "npm run build && electron-builder --win",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist": "npm run build:desktop && electron-builder",
+    "dist:win": "npm run build:desktop && electron-builder --win",
+    "dist:linux": "npm run build:desktop && electron-builder --linux"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",
