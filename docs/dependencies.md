@@ -35,12 +35,16 @@ Please check the current licence and how active the project is before choosing. 
 | Library | Typical use | Note |
 |---|---|---|
 | `pdf-lib` | Create, merge, split, edit pages | Pure JavaScript, popular for client-side work. Check how actively it is maintained |
-| `pdfjs-dist` | Draw pages on canvas, extract text | Mozilla PDF.js. Bundle its worker file locally, so nothing loads from a CDN |
+| `pdfjs-dist` | Draw pages on canvas, extract text | Mozilla PDF.js. Used by the viewer. Bundle its worker file locally, so nothing loads from a CDN |
 | MuPDF (WASM builds) | Fast rendering and compression | Has been AGPL in the past, so check carefully |
 
 ## Desktop tooling
 
 `electron` and `electron-builder` are used for the desktop app. Electron comes with Chromium, so please keep it updated for security fixes. Do not turn on Electron features that talk to a server (crash reporter, auto-updater) without a new entry in the [decisions log](decisions.md).
+
+## Android tooling
+
+`@capacitor/core`, `@capacitor/android` and `@capacitor/cli` are used for the Android app. Check every Capacitor plugin like any other library, and read its source for network code. Do not add plugins that talk to a server (push notifications, analytics, Firebase, crash reporting) without a new entry in the [decisions log](decisions.md). Keep Capacitor and the Android build setup updated.
 
 ## Updating dependencies
 

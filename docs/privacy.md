@@ -30,6 +30,7 @@ flowchart TD
 3. **Library check.** New packages are checked for tracking or network code, not only for the licence.
 4. **Anyone can verify.** Open the browser Network tab, process a file, and see that no request is made.
 5. **Desktop shell check.** The Electron app loads only its own files and blocks navigation to other sites. The main process reads a PDF only to give it to the window. It must never send, log or save the file or its name anywhere else. Electron's crash reporter and auto-updater stay off.
+6. **Android shell check.** The Android app loads only its own files. Android gives us a PDF only so the screen can show it. The native side must never send, log or save the file or its name. No plugin that talks to a server. We will also check whether the `INTERNET` permission can be removed.
 
 ## What is allowed and what is not
 
@@ -39,6 +40,7 @@ flowchart TD
 | Fonts and images bundled in the app | Google Fonts or any CDN link |
 | Saving the user's theme choice in `localStorage` | Saving file contents or file names in storage |
 | Error messages shown on screen | Sending error reports to a server |
+| Showing a PDF in the viewer, in memory only | A "recent files" list that remembers file names or contents |
 
 If you are not sure about something, just ask in an issue before writing the code. We are happy to help.
 

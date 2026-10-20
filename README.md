@@ -15,13 +15,14 @@
 
 <p align="center">
   <a href="https://github.com/intabtools/intabpdf/actions/workflows/build.yml"><img src="https://github.com/intabtools/intabpdf/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status of main"></a>
+  <!--<a href="https://github.com/intabtools/intabpdf/releases/latest"><img src="https://img.shields.io/github/v/release/intabtools/intabpdf?include_prereleases&label=latest" alt="Latest release"></a> -->
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" alt="Vite">
   <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <!--<img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS"> -->
   <img src="https://img.shields.io/badge/Electron-47848F?logo=electron&logoColor=white" alt="Electron">
   <img src="https://img.shields.io/badge/Capacitor-119EFF?logo=capacitor&logoColor=white" alt="Capacitor">
   <img src="https://img.shields.io/badge/Node.js-339933?logo=nodedotjs&logoColor=white" alt="Node.js">
@@ -31,7 +32,7 @@
 
 ## We are just getting started
 
-InTab PDF is a very new project. There is no finished tool yet, and the screens are still being planned. This is a great time to join, because you can help decide how everything looks and works.
+InTab PDF is a very new project. The desktop and Android app shells are ready, and our first release will be a simple PDF viewer. The PDF tools (merge, split and more) come after that. The design is still taking shape, so this is a great time to join and help decide how everything looks and works.
 
 Whether you write code, design screens, test on your phone, fix a spelling mistake in the docs, or just have an idea, you are welcome here.
 
@@ -57,8 +58,12 @@ We are a group of students, so the code must be easy for everyone to read and ch
 | Platform | Technology | Status |
 |---|---|---|
 | Web | Vite + React + TypeScript | Just starting |
-| Desktop | Electron | Foundation added, screens still to come |
-| Android | Capacitor | Planned for later |
+| Desktop | Electron | Shell and icons ready, packages build.  |
+| Android | Capacitor | Shell and icons ready, packages build. |
+
+## First release: a PDF viewer
+
+We want something useful in people's hands early. So the first release is a simple PDF viewer for the desktop and Android apps: open a PDF, read it, zoom, move between pages. No editing yet. The tools follow in later releases. The reasons are in [decision 013](https://github.com/intabtools/intabpdf/blob/main/docs/decisions.md).
 
 ## Quick start
 

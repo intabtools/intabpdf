@@ -5,8 +5,8 @@ One codebase, three places to run it. All of them load the **same web build** (t
 | Platform | Shell | Folder | Status |
 |---|---|---|---|
 | Web | Vite static build | root | Just starting |
-| Desktop | Electron | `electron/` | Foundation added. Windows and Linux packages build. Screens and install testing are still to come |
-| Android | Capacitor | `android/` | Planned for later |
+| Desktop | Electron | `electron/` | Foundation added. Windows and Linux packages build. Viewer screen and install testing are still to come |
+| Android | Capacitor | `android/`, `capacitor.config.ts` | Shell and icons ready. First build and release still to do |
 
 ```mermaid
 flowchart TD
@@ -19,6 +19,20 @@ flowchart TD
     Platform -.-> Electron
     Platform -.-> Cap
 ```
+
+## First release: the PDF viewer
+
+Our first release is a simple PDF viewer. A user opens a PDF from the operating system or a file picker, and reads it. There are no editing tools yet. Tools come in later releases.
+
+Why a viewer first? It uses the whole path (app shell, open a file, show it on screen), so we can test the installers, the file association, signing and the release steps on real devices while tool work continues. See [decision 013](decisions.md).
+
+| Part | Desktop | Android |
+|---|---|---|
+| App shell and icons | Ready | Ready |
+| Build a package | Works (Windows and Linux) | First build still to do |
+| The system hands a PDF to the app | Handoff done (main process to preload) | To do |
+| Viewer screen (shared code in `src/viewer/`) | To do | To do |
+| Tested on real devices | To do | To do |
 
 ## Web
 
@@ -82,7 +96,7 @@ flowchart LR
 - The path can come from the launch arguments, or from a second launch of the app (Electron's single-instance event).
 - Files bigger than 200 MB are not passed on.
 - The main process only reads the file and passes the bytes. It does not change, copy, upload or keep them.
-- **Not done yet:** the screen that receives the file and shows it. The handoff is ready, but the PDF viewer UI is not.
+- **Not done yet:** the screen that receives the file and shows it. The handoff is ready, but the viewer is not. It is the first thing we build (see [First release](#first-release-the-pdf-viewer)).
 
 ### Building packages
 
@@ -110,9 +124,58 @@ Both commands run the Vite and TypeScript build first, and then Electron Builder
 
 ## Android (Capacitor)
 
+The Android shell is ready: the Capacitor project and the app icons are done. What is left is the first build and release, with the viewer inside.
+
+### Files
+
+| File | What it does |
+|---|---|
+| `android/` | The Capacitor Android project. Native config only, no PDF logic |
+| `capacitor.config.ts` | Capacitor settings: app id, app name and the web build folder (`dist`) |
+| `src/platform/capacitor.ts` | React-side code that talks to Capacitor. Tools and the viewer use it only through the platform adapter (to be added with the viewer) |
+
 - Capacitor puts `dist/` inside a WebView.
-- File picking and sharing use Capacitor plugins, called only from `platform/`.
-- Try it on a low-end phone if you can. Big PDFs can use up the WebView memory, so workers and transferable buffers are important.
+- The Android build uses `HashRouter` and `base: "./"`, like Electron (see [decision 012](decisions.md)).
+- File picking, saving and sharing use Capacitor plugins, called only from `platform/`.
+
+### Building the app
+
+The usual Capacitor steps are below. Please check the scripts in `package.json` for the exact commands.
+
+```bash
+# 1. build the web app in packaged mode (see Web above)
+npx cap sync android    # 2. copy dist/ into the Android project
+npx cap open android    # 3. open Android Studio, then build the APK
+```
+
+### Opening a PDF from the phone
+
+```mermaid
+flowchart LR
+    A["User taps a PDF in a file manager"] --> B["Android opens InTab PDF (intent filter for application/pdf)"]
+    B --> C["Native side gets the file"]
+    C --> D["Read the bytes (size limit)"]
+    D --> E["Pass them to the WebView"]
+    E --> F["platform/capacitor.ts"]
+    F --> G["Viewer shows the PDF"]
+```
+
+- The app must declare that it can open `application/pdf` in the Android manifest.
+- Like on desktop, the native side only reads the file and passes the bytes. It does not change, copy, upload or keep them.
+- **Not done yet:** this whole flow. It is built together with the viewer.
+
+### Security and privacy settings
+
+- No Capacitor plugin that talks to a server (push notifications, analytics, Firebase, crash reporting).
+- Worth checking: can we remove the `INTERNET` permission from the manifest? Test that the app still works, then write the result in the [decisions log](decisions.md).
+- **Never commit the signing key** (keystore) or its passwords. Keep them outside the repo. See the [maintainer guide](maintainer-guide.md).
+- Never commit built APK or AAB files.
+
+### Android rules
+
+- Keep the native side very small: handling the intent, reading the file and passing the bytes. **No PDF logic in Kotlin or Java.**
+- Do not use Capacitor APIs in the React code. If the screen needs something from the system, add it in `platform/capacitor.ts`.
+- Try it on a low-end phone if you can. Big PDFs can use up the WebView memory.
 - Use `android:` in commit messages.
 
 ## Simple rule

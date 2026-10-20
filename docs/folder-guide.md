@@ -36,19 +36,20 @@ intabpdf/
 │   │   ├── split/       (example)
 │   │   ├── registry.ts  The one list of tools
 │   │   └── types.ts     ToolDefinition and worker message types
+│   ├── viewer/          The PDF viewer screen (not a tool)
 │   ├── pages/           Screens that are not tools (Home, Donate, About)
 │   ├── components/      Shared UI
 │   ├── hooks/           Shared React hooks (later)
-│   ├── styles/          Global CSS and theme variables (later)
+│   ├── styles/          Global CSS and theme variables (tokens.css, base.css)
 │   ├── assets/          Images and fonts imported by code
 │   ├── App.tsx          Router
 │   └── main.tsx         Entry point
-├── src-tauri/           Desktop app (later)
-├── android/             Android app (later)
+├── electron/            Desktop app shell (main process and preload)
+├── android/             Android app shell (Capacitor)
 └── docs/                These documents
 ```
 
-> **Note:** `core/`, `platform/`, `components/`, `pages/` and `assets/` already exist in the repo. `tools/`, `hooks/` and `styles/` are added with the first tool. The old `src/workers/` folder is **not** part of the plan: each tool keeps its own worker inside its tool folder (see [Architecture](architecture.md#web-workers)). Starter files from the Vite template, like `src/App.css`, are removed when the first tool is built.
+> **Note:** `core/`, `platform/`, `components/`, `pages/`, `assets/` and `styles/` already exist in the repo. `viewer/` is added with the first release (the PDF viewer). `tools/` and `hooks/` are added with the first tool. The old `src/workers/` folder is **not** part of the plan: each tool keeps its own worker inside its tool folder (see [Architecture](architecture.md#web-workers)). Starter files from the Vite template, like `src/App.css`, are removed when the first tool is built.
 
 ## Folder by folder
 
@@ -56,12 +57,12 @@ intabpdf/
 
 - **Purpose:** All PDF logic, like merge, split, rotate and compress.
 - **Keep here:** Pure functions (bytes in, bytes out), their types, small helpers, tests and tiny test PDFs.
-- **Avoid:** React, `document` or `window`, Tauri or Capacitor imports, file paths, UI text.
+- **Avoid:** React, `document` or `window`, Electron or Capacitor imports, file paths, UI text.
 
 ### `src/platform/`
 
 - **Purpose:** One interface for things that differ per platform: pick files, save files, share.
-- **Keep here:** The interface, one version each for web, Tauri and Capacitor, and the code that detects where the app runs.
+- **Keep here:** The interface, one version each for web, Electron and Capacitor, and the code that detects where the app runs.
 - **Avoid:** PDF logic, tool-specific code, UI.
 
 ### `src/tools/<name>/`
@@ -69,6 +70,12 @@ intabpdf/
 - **Purpose:** Everything for one tool, so people can build tools without stepping on each other.
 - **Keep here:** `<Name>Page.tsx`, `<name>.worker.ts`, `index.ts` (id, name, icon, route) and small components used only by this tool. Outside the tool folders, `tools/` also has `registry.ts` (the list of tools) and `types.ts` (shared tool types).
 - **Avoid:** PDF logic (it goes to `core`), imports from another tool, platform checks.
+
+### `src/viewer/`
+
+- **Purpose:** The PDF viewer screen: open one PDF, look at it, move between pages, zoom. It is a screen, not a tool, so it is not in the registry (see [decision 014](decisions.md)).
+- **Keep here:** `ViewerPage.tsx`, the plain code that draws pages with `pdfjs-dist` (for example `renderPage.ts`), and small components used only by the viewer.
+- **Avoid:** PDF editing logic (it goes to `core`), imports from a tool, platform checks. Drawing pages needs a canvas, so this code cannot live in `core`. Keep it in plain `.ts` files and out of the React component.
 
 ### `src/components/`
 
@@ -104,11 +111,11 @@ intabpdf/
 - **Purpose:** Files copied as they are: favicon, app icons, `manifest`. Files here are not processed by Vite and are not imported in code.
 - **Good to remember:** Keep files small, and no third-party scripts or remote links.
 
-### `src-tauri/` and `android/`
+### `electron/` and `android/`
 
-- **Purpose:** The desktop and Android apps that wrap the web build. We will add these later.
-- **Keep here:** Only config, window setup and file or share plugins.
-- **Avoid:** PDF logic. It stays in TypeScript.
+- **Purpose:** The desktop and Android apps that wrap the web build.
+- **Keep here:** Only config, window setup, opening and saving files, and the icons. In `electron/`: `main.cjs` and `preload.cjs`. In `android/`: the Capacitor project.
+- **Avoid:** PDF logic. It stays in TypeScript. Never commit signing keys, keystores or built installers.
 
 ### Root files
 
@@ -123,7 +130,7 @@ intabpdf/
 | `LICENSE` | Project licence. Libraries we use must be compatible with it. |
 | `README.md` | The front page of the project. |
 | `SECURITY.md` | How to report a security or privacy problem privately. |
-| `capacitor.config.ts` | Capacitor settings (added with the Android app). |
+| `capacitor.config.ts` | Capacitor settings: app id, app name and the web build folder. |
 
 ## Where do types go?
 

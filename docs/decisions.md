@@ -133,3 +133,23 @@ Context: Decision 004 said "BrowserRouter and HashRouter" but did not say where 
 Decision: The web build uses `BrowserRouter`. The Electron and Capacitor builds use `HashRouter`. We make this choice in one place inside `src/platform/` (for example an `AppRouter` component). Tools and pages just use normal React Router links and routes. The choice is made at build time, not while the app runs. The Vite `base` setting follows the same choice: `/` for web and `./` for packaged apps.
 
 Consequences: The web gets clean URLs, and the desktop and Android apps have working routes. No platform check is needed outside `platform/`. The web host must serve `index.html` for unknown paths. GitHub Pages needs a `404.html` copy, and Netlify and Cloudflare Pages need a rewrite rule. Clean URLs alone do not give good SEO. We also need a title and description for each page, and maybe pre-rendering of the main pages. We will decide this when the first tools are ready. We now have two build modes (web and packaged), so the Electron and Capacitor scripts must use the packaged one.
+
+## 013: First release is a PDF viewer
+
+Status: accepted
+
+Context: The desktop and Android shells are ready (packaging and icons), but no tool exists yet. The first tools (merge and others) need shared parts first: tool types, the registry, the worker hook and the app shell. That takes time. We want something useful to release early, so we can test installers, file opening, signing and the release steps on real devices.
+
+Decision: The first release is a simple PDF viewer for the desktop and Android apps (the web gets it from the same code). A user can open a PDF from the operating system or a file picker, read it, move between pages and zoom. No editing. Tools are built after that, in separate PRs.
+
+Consequences: We test the whole path from shell to screen early, and users have a reason to install. Tool work can run in parallel once the viewer lands. A viewer is not our main promise (PDF tools), so release notes must say clearly what is included and what is coming. We add `pdfjs-dist` before any tool exists (see [Dependencies](dependencies.md)).
+
+## 014: The viewer lives in `src/viewer/`
+
+Status: accepted
+
+Context: The viewer is a screen, not a tool: it makes no output file and is not in the registry. It draws pages on a canvas with `pdfjs-dist`, which needs the DOM, so it cannot go in `core` (decision 001 and the rules in [Architecture](architecture.md) keep `core` free of the DOM). `src/pages/` is only for screens without PDF code (decision 008).
+
+Decision: The viewer gets its own folder, `src/viewer/`, with its page, the plain code that talks to `pdfjs-dist`, and viewer-only components. Its route is added in `App.tsx` directly, not from the registry. The PDF.js worker is bundled locally. The viewer does not import tools, and tools do not import the viewer. If a tool later needs page previews, we move the shared drawing code to `components/` or `hooks/`, the lowest folder both can import from.
+
+Consequences: One place to look for everything about the viewer. It is the one folder where PDF-related code may use the canvas. Rule 4 still holds: drawing code stays in plain `.ts` files, not inside React components. Reviewers need to watch this by hand for now (see decision 007).
