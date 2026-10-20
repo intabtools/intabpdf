@@ -2,7 +2,7 @@
 
 This page explains how we plan to arrange the code. It is a plan to keep things simple as the project grows, not a strict law. If you feel something should change, please open an issue and tell us.
 
-InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Electron desktop app and the Capacitor Android app (Android is planned for later).
+InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Electron desktop app and the Capacitor Android app (the Android shell is ready, and the first build is next).
 
 ## What we want from this code
 
@@ -28,6 +28,8 @@ flowchart TD
     Tools --> Platform["platform (open, save, share)"]
     Tools --> Workers["tool workers"]
     Workers --> Core["core (PDF logic)"]
+    Viewer["viewer (PDF viewer screen)"] --> Components
+    Viewer --> Platform
 ```
 
 The arrows show who can use whom. Code flows in **one direction only**. `core` sits at the bottom and knows nothing about the rest of the app. `pages` are the non-tool screens: they may use `components` and read the tool list, but they never contain PDF logic.
@@ -91,6 +93,15 @@ type WorkerResponse<R> =
 // For long jobs you can also send: { id: string; progress: number }
 ```
 
+## The viewer
+
+The PDF viewer is a screen, not a tool. It opens one PDF and shows it. It lives in its own folder, `src/viewer/`, and is not in the tool registry (see [decision 014](decisions.md)).
+
+- It draws pages onto a canvas with `pdfjs-dist`. Canvas needs the DOM, so this code cannot be in `core`.
+- Rule 4 still holds: the drawing code lives in plain `.ts` files in `src/viewer/`, not inside the React component.
+- It gets files only through the platform adapter, so it works the same on web, Electron and Capacitor.
+- The PDF.js worker file is bundled with the app. Nothing loads from a CDN.
+
 ## Platform adapter
 
 `platform/` hides the difference between browser, Electron and Capacitor. Tools only talk to this interface and never check which platform they are on.
@@ -101,6 +112,9 @@ export interface PlatformAdapter {
   pickFiles(opts: { accept: string[]; multiple: boolean }): Promise<File[]>;
   saveFile(bytes: Uint8Array, suggestedName: string): Promise<void>;
   share?(bytes: Uint8Array, name: string): Promise<void>;
+  // Called when the operating system opens a PDF with our app (desktop and Android).
+  // Returns a function that stops listening.
+  onFileOpened?(handler: (file: { name: string; bytes: Uint8Array }) => void): () => void;
 }
 ```
 
@@ -115,6 +129,8 @@ The desktop app is a thin Electron shell around the same web build.
 - `src/platform/electron.ts` is the only React-side file that talks to this bridge.
 
 The main process does only window and file work. **No PDF logic lives there.** Tools never talk to Electron directly. They use the platform adapter. See [Platforms](platforms.md) for the full desktop flow.
+
+The Android app is a Capacitor shell around the same web build. `android/` holds only native config and the small code that receives a PDF from Android and passes its bytes to the screen. **No PDF logic lives in Kotlin or Java.** `src/platform/capacitor.ts` is the only React-side file that talks to Capacitor.
 
 ## Tool registry
 
@@ -138,6 +154,8 @@ flowchart LR
 | Lazy loading | Loading a page or library only when the user opens it. We use dynamic `import()` for this. |
 | Adapter | A small layer that gives the same functions on different platforms. `platform/` is our adapter. |
 | Electron | A way to make a desktop app from a web app. It comes with its own Chromium browser, so the app behaves the same on every desktop system. |
+| Capacitor | A way to make an Android app from a web app. It puts our web build inside a WebView. |
+| Intent filter | An Android setting that tells the system which file types an app can open, for example PDF files. |
 | Main process | The Electron part that runs outside the web page. It makes the window and reads files. It lives in `electron/main.cjs`. |
 | Preload script | A small script that gives the web page a safe and limited bridge to the main process. |
 | IPC | Inter-process communication. The way the main process and the web page send messages to each other. |

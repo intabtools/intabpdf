@@ -33,6 +33,8 @@ core: add page rotation to merge
 ui: fix drag-and-drop highlight in dark theme
 desktop: open pdf files passed at launch
 android: request storage permission on file pick
+android: open pdf files from the file manager
+ui: add pdf viewer page
 build: split pdf worker into separate chunk
 build: add windows nsis and zip targets
 deps: update pdf-lib

@@ -2,7 +2,7 @@
 
 Each tool lives in its own folder. This way two people can build two different tools without touching the same files.
 
-No tool exists yet. When the Merge tool is ready, it will become the reference to copy from. Until then, this page shows the idea using a small `rotate` tool as an example.
+No tool exists yet. Our first release is the PDF viewer, which is a screen and not a tool (see [decision 013](decisions.md)), so it is not the reference either. When the Merge tool is ready, it will become the reference to copy from. Until then, this page shows the idea using a small `rotate` tool as an example.
 
 ## The steps
 

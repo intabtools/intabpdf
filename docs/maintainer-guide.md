@@ -38,7 +38,7 @@ flowchart TD
 Look at the most important things first. If privacy or structure has a problem, there is no need to review style yet.
 
 1. **Privacy.** Search the PR for `fetch(`, `XMLHttpRequest`, `WebSocket`, `sendBeacon`, new `<script>` tags, analytics packages and remote URLs. Anything found needs a clear reason, or the PR cannot be merged.
-2. **Structure.** Is the code in the right folder? See the [folder guide](folder-guide.md). Does `core` stay clean? Does any tool import another tool? Is there any platform check outside `platform/`? For changes in `electron/`: are context isolation and sandbox still on, and Node integration still off? Does the preload give the screen only the few functions it needs?
+2. **Structure.** Is the code in the right folder? See the [folder guide](folder-guide.md). Does `core` stay clean? Does any tool import another tool? Is there any platform check outside `platform/`? For changes in `electron/`: are context isolation and sandbox still on, and Node integration still off? Does the preload give the screen only the few functions it needs? For changes in `android/`: no new permissions, no plugin that talks to a server, and no PDF logic in native code.
 3. **Does it work?** Does it do what the issue asked? Try the branch with a normal file, a bad file and a large file.
 4. **Tests.** Does new `core` logic have tests, including bad inputs?
 5. **Readability and user experience.** Can another student understand this in a few minutes? Clear names, simple code, a short comment at the top of new files, good error messages, works on a small screen and with the keyboard. See [Code quality](code-quality.md).
@@ -57,7 +57,7 @@ Look at the most important things first. If privacy or structure has a problem, 
 | Rule | Detail |
 |---|---|
 | Checks pass | Lint, build and tests (once CI is set up) |
-| Approvals | 1 approval is enough. For changes to `core/`, `platform/`, `electron/`, `registry.ts`, build config, CI or libraries, please try to get a second maintainer to look, if one is available |
+| Approvals | 1 approval is enough. For changes to `core/`, `platform/`, `electron/`, `android/`, `registry.ts`, build config, CI or libraries, please try to get a second maintainer to look, if one is available |
 | Merge type | Squash merge. The final commit message follows `area: description` |
 | Your own PR | Please get another person to review it, except for tiny typo fixes |
 | `main` branch | Please do not push directly, even if you are a maintainer |
@@ -132,6 +132,7 @@ Once there is code, a quick look at these is enough:
 - [ ] Library licences are still compatible
 - [ ] Bundle size has no big surprise
 - [ ] Electron and Electron Builder are up to date (Electron comes with Chromium, so security fixes matter)
+- [ ] Capacitor, its plugins and the Android build setup are up to date
 - [ ] No `fetch(` or third-party scripts in the code (search the repo)
 - [ ] CI is passing on `main`
 - [ ] Old open PRs have been answered
@@ -165,7 +166,9 @@ Before releasing:
 - [ ] Tried in Chrome, Firefox and Safari if possible
 - [ ] Desktop packages built with `npm run dist` and `npm run dist:win`
 - [ ] Installed on Windows and Linux, and a PDF opened through the operating system (check the file association after install)
-- [ ] Tried on an Android phone, once the Android app exists
+- [ ] Android: APK built, signed with the release key and installed on a real phone (a low-end one if possible)
+- [ ] Android: a PDF opened from the file manager opens in InTab PDF
+- [ ] Android: no new permissions in the manifest compared with the last release
 - [ ] Changelog written in simple words
 - [ ] Version bumped with a `release:` commit and tagged
 - [ ] Docs updated
@@ -185,6 +188,7 @@ Students get busy with exams, jobs and moving to new cities. That is completely 
 - Tell others in advance if you can.
 - Hand over your open reviews and release tasks.
 - Update repository access (and `CODEOWNERS`, once we have it).
+- Make sure someone else has a safe backup of the Android signing key. If it is lost, users cannot update the app. The key must never be in the repo.
 - Write down anything only you know in these docs.
 
 ## Red flags
@@ -197,5 +201,7 @@ Please stop and discuss with the team if you see any of these:
 - PDF logic being written in the Electron main process or in Kotlin
 - Electron security settings made weaker (context isolation or sandbox turned off, Node integration turned on)
 - Electron crash reporter, auto-updater or anything else in the shell that talks to a server
+- A new Android permission (especially `INTERNET`), or a Capacitor plugin that talks to a server (push, analytics, Firebase, crash reports)
+- A signing key, keystore or password committed to the repo
 - A giant PR that nobody can review properly
 - The same bug fixed in two places because code was copied
