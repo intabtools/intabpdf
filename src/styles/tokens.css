@@ -1,0 +1,55 @@
+/* design tokens: colors, font and sizes for light and dark mode */
+
+:root {
+    /* surfaces */
+    --header: #E2E7FA;
+    --background: #F2F4FA;
+    --surface: #FFFFFF;
+    --surface-2: #E7EAF5;
+
+    /* text and lines */
+    --text: #0E1330;
+    --text-muted: #5A6180;
+    --border: #D9DDEC;
+
+    /* accent */
+    --accent: #0B2EA8;
+    --button: #0B2EA8;
+    --accent-soft: #E4E9FF;
+    --banner: #0B2EA8;
+
+    /* success */
+    --success: #16794A;
+    --success-soft: #DDF3E6;
+
+    /* fonts */
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* corner sizes */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 14px;
+
+}
+
+:root[data-theme="dark"] {
+    --header: #181D2F;
+    --background: #0A0C14;
+    --surface: #10131D;
+    --surface-2: #181C29;
+
+    --text: #E8EBF5;
+    --text-muted: #8C94B0;
+    --border: #212638;
+
+    --accent: #AAB8FF;
+    --button: #4F63F0;
+    --accent-soft: rgba(170, 184, 255, 0.12);
+    --banner: #14208A;
+
+    --success: #6FD3A0;
+    --success-soft: rgba(63, 185, 120, 0.16);
+
+
+}
