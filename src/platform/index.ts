@@ -26,6 +26,20 @@ function pickPdfFromInput(): Promise<OpenedFile | null> {
     });
 }
 
+export function uint8ArrayToBase64(bytes: Uint8Array): string {
+    const CHUNK_SIZE = 0x8000;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        chunks.push(
+            String.fromCharCode.apply(
+                null,
+                bytes.subarray(i, i + CHUNK_SIZE) as unknown as number[]
+            )
+        );
+    }
+    return btoa(chunks.join(''));
+}
+
 function base64ToUint8Array(base64: string): Uint8Array {
     const clean = base64.includes(',') ? base64.split(',')[1] : base64;
     const binary = atob(clean);
@@ -168,27 +182,43 @@ export const platform: PlatformAdapter = {
         // 1. Native Capacitor Android/iOS runtime
         if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
             try {
-                let binary = '';
-                const len = bytes.byteLength;
-                for (let i = 0; i < len; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                const base64Data = btoa(binary);
+                const base64Data = uint8ArrayToBase64(bytes);
 
+                // Attempt to write permanently to user Documents
+                let documentsSaved = false;
+                try {
+                    await Filesystem.writeFile({
+                        path: fileName,
+                        data: base64Data,
+                        directory: Directory.Documents,
+                        recursive: true,
+                    });
+                    documentsSaved = true;
+                } catch (docErr) {
+                    console.warn('Could not write directly to Documents directory:', docErr);
+                }
+
+                // Also write to Cache so native share/view providers have immediate access
                 const writeResult = await Filesystem.writeFile({
                     path: fileName,
                     data: base64Data,
                     directory: Directory.Cache,
+                    recursive: true,
                 });
 
+                // Present the native Android Share sheet
                 const { Share } = await import('@capacitor/share');
                 const canShare = await Share.canShare().then((r) => r.value).catch(() => false);
                 if (canShare) {
                     await Share.share({
                         title: fileName,
                         url: writeResult.uri,
-                        dialogTitle: `Save ${fileName}`,
+                        dialogTitle: `Save or Share ${fileName}`,
                     });
+                    return;
+                }
+
+                if (documentsSaved) {
                     return;
                 }
             } catch (nativeErr) {

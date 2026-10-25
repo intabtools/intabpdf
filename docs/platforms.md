@@ -116,7 +116,24 @@ To best fit the constraints and strengths of each environment, InTabPDF uses tai
 
 ---
 
-## 6. Build Commands
+## 6. File Saving & Sharing Strategies
+
+File saving across platforms is coordinated through `platform.saveFile()` in [src/platform/index.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/index.ts):
+
+### Android Mobile (Capacitor)
+- **Chunked Base64 Encoding:** High-resolution or multi-page PDFs can reach tens of megabytes. To prevent memory bottlenecks and call-stack limits, byte streams are encoded using 32 KB chunked buffers (`uint8ArrayToBase64`).
+- **Direct Documents Persistence:** Files are written directly to `Directory.Documents` via the Capacitor Filesystem plugin.
+- **System Share Sheet Integration:** The file is mirrored to `Directory.Cache`, allowing Android's FileProvider to pass a content URI to `@capacitor/share`. Users can immediately save to Google Drive, send via email, or open in another viewer.
+- **Fail-Safe Fallback:** If native file system or sharing operations encounter restrictions, the adapter automatically falls back to an HTML5 anchor download.
+
+### Web Browser & Electron Desktop
+- Generates an in-memory `Blob` matching the file's MIME type.
+- Creates an invisible DOM `<a>` tag with the `download` attribute set to the sanitized filename.
+- Programmatically triggers the download and schedules `URL.revokeObjectURL()` cleanup after 5 seconds to prevent browser memory leaks.
+
+---
+
+## 7. Build Commands
 
 ```bash
 # Web development server

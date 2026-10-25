@@ -1,3 +1,4 @@
+// Top application header coordinating sidebar toggles, breadcrumb navigation, search, and theme switching.
 import type { ReactNode } from 'react';
 import { ChevronLeft, Menu, Moon, Search, Sun } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -59,6 +60,7 @@ export default function AppHeader({
           className="ib bk"
           onClick={() => navigate(-1)}
           aria-label="Back to previous page"
+          title="Back to previous page"
         >
           <ChevronLeft size={24} strokeWidth={1.8} />
         </button>
@@ -78,6 +80,7 @@ export default function AppHeader({
         className="hs"
         onClick={onOpenPalette}
         aria-label="Search tools (Ctrl+K)"
+        title="Search tools (Ctrl+K)"
       >
         <Search size={18} strokeWidth={1.8} />
         <span>Search tools</span>
@@ -89,6 +92,7 @@ export default function AppHeader({
         className="ib hsi"
         onClick={onOpenPalette}
         aria-label="Search tools"
+        title="Search tools"
       >
         <Search size={22} strokeWidth={1.8} />
       </button>

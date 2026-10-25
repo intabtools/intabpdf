@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import packageJson from '../../package.json';
 import {
   APP_CONFIG,
+  APP_VERSION,
   getDefaultShellVisibility,
   getInitialDestination,
   isScreenEnabled,
   resolveDestination,
-} from './screens';
+} from './index';
 
 describe('config/screens', () => {
+  it('maintains dynamic version consistency between package.json and application constant', () => {
+    expect(APP_VERSION).toBe(packageJson.version);
+    expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+/);
+  });
   it('provides configuration for all platforms and screens', () => {
     expect(APP_CONFIG.enabledScreens.home).toBe(true);
     expect(APP_CONFIG.enabledScreens.viewer).toBe(true);

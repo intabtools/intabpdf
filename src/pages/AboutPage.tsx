@@ -1,7 +1,9 @@
+// About page presenting privacy guarantees, FAQ, open-source repository link, and dynamic version.
 import type { ReactNode } from 'react';
 import { Code2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useShell } from '../hooks/useShell';
+import { APP_VERSION } from '../config';
 
 const FAQ_ITEMS = [
   {
@@ -49,7 +51,7 @@ export default function AboutPage(): ReactNode {
             <Code2 size={18} />
             <span>View source</span>
           </a>
-          <small className="mu">Version 0.1.0, MIT license</small>
+          <small className="mu">Version {APP_VERSION}, MIT license</small>
         </div>
       </section>
 

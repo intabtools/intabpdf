@@ -1,4 +1,6 @@
+// Bottom desktop status bar displaying license, dynamic application version, and shortcuts.
 import type { ReactNode } from 'react';
+import { APP_VERSION } from '../config';
 
 interface StatusBarProps {
   onSwitchToWeb?: () => void;
@@ -8,7 +10,7 @@ export default function StatusBar({ onSwitchToWeb }: StatusBarProps): ReactNode 
   return (
     <footer className="stb" aria-label="Status bar">
       <span>MIT</span>
-      <span>v1.0.0</span>
+      <span>v{APP_VERSION}</span>
       {Boolean(import.meta.env.DEV) && onSwitchToWeb && (
         <button
           type="button"

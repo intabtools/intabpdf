@@ -1977,6 +1977,7 @@ details p {
   }
 }
 
+/* Viewport-level fallback mirroring `@container app (min-width: 900px)` for runtimes and test environments */
 @media (min-width: 900px) {
   .body {
     position: relative;
@@ -2139,6 +2140,7 @@ details p {
   }
 }
 
+/* Viewport-level fallback mirroring `@container app (min-width: 1200px)` */
 @media (min-width: 1200px) {
   .tp {
     grid-template-columns: minmax(0, 1fr) 360px;

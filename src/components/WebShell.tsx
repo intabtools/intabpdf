@@ -1,3 +1,4 @@
+// Web layout shell for standalone browser usage with sticky navigation header, breadcrumbs, and footer.
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Moon, Search, Sun } from 'lucide-react';
@@ -5,6 +6,7 @@ import { Link, useLocation } from 'react-router-dom';
 import CommandPalette from './CommandPalette';
 import Logo from './Logo';
 import { useShell } from '../hooks/useShell';
+import { APP_VERSION } from '../config';
 
 interface WebShellProps {
   children: ReactNode;
@@ -189,7 +191,7 @@ export default function WebShell({
               </a>
             </div>
 
-            <small className="wfc">MIT license, version 0.1.0</small>
+            <small className="wfc">MIT license, version {APP_VERSION}</small>
           </div>
         </footer>
       </div>
