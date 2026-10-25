@@ -1938,8 +1938,14 @@ details p {
   }
   .t1 {
     flex: 0 0 auto;
-    min-width: 200px;
+    min-width: 0;
     font-size: 20px;
+  }
+  .sub .hb {
+    display: flex !important;
+  }
+  .sub .hc {
+    display: none !important;
   }
   .hs {
     position: absolute;
@@ -2094,8 +2100,14 @@ details p {
   }
   .t1 {
     flex: 0 0 auto;
-    min-width: 200px;
+    min-width: 0;
     font-size: 20px;
+  }
+  .sub .hb {
+    display: flex !important;
+  }
+  .sub .hc {
+    display: none !important;
   }
   .hs {
     position: absolute;

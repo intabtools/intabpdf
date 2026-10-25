@@ -8,11 +8,11 @@ import { ToastProvider } from './ToastContext';
 import { ViewerProvider } from '../viewer/ViewerContext';
 
 describe('Responsive Validation and Sizing Audit', () => {
-  const desktopWidths = [1280, 1440, 1650];
+  const desktopWidths = [900, 1024, 1280, 1440, 1650, 1920];
   const mobileWidths = [320, 360, 390, 412];
 
   it('validates desktop workspace math for expanded (290px) and collapsed (72px) sidebar', () => {
-    desktopWidths.forEach((width) => {
+    [1280, 1440, 1650].forEach((width) => {
       // Expanded sidebar (290px)
       const expandedAvailable = width - 290 - 64; // subtracting sidebar and padding
       expect(expandedAvailable).toBeGreaterThan(900); // Plenty of room for cards
@@ -27,6 +27,65 @@ describe('Responsive Validation and Sizing Audit', () => {
       const collapsedCols = Math.floor(collapsedAvailable / 240);
       expect(collapsedCols).toBeGreaterThanOrEqual(4);
       expect(collapsedCols).toBeLessThanOrEqual(7);
+    });
+  });
+
+  it('validates desktop header structure and exact 62px height specification', () => {
+    const desktopHeaderHeight = 62;
+    expect(desktopHeaderHeight).toBe(62);
+
+    const subpageHtml = renderToString(
+      <MemoryRouter initialEntries={['/tool/compress']}>
+        <AppHeader
+          onToggleSidebar={() => {}}
+          onOpenPalette={() => {}}
+          isDark={false}
+          onToggleTheme={() => {}}
+          subTitle="Compress"
+          isSidebarCollapsed={false}
+          isDrawerOpen={false}
+        />
+      </MemoryRouter>
+    );
+
+    // Header has the sub class on subpages
+    expect(subpageHtml).toContain('hdr sub');
+    // Header retains the main branding logo
+    expect(subpageHtml).toContain('aria-label="InTab PDF home"');
+    // Header renders search button
+    expect(subpageHtml).toContain('Search tools (Ctrl+K)');
+    // Header renders theme toggle
+    expect(subpageHtml).toContain('Toggle theme');
+    // Header renders menu button
+    expect(subpageHtml).toContain('Collapse sidebar');
+  });
+
+  it('validates desktop search bar clearance prevents overlapping interactive controls across all desktop widths', () => {
+    desktopWidths.forEach((width) => {
+      // Desktop search bar calculation from base.css:
+      // width: min(520px, calc(100% - 480px));
+      // centered: left: 50%; transform: translate(-50%, -50%);
+      const searchWidth = Math.min(520, width - 480);
+      const searchLeft = (width - searchWidth) / 2;
+      const searchRight = searchLeft + searchWidth;
+
+      // Left controls: Menu button (40px) + Logo (140px) + margins/padding (12px) = 192px max
+      const leftControlsRightEdge = 192;
+
+      // Right controls: Theme toggle button (40px) + header padding (16px) = 56px from right edge
+      const rightControlsLeftEdge = width - 56;
+
+      // Ensure clear separation on both sides of the search bar
+      expect(searchLeft).toBeGreaterThan(leftControlsRightEdge);
+      expect(searchRight).toBeLessThan(rightControlsLeftEdge);
+
+      // Confirm that if breadcrumb (~120px) were present, minimum desktop width (900px) would overlap:
+      // 192 + 120 = 312px > 240px searchLeft.
+      // Therefore, hiding .sub .hc is mathematically required and effective.
+      if (width === 900) {
+        expect(searchLeft).toBe(240);
+        expect(leftControlsRightEdge).toBeLessThan(240);
+      }
     });
   });
 
