@@ -10,6 +10,7 @@ import {
   imagesToPdf,
   mergePdfs,
   parsePageRanges,
+  parseRemovePageInput,
   removePdfPages,
   rotatePdfPages,
   splitPdfPages,
@@ -156,6 +157,77 @@ describe('PDF Core Operations', () => {
 
       const resultDoc = await PDFDocument.load(trimmedBytes);
       expect(resultDoc.getPageCount()).toBe(2);
+    });
+
+    describe('parseRemovePageInput', () => {
+      it('rejects empty and whitespace-only input without silently removing page 1', () => {
+        expect(parseRemovePageInput('', 5).error).toBeTruthy();
+        expect(parseRemovePageInput('   ', 5).error).toBeTruthy();
+        expect(parseRemovePageInput('', 5).indices).toEqual([]);
+      });
+
+      it('rejects non-integer, negative, or malformed inputs', () => {
+        expect(parseRemovePageInput('abc', 5).error).toBeTruthy();
+        expect(parseRemovePageInput('1, foo', 5).error).toBeTruthy();
+        expect(parseRemovePageInput('0', 5).error).toBeTruthy();
+        expect(parseRemovePageInput('-1', 5).error).toBeTruthy();
+        expect(parseRemovePageInput('1-a', 5).error).toBeTruthy();
+      });
+
+      it('rejects reversed ranges such as 4-2', () => {
+        const res = parseRemovePageInput('4-2', 5);
+        expect(res.error).toContain('Reversed range');
+        expect(res.indices).toEqual([]);
+      });
+
+      it('rejects pages exceeding the total document page count', () => {
+        const res1 = parseRemovePageInput('6', 5);
+        expect(res1.error).toContain('exceeds total document page count (5)');
+
+        const res2 = parseRemovePageInput('2-7', 5);
+        expect(res2.error).toContain('exceeds total document page count (5)');
+      });
+
+      it('rejects attempts to remove all pages from a document', () => {
+        const resAll = parseRemovePageInput('1-5', 5);
+        expect(resAll.error).toContain('Cannot remove all 5 pages');
+        expect(resAll.indices).toEqual([]);
+
+        const resSingle = parseRemovePageInput('1', 1);
+        expect(resSingle.error).toContain('Cannot remove all 1 pages');
+      });
+
+      it('supports dash ranges such as 1-3', () => {
+        const res = parseRemovePageInput('1-3', 5);
+        expect(res.error).toBeUndefined();
+        expect(res.pageNumbers).toEqual([1, 2, 3]);
+        expect(res.indices).toEqual([0, 1, 2]);
+        expect(res.remainingCount).toBe(2);
+      });
+
+      it('supports single pages and comma-separated combinations', () => {
+        const res = parseRemovePageInput('1, 3, 5', 5);
+        expect(res.error).toBeUndefined();
+        expect(res.pageNumbers).toEqual([1, 3, 5]);
+        expect(res.indices).toEqual([0, 2, 4]);
+        expect(res.remainingCount).toBe(2);
+      });
+
+      it('supports mixed ranges and single pages', () => {
+        const res = parseRemovePageInput('1-2, 4', 5);
+        expect(res.error).toBeUndefined();
+        expect(res.pageNumbers).toEqual([1, 2, 4]);
+        expect(res.indices).toEqual([0, 1, 3]);
+        expect(res.remainingCount).toBe(2);
+      });
+
+      it('deduplicates overlapping pages cleanly without crashing', () => {
+        const res = parseRemovePageInput('1-3, 2, 3', 5);
+        expect(res.error).toBeUndefined();
+        expect(res.pageNumbers).toEqual([1, 2, 3]);
+        expect(res.indices).toEqual([0, 1, 2]);
+        expect(res.remainingCount).toBe(2);
+      });
     });
   });
 

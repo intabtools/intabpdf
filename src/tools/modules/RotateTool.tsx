@@ -26,10 +26,9 @@ export default function RotateTool({
   const handleRun = async () => {
     await onExecute(async () => {
       const isCw = optionsState['cw'] ?? true;
-      const allPages = optionsState['all-pages'] ?? true;
       return await pdfProcessingService.execute('rotate', {
         buffer: stagedFiles[0].bytes,
-        options: { clockwise: isCw, allPages },
+        options: { clockwise: isCw, allPages: true },
       });
     });
   };

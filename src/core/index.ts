@@ -3,8 +3,8 @@ export { mergePdfs } from './merge';
 export { rotatePdfPages } from './rotate';
 export type { RotateOptions } from './rotate';
 
-export { removePdfPages } from './remove-pages';
-export type { RemovePagesOptions } from './remove-pages';
+export { removePdfPages, parseRemovePageInput } from './remove-pages';
+export type { RemovePagesOptions, ParsedRemovePagesResult } from './remove-pages';
 
 export {
   splitPdfPages,

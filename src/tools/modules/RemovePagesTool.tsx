@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Info, Trash2 } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import type { ToolComponentProps } from '../types';
-import { pdfProcessingService } from '../../core';
+import { getPdfPageCount, parseRemovePageInput, pdfProcessingService } from '../../core';
 
 export default function RemovePagesTool({
   tool,
@@ -17,7 +17,37 @@ export default function RemovePagesTool({
   defaultBaseName,
   outputExtension,
 }: ToolComponentProps): ReactNode {
-  const [removePagesInput, setRemovePagesInput] = useState('1');
+  const [removePagesInput, setRemovePagesInput] = useState('');
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+
+  const file = stagedFiles[0];
+
+  useEffect(() => {
+    let active = true;
+
+    if (file?.bytes) {
+      void getPdfPageCount(file.bytes).then(
+        (count) => {
+          if (!active) return;
+          setPageCount(count);
+          setPageError(null);
+        },
+        (err: unknown) => {
+          if (!active) return;
+          setPageError(err instanceof Error ? err.message : 'Failed to inspect PDF');
+          setPageCount(null);
+        }
+      );
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [file]);
+
+  const effectivePageCount = file?.bytes ? pageCount : null;
+  const effectivePageError = file?.bytes ? pageError : null;
 
   const toggleOption = (id: string) => {
     onOptionsChange({
@@ -26,16 +56,26 @@ export default function RemovePagesTool({
     });
   };
 
-  const handleRun = async () => {
-    await onExecute(async () => {
-      const indices = removePagesInput
-        .split(/[,\s]+/)
-        .map((s) => parseInt(s.trim(), 10) - 1)
-        .filter((n) => !isNaN(n) && n >= 0);
+  const validation = useMemo(() => {
+    if (effectivePageCount === null) return null;
+    return parseRemovePageInput(removePagesInput, effectivePageCount);
+  }, [removePagesInput, effectivePageCount]);
 
+  const isValidToRemove =
+    Boolean(file) &&
+    effectivePageCount !== null &&
+    !effectivePageError &&
+    Boolean(validation) &&
+    !validation?.error &&
+    (validation?.indices.length ?? 0) > 0;
+
+  const handleRun = async () => {
+    if (!isValidToRemove || !file || !validation || validation.indices.length === 0) return;
+
+    await onExecute(async () => {
       return await pdfProcessingService.execute('remove-pages', {
-        buffer: stagedFiles[0].bytes,
-        pageIndices: indices.length > 0 ? indices : [0],
+        buffer: file.bytes,
+        pageIndices: validation.indices,
       });
     });
   };
@@ -47,29 +87,122 @@ export default function RemovePagesTool({
         style={{
           flexDirection: 'column',
           alignItems: 'flex-start',
-          gap: '6px',
+          gap: '8px',
         }}
       >
         <span>
-          Page numbers to remove
-          <small>Comma-separated (e.g. 1, 3)</small>
+          Page numbers or ranges to remove
+          <small>
+            {effectivePageCount !== null
+              ? `Document has ${effectivePageCount} ${effectivePageCount === 1 ? 'page' : 'pages'}. Enter page numbers or ranges (e.g. 1-3, 5)`
+              : 'Enter page numbers or ranges (e.g. 1-3, 5)'}
+          </small>
         </span>
         <input
           type="text"
           value={removePagesInput}
           onChange={(e) => setRemovePagesInput(e.target.value)}
-          placeholder="e.g. 1, 3"
+          placeholder="e.g. 1-3, 5"
           style={{
             width: '100%',
             padding: '6px 10px',
             borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--border)',
+            border: validation?.error
+              ? '1px solid #E81123'
+              : '1px solid var(--border)',
             background: 'var(--surface-2)',
             color: 'var(--text)',
             fontFamily: 'var(--font-mono)',
             fontSize: '13px',
+            boxSizing: 'border-box',
           }}
         />
+
+        {effectivePageCount === 1 && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'flex-start',
+              color: 'var(--text-muted)',
+              fontSize: '12px',
+              lineHeight: '1.4',
+            }}
+          >
+            <Info size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
+            <span>This document has only 1 page. A PDF must have at least one remaining page, so pages cannot be removed.</span>
+          </div>
+        )}
+
+        {effectivePageError && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              alignItems: 'flex-start',
+              color: '#E81123',
+              fontSize: '12px',
+              lineHeight: '1.4',
+            }}
+            role="alert"
+          >
+            <AlertCircle size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
+            <span>{effectivePageError}</span>
+          </div>
+        )}
+
+        {!effectivePageError && effectivePageCount !== null && effectivePageCount > 1 && (
+          <>
+            {validation?.error ? (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '6px',
+                  alignItems: 'flex-start',
+                  color: '#E81123',
+                  fontSize: '12px',
+                  lineHeight: '1.4',
+                }}
+                role="alert"
+              >
+                <AlertCircle size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <span>{validation.error}</span>
+              </div>
+            ) : validation && validation.pageNumbers.length > 0 ? (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '6px',
+                  alignItems: 'center',
+                  color: 'var(--accent)',
+                  fontSize: '12px',
+                }}
+              >
+                <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                <span>
+                  Will remove {validation.pageNumbers.length}{' '}
+                  {validation.pageNumbers.length === 1 ? 'page' : 'pages'} (
+                  {validation.pageNumbers.join(', ')}). {validation.remainingCount}{' '}
+                  {validation.remainingCount === 1 ? 'page' : 'pages'} will remain.
+                </span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '6px',
+                  alignItems: 'flex-start',
+                  color: 'var(--text-muted)',
+                  fontSize: '12px',
+                  lineHeight: '1.4',
+                }}
+              >
+                <Info size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <span>Enter page numbers or ranges like 1-3, 5 to select pages for removal.</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {tool.options.map((opt) => {
@@ -105,7 +238,7 @@ export default function RemovePagesTool({
         type="button"
         className="cta"
         onClick={handleRun}
-        disabled={isProcessing || stagedFiles.length === 0}
+        disabled={isProcessing || !isValidToRemove}
       >
         <Trash2 size={16} />
         <span>

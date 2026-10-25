@@ -123,4 +123,14 @@ describe('tools/registry', () => {
       expect(typeof mod.default).toBe('function');
     }
   });
+
+  it('has truthful options for rotate tool without misleading page-selection claims', () => {
+    const rotate = getToolById('rotate');
+    expect(rotate).toBeDefined();
+    expect(rotate?.options.some((opt) => opt.id === 'all-pages')).toBe(false);
+    expect(rotate?.options.some((opt) => opt.description.includes('lets you pick pages'))).toBe(false);
+    const cwOption = rotate?.options.find((opt) => opt.id === 'cw');
+    expect(cwOption).toBeDefined();
+    expect(cwOption?.description).toContain('all pages');
+  });
 });

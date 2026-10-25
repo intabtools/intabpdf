@@ -99,7 +99,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: 'rotate',
     name: 'Rotate pages',
-    description: 'Turn pages the right way up',
+    description: 'Turn all pages the right way up',
     category: 'Organize',
     icon: 'rotate',
     fileType: 'pdf',
@@ -109,8 +109,12 @@ export const TOOLS: ToolDefinition[] = [
     availability: 'available',
     component: () => import('./modules/RotateTool'),
     options: [
-      { id: 'cw', label: 'Turn clockwise', description: 'Off turns pages anticlockwise', defaultValue: true },
-      { id: 'all-pages', label: 'Rotate every page', description: 'Off lets you pick pages', defaultValue: true },
+      {
+        id: 'cw',
+        label: 'Turn clockwise',
+        description: 'Off turns anticlockwise (rotates all pages in the document)',
+        defaultValue: true,
+      },
     ],
   },
   {

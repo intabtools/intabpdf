@@ -85,7 +85,7 @@ function ToolRouteGuard() {
     return <Navigate to={resolved} replace />;
   }
 
-  return <ToolPage />;
+  return <ToolPage key={location.pathname} />;
 }
 
 export default function App(): ReactNode {

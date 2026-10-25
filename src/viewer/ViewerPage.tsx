@@ -234,6 +234,10 @@ export default function ViewerPage(): ReactNode {
     const requestId = ++loadRequestRef.current;
     let doc: PdfDocument | null = null;
     let adopted = false;
+    setPdfDoc(null);
+    setPageSizes([]);
+    setFileName(file.name);
+    setCurrentPage(1);
     setIsLoading(true);
     setError(null);
 
@@ -249,8 +253,6 @@ export default function ViewerPage(): ReactNode {
 
       setPdfDoc(doc);
       adopted = true;
-      setFileName(file.name);
-      setCurrentPage(1);
       setPageSizes(Array.from({ length: doc.numPages }, () => firstSize));
       setIsLoading(false);
 
@@ -272,6 +274,8 @@ export default function ViewerPage(): ReactNode {
       }
       if (requestId === loadRequestRef.current) {
         console.error('Failed to open PDF:', loadError);
+        setPdfDoc(null);
+        setPageSizes([]);
         setError(
           'Could not open this PDF. Check whether the file is damaged, unsupported, or password-protected.',
         );
@@ -333,6 +337,8 @@ export default function ViewerPage(): ReactNode {
       dropped.type !== 'application/pdf' &&
       !dropped.name.toLowerCase().endsWith('.pdf')
     ) {
+      setPdfDoc(null);
+      setPageSizes([]);
       setError('Please choose a PDF file.');
       return;
     }
@@ -346,6 +352,8 @@ export default function ViewerPage(): ReactNode {
       loadFile(opened);
     } catch (err) {
       console.error('Failed to read dropped file:', err);
+      setPdfDoc(null);
+      setPageSizes([]);
       setError('Could not read that file. Please try selecting it again.');
     }
   };
@@ -655,7 +663,7 @@ export default function ViewerPage(): ReactNode {
       )}
 
       <div className="vwr">
-        {pdfDoc && showThumbnails && (
+        {pdfDoc && !error && showThumbnails && (
           <aside
             className={`thm ${showThumbnails ? 'visible' : ''}`}
             aria-label="Page thumbnails"
@@ -690,7 +698,7 @@ export default function ViewerPage(): ReactNode {
             </div>
           )}
 
-          {error && !pdfDoc && (
+          {error && (
             <div className="viewer-state-box error" role="alert">
               <AlertTriangle size={36} className="state-err-icon" />
               <h3>Could not open PDF</h3>
@@ -718,7 +726,7 @@ export default function ViewerPage(): ReactNode {
             </div>
           )}
 
-          {pdfDoc &&
+          {pdfDoc && !error &&
             Array.from({ length: numPages }, (_, index) => {
               const pageNumber = index + 1;
               const baseSize = pageSizes[index] ?? DEFAULT_PAGE_SIZE;
@@ -736,7 +744,7 @@ export default function ViewerPage(): ReactNode {
             })}
         </main>
 
-        {pdfDoc && (
+        {pdfDoc && !error && (
           <div className="pl" aria-label="Page navigation">
             <button
               type="button"
@@ -774,7 +782,7 @@ export default function ViewerPage(): ReactNode {
           </div>
         )}
 
-        {pdfDoc && mobileThumbnailsOpen && (
+        {pdfDoc && !error && mobileThumbnailsOpen && (
           <div
             className="mobile-thm-backdrop"
             onClick={() => setMobileThumbnailsOpen(false)}
