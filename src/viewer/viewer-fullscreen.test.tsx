@@ -6,6 +6,8 @@ import { ToastProvider } from '../components/ToastContext';
 import { ShellContext } from '../components/shellContextDef';
 import { ViewerProvider } from './ViewerContext';
 import ViewerPage from './ViewerPage';
+import ViewerToolbar from './ViewerToolbar';
+import type { PdfDocument } from './renderPage';
 
 // Mock renderPage functions for unit tests
 vi.mock('./renderPage', () => {
@@ -112,6 +114,123 @@ describe('Stage 2 — PDF Viewer Overhaul & Fullscreen Controls', () => {
       // Empty state contains open button and dropzone
       expect(html).toContain('Open PDF');
       expect(html).toContain('Choose a PDF from your device');
+    });
+
+    it('applies vtb-empty class to ViewerToolbar when no document is loaded for desktop suppression', () => {
+      const emptyToolbarHtml = renderToString(
+        <ViewerToolbar
+          pdfDoc={null}
+          isLoading={false}
+          onOpenClick={() => {}}
+          onOpenPalette={() => {}}
+          onCloseDocument={() => {}}
+          showThumbnails={false}
+          mobileThumbnailsOpen={false}
+          onToggleThumbnails={() => {}}
+          numPages={0}
+          currentPage={1}
+          onJumpToPage={() => {}}
+          isEditingPage={false}
+          setIsEditingPage={() => {}}
+          pageInputRef={{ current: null }}
+          pageInputValue="1"
+          setPageInputValue={() => {}}
+          onPageJumpSubmit={() => {}}
+          onStartPageEdit={() => {}}
+          zoom={100}
+          onZoomIn={() => {}}
+          onZoomOut={() => {}}
+          isFitToWidth={false}
+          fitScale={1}
+          onToggleFitOrZoom={() => {}}
+          isSearchOpen={false}
+          onToggleSearch={() => {}}
+          isFullscreen={false}
+          onToggleFullscreen={() => {}}
+          autoHideControls={false}
+          onToggleAutoHide={() => {}}
+          isDistractionFree={false}
+          onToggleDistractionFree={() => {}}
+        />
+      );
+
+      // Verifies empty-state bar has vtb-empty class for desktop CSS hiding
+      expect(emptyToolbarHtml).toContain('class="vtb vtb-empty"');
+      expect(emptyToolbarHtml).toContain('vtb-open-btn');
+      expect(emptyToolbarHtml).toContain('Search tools catalog (Ctrl+K)');
+    });
+
+    it('does NOT apply vtb-empty class when document is loaded, preserving all active viewer controls', () => {
+      const mockDoc = { numPages: 5 } as unknown as PdfDocument;
+      const activeToolbarHtml = renderToString(
+        <ViewerToolbar
+          pdfDoc={mockDoc}
+          isLoading={false}
+          onOpenClick={() => {}}
+          onOpenPalette={() => {}}
+          onCloseDocument={() => {}}
+          showThumbnails={false}
+          mobileThumbnailsOpen={false}
+          onToggleThumbnails={() => {}}
+          numPages={5}
+          currentPage={1}
+          onJumpToPage={() => {}}
+          isEditingPage={false}
+          setIsEditingPage={() => {}}
+          pageInputRef={{ current: null }}
+          pageInputValue="1"
+          setPageInputValue={() => {}}
+          onPageJumpSubmit={() => {}}
+          onStartPageEdit={() => {}}
+          zoom={100}
+          onZoomIn={() => {}}
+          onZoomOut={() => {}}
+          isFitToWidth={false}
+          fitScale={1}
+          onToggleFitOrZoom={() => {}}
+          isSearchOpen={false}
+          onToggleSearch={() => {}}
+          isFullscreen={false}
+          onToggleFullscreen={() => {}}
+          autoHideControls={false}
+          onToggleAutoHide={() => {}}
+          isDistractionFree={false}
+          onToggleDistractionFree={() => {}}
+        />
+      );
+
+      // Document toolbar does not have vtb-empty and keeps all controls active
+      expect(activeToolbarHtml).not.toContain('vtb-empty');
+      expect(activeToolbarHtml).toContain('class="vtb"');
+      expect(activeToolbarHtml).toContain('Open another PDF');
+      expect(activeToolbarHtml).toContain('Close PDF');
+    });
+
+    it('retains central DropZone file picker and AppHeader search on the empty desktop home screen', () => {
+      const html = renderToString(
+        <MemoryRouter initialEntries={['/viewer']}>
+          <ToastProvider>
+            <ShellContext.Provider value={{ shell: 'app', setShell: () => {}, showAppLayout: true, setShowAppLayout: () => {} }}>
+              <ViewerProvider>
+                <AppShell>
+                  <ViewerPage />
+                </AppShell>
+              </ViewerProvider>
+            </ShellContext.Provider>
+          </ToastProvider>
+        </MemoryRouter>
+      );
+
+      // 1. Central DropZone is present
+      expect(html).toContain('Open PDF file');
+      expect(html).toContain('Choose file');
+      expect(html).toContain('Choose a PDF from your device or drop it here to read.');
+
+      // 2. Main AppHeader search is present
+      expect(html).toContain('Search tools (Ctrl+K)');
+
+      // 3. Toolbar has the vtb-empty class so desktop CSS suppresses the secondary bar
+      expect(html).toContain('vtb vtb-empty');
     });
 
     it('verifies auto-hide timing contract: 3.5s initial delay, 1.8s scroll stop, 3.0s mouse reveal', () => {

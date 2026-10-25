@@ -224,11 +224,17 @@
   .thm {
     width: 128px;
   }
+  .vtb.vtb-empty {
+    display: none !important;
+  }
 }
 
 @media (min-width: 900px) {
   .thm {
     width: 128px;
+  }
+  .vtb.vtb-empty {
+    display: none !important;
   }
 }
 

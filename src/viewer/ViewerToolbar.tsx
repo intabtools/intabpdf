@@ -87,7 +87,7 @@ export default function ViewerToolbar({
   onToggleDistractionFree,
 }: ViewerToolbarProps): ReactNode {
   return (
-    <div className="vtb">
+    <div className={`vtb${!pdfDoc ? ' vtb-empty' : ''}`}>
       {!pdfDoc ? (
         <>
           {isLoading ? (
