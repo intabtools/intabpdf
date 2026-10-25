@@ -6,6 +6,7 @@ import ToolIcon from '../components/ToolIcon';
 import { useShell } from '../hooks/useShell';
 import { useToast } from '../hooks/useToast';
 import { useViewer } from '../hooks/useViewer';
+import { getPlatformType, openPdfInNewTab } from '../platform';
 import type { OpenedFile } from '../platform';
 import { TOOL_CATEGORIES, getToolsByCategory, isToolImplemented } from '../tools/registry';
 
@@ -17,14 +18,21 @@ export default function HomePage(): ReactNode {
 
   const handleToolClick = (_e: MouseEvent, toolId: string) => {
     if (!isToolImplemented(toolId)) {
-      showToast('Coming soon — tool is under development');
+      showToast('Coming soon: tool is under development');
     }
   };
 
   const handleFilesSelected = (files: OpenedFile[]) => {
     if (files.length > 0) {
-      loadFile(files[0]);
-      navigate('/viewer');
+      if (getPlatformType() === 'web') {
+        const opened = openPdfInNewTab(files[0].bytes, files[0].name);
+        if (!opened) {
+          showToast('Pop-up was blocked. Please allow pop-ups for this site.');
+        }
+      } else {
+        loadFile(files[0]);
+        navigate('/viewer');
+      }
     }
   };
 

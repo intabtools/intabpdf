@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { useShell } from '../hooks/useShell';
-import { useViewer } from '../hooks/useViewer';
 import AppHeader from './AppHeader';
 import BottomNav from './BottomNav';
 import CommandPalette from './CommandPalette';
@@ -151,12 +150,10 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
   const isSubPage = location.pathname !== '/';
   const isViewerPage = location.pathname.startsWith('/viewer');
 
-  const { currentFile } = useViewer();
-
   // Derive page title for breadcrumb
   let subTitle: string | undefined;
-  if (location.pathname === '/viewer') {
-    subTitle = currentFile?.name || 'Viewer';
+  if (location.pathname === '/viewer' || location.pathname.startsWith('/viewer')) {
+    subTitle = undefined;
   } else if (location.pathname === '/about') {
     subTitle = 'About';
   } else if (location.pathname.startsWith('/tool/')) {
@@ -167,47 +164,39 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
       .join(' ');
   }
 
-  if (!showAppLayout) {
-    return (
-      <div className="app full-bleed">
-        <main className={`main ${isViewerPage ? 'flush' : ''}`} style={{ padding: 0, height: '100%', overflow: 'hidden' }}>
-          <div className={`an ${isViewerPage ? 'flush-wrap' : ''}`} style={{ height: '100%' }}>
-            {children}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`app ${isSubPage ? 'sub' : ''} ${isDrawerOpen ? 'dr' : ''} ${
         isSidebarCollapsed ? 'sc' : ''
-      }`}
+      } ${!showAppLayout ? 'full-bleed' : ''} ${isViewerPage ? 'is-viewer' : ''}`}
     >
-      <AppHeader
-        onToggleSidebar={handleToggleMenu}
-        onOpenPalette={() => setIsPaletteOpen(true)}
-        isDark={isDark}
-        onToggleTheme={toggleTheme}
-        subTitle={subTitle}
-        isSidebarCollapsed={isSidebarCollapsed}
-        isDrawerOpen={isDrawerOpen}
-      />
+      {showAppLayout && (
+        <AppHeader
+          onToggleSidebar={handleToggleMenu}
+          onOpenPalette={() => setIsPaletteOpen(true)}
+          isDark={isDark}
+          onToggleTheme={toggleTheme}
+          subTitle={subTitle}
+          isSidebarCollapsed={isSidebarCollapsed}
+          isDrawerOpen={isDrawerOpen}
+        />
+      )}
 
       <div className="body">
-        <NavigationRail />
-        <Sidebar
-          onCloseDrawer={() => setIsDrawerOpen(false)}
-          isCollapsed={isSidebarCollapsed}
-        />
+        {showAppLayout && !isViewerPage && <NavigationRail />}
+        {showAppLayout && !isViewerPage && (
+          <Sidebar
+            onCloseDrawer={() => setIsDrawerOpen(false)}
+            isCollapsed={isSidebarCollapsed}
+          />
+        )}
         <main className={`main ${isViewerPage ? 'flush' : ''}`} id="main-content">
           <div className={`an ${isViewerPage ? 'flush-wrap' : ''}`}>{children}</div>
         </main>
       </div>
 
-      <BottomNav />
-      <StatusBar onSwitchToWeb={onSwitchToWeb} />
+      {showAppLayout && <BottomNav />}
+      {showAppLayout && <StatusBar onSwitchToWeb={onSwitchToWeb} />}
 
       <CommandPalette
         isOpen={isPaletteOpen}

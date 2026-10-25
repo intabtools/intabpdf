@@ -59,14 +59,14 @@
 }
 
 :root[data-theme="dark"] {
-  --header: #181D2F;
-  --background: #0A0C14;
-  --surface: #10131D;
-  --surface-2: #181C29;
+  --header: #141826;
+  --background: #0C0E18;
+  --surface: #141824;
+  --surface-2: #1C2132;
 
-  --text: #E8EBF5;
-  --text-muted: #8C94B0;
-  --border: #212638;
+  --text: #EEF1FA;
+  --text-muted: #9BA4C2;
+  --border: #2B3349;
 
   --accent: #AAB8FF;
   --button: #4F63F0;

@@ -1,3 +1,4 @@
+// Pure core operation for rotating pages in a PDF document in 90-degree increments.
 import { PDFDocument, degrees } from 'pdf-lib';
 
 export interface RotateOptions {

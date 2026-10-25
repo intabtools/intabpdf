@@ -1,3 +1,4 @@
+// Pure core operation for merging multiple PDF documents into a single document.
 import { PDFDocument } from 'pdf-lib';
 
 /**

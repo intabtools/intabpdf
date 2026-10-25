@@ -5,6 +5,7 @@ declare global {
     interface Window {
         intab?: {
             onOpenPdf(callback: (file: OpenedFile) => void): () => void;
+            openExternalUrl?(url: string): void;
         };
     }
 }

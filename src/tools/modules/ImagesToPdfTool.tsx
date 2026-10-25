@@ -1,3 +1,4 @@
+// Tool module for converting image files (JPEG, PNG, WebP) to a single PDF document.
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileImage, Info } from 'lucide-react';

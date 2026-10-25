@@ -9,7 +9,7 @@ export default function StatusBar({ onSwitchToWeb }: StatusBarProps): ReactNode 
     <footer className="stb" aria-label="Status bar">
       <span>MIT</span>
       <span>v1.0.0</span>
-      {onSwitchToWeb && (
+      {Boolean(import.meta.env.DEV) && onSwitchToWeb && (
         <button
           type="button"
           onClick={onSwitchToWeb}

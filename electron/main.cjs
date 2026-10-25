@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
 const path = require('path');
 const { fileURLToPath } = require('url');
 const fs = require('fs');
@@ -90,6 +90,25 @@ async function flushPendingFiles() {
     }
   }
 }
+const CANONICAL_REPO_PATH = '/intabtools/intabpdf';
+
+// External link check: restrict external browser opening strictly to the
+// canonical GitHub repository and its issues/releases.
+function isAllowedExternalUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com') {
+      return false;
+    }
+    return (
+      parsed.pathname === CANONICAL_REPO_PATH ||
+      parsed.pathname.startsWith(`${CANONICAL_REPO_PATH}/`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Navigation / IPC origin check: only the packaged frontend, or the local
 // Vite dev server. blob: and data: are NOT acceptable here.
 function isAllowedNavigation(rawUrl) {
@@ -186,8 +205,16 @@ function createWindow() {
   wc.on('will-attach-webview', (event) => {
     event.preventDefault();
   });
-  // Do not allow pages to create arbitrary new windows.
-  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Do not allow pages to create arbitrary new windows. Only open the trusted
+  // canonical repository externally in the system's default browser.
+  wc.setWindowOpenHandler(({ url }) => {
+    if (isAllowedExternalUrl(url)) {
+      shell.openExternal(url).catch((err) => {
+        console.error('Failed to open external URL:', err);
+      });
+    }
+    return { action: 'deny' };
+  });
   win.on('closed', () => {
     win = null;
     rendererReady = false;
@@ -215,6 +242,20 @@ if (!gotLock) {
       win.focus();
     }
   });
+  // Safely open the canonical repository externally via IPC from our trusted main frame.
+  ipcMain.on('open-external-url', (event, rawUrl) => {
+    if (!win || win.isDestroyed()) return;
+    if (event.sender !== win.webContents) return;
+    const frame = event.senderFrame;
+    if (!frame || frame !== win.webContents.mainFrame) return;
+    if (!isAllowedNavigation(frame.url)) return;
+    if (typeof rawUrl === 'string' && isAllowedExternalUrl(rawUrl)) {
+      shell.openExternal(rawUrl).catch((err) => {
+        console.error('Failed to open external URL:', err);
+      });
+    }
+  });
+
   // Only accept readiness messages from our own renderer's main frame,
   // loaded from an allowed origin.
   ipcMain.on('renderer-ready', (event) => {

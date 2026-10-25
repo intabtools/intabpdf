@@ -1,3 +1,4 @@
+// Tool module for removing specific pages and page ranges from a PDF.
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Info, Trash2 } from 'lucide-react';

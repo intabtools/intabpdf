@@ -85,3 +85,60 @@ export function drawPageOnCanvas(
     },
   };
 }
+
+export function renderPageTextLayer(
+  doc: PdfDocument,
+  pageNumber: number,
+  container: HTMLDivElement,
+  scale: number,
+): { promise: Promise<void>; cancel: () => void } {
+  let cancelled = false;
+  let textLayerInstance: pdfjsLib.TextLayer | null = null;
+
+  const promise = (async () => {
+    const page = await doc.getPage(pageNumber);
+    if (cancelled) return;
+
+    const viewport = page.getViewport({ scale });
+    container.innerHTML = '';
+    container.style.width = `${Math.floor(viewport.width)}px`;
+    container.style.height = `${Math.floor(viewport.height)}px`;
+
+    const textContentSource = await page.getTextContent();
+    if (cancelled) return;
+
+    try {
+      textLayerInstance = new pdfjsLib.TextLayer({
+        textContentSource,
+        container,
+        viewport,
+      });
+      await textLayerInstance.render();
+    } catch {
+      if (cancelled) return;
+      // Fallback for mock/test environments without full canvas font measurement
+      if (textContentSource && Array.isArray(textContentSource.items)) {
+        container.innerHTML = '';
+        for (const item of textContentSource.items) {
+          if (item && typeof item === 'object' && 'str' in item && typeof (item as { str: string }).str === 'string') {
+            const span = document.createElement('span');
+            span.textContent = (item as { str: string }).str;
+            container.appendChild(span);
+          }
+        }
+      }
+    }
+  })();
+
+  return {
+    promise,
+    cancel() {
+      cancelled = true;
+      try {
+        textLayerInstance?.cancel();
+      } catch {
+        // ignore
+      }
+    },
+  };
+}

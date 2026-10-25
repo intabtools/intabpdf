@@ -71,6 +71,97 @@ button:disabled {
   font-family: var(--font-mono);
 }
 
+/* ==========================================================================
+   Deliberate UI Selection Policy
+   ========================================================================== */
+
+/* Non-selectable application UI: headings, cards, navigation, controls, badges, toolbars */
+.hdr,
+.wh,
+.sb,
+.sbl,
+.sbo,
+.si,
+.sbt,
+.sbf,
+.sbg,
+.rail,
+.ri,
+.sq,
+.vt,
+.bn,
+.wf,
+.vtb,
+.vtb-page-badge,
+.zoom-badge,
+.file-tag,
+.pl,
+.thm,
+.sec,
+.wsec,
+.wgl,
+.idx,
+.cell,
+.tc,
+.tci,
+.dz,
+.cd,
+.card.opts .sw,
+button,
+.ib,
+.cta,
+.tg,
+.t1,
+.hb,
+.hc,
+.wlogo,
+.wnav,
+.bge,
+.badge-cs,
+.badge-page,
+.badge-opt,
+.stb,
+.sb-tooltip,
+.hs kbd,
+.pin kbd,
+.grp,
+[data-drag-handle],
+.reorder-handle,
+.staged-item-controls,
+.vfs-pill,
+.vfs-btn,
+.viewer-floating-pill {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Explicit exceptions: areas where text selection must remain naturally available */
+input,
+textarea,
+[contenteditable="true"],
+.ofn-input,
+.ofn-container input,
+.output-filename-group input,
+.viewer-search-bar input,
+.selectable,
+.output-info,
+.summary-text,
+.doc-text,
+.error-details,
+.err,
+pre,
+code,
+.vwr .textLayer,
+.textLayer,
+.textLayer span,
+.card.busy,
+.card.busy .lede,
+.card.opts .summary,
+.card.opts .summary b {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* App container and layout structure */
 .app {
   container-type: inline-size;
@@ -84,6 +175,26 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overscroll-behavior: none;
+}
+
+.app.full-bleed {
+  padding: 0;
+  margin: 0;
+}
+
+.app.full-bleed .body {
+  height: 100%;
+  flex: 1;
+}
+
+.app.full-bleed .main,
+.app.full-bleed .main.flush,
+.app.full-bleed .an,
+.app.full-bleed .an.flush-wrap {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  max-width: none;
 }
 
 /* Allow natural scroll chaining on non-scrollable children */
@@ -102,7 +213,7 @@ button:disabled {
   align-items: center;
   gap: 2px;
   padding: 4px 8px 4px 4px;
-  min-height: 56px;
+  min-height: 60px;
   flex: none;
   background: var(--background);
   transition: background-color 0.2s;
@@ -191,19 +302,21 @@ button:disabled {
 .hs {
   display: none;
   flex: 1;
-  max-width: 400px;
+  max-width: 420px;
+  height: 40px;
   margin-left: 16px;
   margin-right: auto;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: 0 14px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--surface-2);
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 13.5px;
   text-align: left;
   transition: border-color 0.15s, background-color 0.15s;
+  cursor: pointer;
 }
 
 .hs:hover {
@@ -216,10 +329,10 @@ button:disabled {
 
 .hs kbd, .pin kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 5px;
+  border-radius: 5px;
+  padding: 2px 6px;
   color: var(--text-muted);
 }
 
@@ -289,7 +402,7 @@ button:disabled {
 
 .cnt {
   width: 100%;
-  max-width: 980px;
+  max-width: 1560px;
   margin: 0 auto;
 }
 
@@ -407,11 +520,11 @@ button:disabled {
   left: 0;
   top: env(safe-area-inset-top, 0px);
   bottom: env(safe-area-inset-bottom, 0px);
-  width: 84%;
-  max-width: 310px;
+  width: min(88%, 360px);
+  max-width: 360px;
   display: flex;
   flex-direction: column;
-  padding: 14px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 12px calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-right: 1px solid var(--border);
   border-radius: 0 20px 20px 0;
@@ -453,37 +566,58 @@ button:disabled {
 .sbl {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding: 4px 8px 14px;
+  padding: 4px 6px 16px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.sbl-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sbc {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: var(--text-muted);
+}
+
+.sbc:hover {
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 .sbl b {
   display: block;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .sbl small {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .sbo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 10px 14px;
-  margin-bottom: 8px;
+  height: 50px;
+  padding: 0 16px;
+  margin-bottom: 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--button);
   color: #ffffff;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 15.5px;
   flex: none;
   transition: filter 0.15s;
   cursor: pointer;
@@ -502,15 +636,15 @@ button:disabled {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  height: 42px;
-  padding: 0 12px;
+  height: 50px;
+  padding: 0 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   background: none;
   color: var(--text);
-  font-size: 13.5px;
+  font-size: 16px;
   font-weight: 500;
   text-align: left;
   text-decoration: none;
@@ -538,7 +672,7 @@ button:disabled {
   left: 0;
   top: 10px;
   bottom: 10px;
-  width: 3px;
+  width: 3.5px;
   border-radius: 0 3px 3px 0;
   background: var(--accent);
 }
@@ -560,18 +694,50 @@ button:disabled {
 }
 
 .sbt {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 18px 12px 6px;
+  padding: 22px 16px 8px;
 }
 
 .sbf {
   border-top: 1px solid var(--border);
-  margin-top: 10px;
-  padding-top: 8px;
+  margin-top: 14px;
+  padding-top: 10px;
+}
+
+.badge-cs {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sb-tooltip {
+  position: fixed;
+  z-index: 1000;
+  padding: 6px 12px;
+  background: var(--text);
+  color: var(--background);
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  animation: sbTooltipIn 0.12s ease-out;
+}
+
+@keyframes sbTooltipIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
 }
 
 /* Home Page UI */
@@ -678,8 +844,8 @@ button:disabled {
   align-items: flex-start;
   gap: 12px;
   text-align: left;
-  padding: 15px 14px;
-  min-height: 112px;
+  padding: 18px 18px;
+  min-height: 110px;
   border: 0;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
@@ -691,6 +857,9 @@ button:disabled {
 
 .cell svg {
   color: var(--accent);
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .cell:hover, .cell:active {
@@ -699,16 +868,17 @@ button:disabled {
 
 .cell b {
   display: block;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .cell small {
   display: block;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.35;
-  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  margin-top: 4px;
 }
 
 /* Tool & Card UI */
@@ -723,6 +893,8 @@ button:disabled {
   display: grid;
   gap: 16px;
   align-items: start;
+  max-width: 1240px;
+  margin: 0 auto;
 }
 
 .card {
@@ -1085,6 +1257,8 @@ button:disabled {
 .busy {
   padding: 34px 20px;
   text-align: center;
+  max-width: 620px;
+  margin: 0 auto;
 }
 
 .busy b {
@@ -1102,7 +1276,7 @@ button:disabled {
 
 .done {
   padding: 28px 24px;
-  max-width: 580px;
+  max-width: 620px;
   margin: 0 auto;
   text-align: left;
 }
@@ -1414,8 +1588,9 @@ details p {
   .hdr {
     background: var(--header);
     border-bottom: 0;
-    padding: 4px 8px 10px 4px;
-    min-height: 56px;
+    padding: env(safe-area-inset-top, 0px) 8px 0 4px;
+    min-height: 60px;
+    height: calc(60px + env(safe-area-inset-top, 0px));
   }
   .hdr .ib:active {
     background: color-mix(in srgb, var(--text) 10%, transparent);
@@ -1432,6 +1607,16 @@ details p {
     border-radius: 0;
     padding: 0;
   }
+  .cell {
+    padding: 15px 13px;
+    min-height: 104px;
+  }
+  .cell b {
+    font-size: 14.5px;
+  }
+  .cell small {
+    font-size: 12px;
+  }
   .sub .hb {
     display: none;
   }
@@ -1442,6 +1627,12 @@ details p {
   }
   .sub .bk {
     display: inline-flex;
+  }
+  .hdr.hdr-viewer .hb {
+    display: flex !important;
+  }
+  .hdr.hdr-viewer .hc {
+    display: none !important;
   }
 }
 
@@ -1449,8 +1640,9 @@ details p {
   .hdr {
     background: var(--header);
     border-bottom: 0;
-    padding: 4px 8px 10px 4px;
-    min-height: 56px;
+    padding: env(safe-area-inset-top, 0px) 8px 0 4px;
+    min-height: 60px;
+    height: calc(60px + env(safe-area-inset-top, 0px));
   }
   .hdr .ib:active {
     background: color-mix(in srgb, var(--text) 10%, transparent);
@@ -1467,6 +1659,16 @@ details p {
     border-radius: 0;
     padding: 0;
   }
+  .cell {
+    padding: 15px 13px;
+    min-height: 104px;
+  }
+  .cell b {
+    font-size: 14.5px;
+  }
+  .cell small {
+    font-size: 12px;
+  }
   .sub .hb {
     display: none;
   }
@@ -1477,6 +1679,12 @@ details p {
   }
   .sub .bk {
     display: inline-flex;
+  }
+  .hdr.hdr-viewer .hb {
+    display: flex !important;
+  }
+  .hdr.hdr-viewer .hc {
+    display: none !important;
   }
 }
 
@@ -1490,7 +1698,9 @@ details p {
   }
   .hdr {
     border-bottom: 1px solid var(--border);
-    padding-left: 8px;
+    padding-left: 10px;
+    min-height: 58px;
+    height: 58px;
   }
   .main {
     padding: 8px 24px 28px;
@@ -1515,13 +1725,13 @@ details p {
     opacity: 0.5;
   }
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   }
   .dz .go {
     display: block;
   }
   .dz {
-    padding: 18px;
+    padding: 18px 20px;
   }
 }
 
@@ -1534,7 +1744,9 @@ details p {
   }
   .hdr {
     border-bottom: 1px solid var(--border);
-    padding-left: 8px;
+    padding-left: 10px;
+    min-height: 58px;
+    height: 58px;
   }
   .main {
     padding: 8px 24px 28px;
@@ -1559,25 +1771,30 @@ details p {
     opacity: 0.5;
   }
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   }
   .dz .go {
     display: block;
   }
   .dz {
-    padding: 18px;
+    padding: 18px 20px;
   }
 }
 
 /* Medium viewports (>= 720px): two-column tool and about layouts */
 @container app (min-width: 720px) {
   .tp {
-    grid-template-columns: 1fr minmax(280px, 340px);
-    gap: 22px;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    gap: 24px;
+    max-width: 1240px;
+    margin: 0 auto;
   }
   .ab {
     grid-template-columns: 1fr 1fr;
+    gap: 22px;
     align-items: start;
+    max-width: 1240px;
+    margin: 0 auto;
   }
   .ab .wide {
     grid-column: 1 / -1;
@@ -1586,12 +1803,17 @@ details p {
 
 @media (min-width: 720px) {
   .tp {
-    grid-template-columns: 1fr minmax(280px, 340px);
-    gap: 22px;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    gap: 24px;
+    max-width: 1240px;
+    margin: 0 auto;
   }
   .ab {
     grid-template-columns: 1fr 1fr;
+    gap: 22px;
     align-items: start;
+    max-width: 1240px;
+    margin: 0 auto;
   }
   .ab .wide {
     grid-column: 1 / -1;
@@ -1604,7 +1826,7 @@ details p {
     position: relative;
   }
   .cnt {
-    max-width: 980px;
+    max-width: 1560px;
   }
   .rail, .sbl, .scr {
     display: none !important;
@@ -1612,10 +1834,10 @@ details p {
   .sb {
     position: static;
     z-index: auto;
-    width: 232px;
+    width: 290px;
     max-width: none;
     border-radius: 0;
-    padding: 10px 8px;
+    padding: 12px 10px;
     transform: none;
     visibility: visible;
     box-shadow: none !important;
@@ -1624,19 +1846,36 @@ details p {
   }
   /* Collapsed sidebar (Ctrl+B) */
   .sc .sb {
-    width: 64px;
+    width: 72px;
+    padding: 12px 8px;
   }
   .sc .sb .si span,
   .sc .sb .sbo span {
     display: none;
   }
   .sc .sb .si {
-    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 4px;
+    border-radius: 10px;
     padding: 0;
+    justify-content: center;
     gap: 0;
   }
   .sc .sb .sbo {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 10px;
+    border-radius: 12px;
     padding: 0;
+    justify-content: center;
+  }
+  .sc .sb .si.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .sc .sb .si.on svg {
+    color: var(--accent);
   }
   .sc .sbt {
     height: 1px;
@@ -1647,39 +1886,81 @@ details p {
     overflow: hidden;
   }
   .sbo {
-    height: 36px;
-    font-size: 13px;
-    margin-bottom: 6px;
+    height: 50px;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0 16px;
+    gap: 12px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .sbo svg {
+    width: 20px;
+    height: 20px;
   }
   .si {
-    height: 32px;
-    font-size: 13px;
-    gap: 10px;
-    border-radius: 8px;
+    height: 46px;
+    font-size: 15px;
+    font-weight: 500;
+    gap: 14px;
+    padding: 0 14px;
+    border-radius: 10px;
+    margin-bottom: 2px;
+  }
+  .si svg {
+    width: 21px;
+    height: 21px;
   }
   .si.on::before {
     display: none;
   }
   .sbt {
-    padding: 14px 10px 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 18px 14px 8px;
+  }
+  .sbf {
+    margin-top: 12px;
+    padding-top: 10px;
   }
   .sbf .si {
-    height: 32px;
+    height: 44px;
   }
   .t1 {
     flex: 0 0 auto;
-    min-width: 184px;
-    font-size: 18px;
+    min-width: 200px;
+    font-size: 20px;
   }
   .hs {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
+    height: 42px;
+    gap: 12px;
+    font-size: 13.5px;
+    padding: 0 14px;
+    border-radius: 10px;
+    width: min(520px, calc(100% - 480px));
+    max-width: 540px;
+    min-width: 200px;
+    margin: 0;
   }
   .hsi {
     display: none;
   }
   .hdr {
-    padding-right: 12px;
-    min-height: 48px;
+    position: relative;
+    padding-right: 16px;
+    padding-left: 12px;
+    min-height: 62px;
+    height: 62px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hdr .theme-toggle {
+    margin-left: auto;
   }
   .main {
     padding: 8px 32px 32px;
@@ -1688,7 +1969,11 @@ details p {
     display: flex;
   }
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .dz {
+    padding: 20px 22px;
+    border-radius: 16px;
   }
 }
 
@@ -1697,7 +1982,7 @@ details p {
     position: relative;
   }
   .cnt {
-    max-width: 980px;
+    max-width: 1560px;
   }
   .rail, .sbl, .scr {
     display: none !important;
@@ -1705,10 +1990,10 @@ details p {
   .sb {
     position: static;
     z-index: auto;
-    width: 232px;
+    width: 290px;
     max-width: none;
     border-radius: 0;
-    padding: 10px 8px;
+    padding: 12px 10px;
     transform: none;
     visibility: visible;
     box-shadow: none !important;
@@ -1716,19 +2001,36 @@ details p {
     transition: width 0.2s cubic-bezier(0.2, 0, 0, 1);
   }
   .sc .sb {
-    width: 64px;
+    width: 72px;
+    padding: 12px 8px;
   }
   .sc .sb .si span,
   .sc .sb .sbo span {
     display: none;
   }
   .sc .sb .si {
-    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 4px;
+    border-radius: 10px;
     padding: 0;
+    justify-content: center;
     gap: 0;
   }
   .sc .sb .sbo {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 10px;
+    border-radius: 12px;
     padding: 0;
+    justify-content: center;
+  }
+  .sc .sb .si.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .sc .sb .si.on svg {
+    color: var(--accent);
   }
   .sc .sbt {
     height: 1px;
@@ -1739,39 +2041,81 @@ details p {
     overflow: hidden;
   }
   .sbo {
-    height: 36px;
-    font-size: 13px;
-    margin-bottom: 6px;
+    height: 50px;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0 16px;
+    gap: 12px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .sbo svg {
+    width: 20px;
+    height: 20px;
   }
   .si {
-    height: 32px;
-    font-size: 13px;
-    gap: 10px;
-    border-radius: 8px;
+    height: 46px;
+    font-size: 15px;
+    font-weight: 500;
+    gap: 14px;
+    padding: 0 14px;
+    border-radius: 10px;
+    margin-bottom: 2px;
+  }
+  .si svg {
+    width: 21px;
+    height: 21px;
   }
   .si.on::before {
     display: none;
   }
   .sbt {
-    padding: 14px 10px 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 18px 14px 8px;
+  }
+  .sbf {
+    margin-top: 12px;
+    padding-top: 10px;
   }
   .sbf .si {
-    height: 32px;
+    height: 44px;
   }
   .t1 {
     flex: 0 0 auto;
-    min-width: 184px;
-    font-size: 18px;
+    min-width: 200px;
+    font-size: 20px;
   }
   .hs {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
+    height: 42px;
+    gap: 12px;
+    font-size: 13.5px;
+    padding: 0 14px;
+    border-radius: 10px;
+    width: min(520px, calc(100% - 480px));
+    max-width: 540px;
+    min-width: 200px;
+    margin: 0;
   }
   .hsi {
     display: none;
   }
   .hdr {
-    padding-right: 12px;
-    min-height: 48px;
+    position: relative;
+    padding-right: 16px;
+    padding-left: 12px;
+    min-height: 62px;
+    height: 62px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hdr .theme-toggle {
+    margin-left: auto;
   }
   .main {
     padding: 8px 32px 32px;
@@ -1780,7 +2124,25 @@ details p {
     display: flex;
   }
   .grid {
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .dz {
+    padding: 20px 22px;
+    border-radius: 16px;
+  }
+}
+
+@container app (min-width: 1200px) {
+  .tp {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 28px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .tp {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 28px;
   }
 }
 
@@ -1800,14 +2162,10 @@ details p {
    Unobtrusive, transient floating scrollbars that reveal during hover/interaction
    and remain invisible when idle. Preserves mouse-wheel, trackpad, and keyboard scrolling. */
 html[data-platform="electron"] .main,
-html[data-platform="electron"] .cvs,
-html[data-platform="electron"] .thm,
 html[data-platform="electron"] #pl,
 html[data-platform="electron"] .dlg,
 html[data-platform="electron"] .mo,
 .app:not(.web) .main,
-.app:not(.web) .cvs,
-.app:not(.web) .thm,
 .app:not(.web) #pl,
 .app:not(.web) .dlg,
 .app:not(.web) .mo {
@@ -1817,14 +2175,10 @@ html[data-platform="electron"] .mo,
 }
 
 html[data-platform="electron"] .main:hover,
-html[data-platform="electron"] .cvs:hover,
-html[data-platform="electron"] .thm:hover,
 html[data-platform="electron"] #pl:hover,
 html[data-platform="electron"] .dlg:hover,
 html[data-platform="electron"] .mo:hover,
 .app:not(.web) .main:hover,
-.app:not(.web) .cvs:hover,
-.app:not(.web) .thm:hover,
 .app:not(.web) #pl:hover,
 .app:not(.web) .dlg:hover,
 .app:not(.web) .mo:hover {
@@ -1833,14 +2187,10 @@ html[data-platform="electron"] .mo:hover,
 
 /* Slim 6px WebKit scrollbars for desktop application */
 html[data-platform="electron"] .main::-webkit-scrollbar,
-html[data-platform="electron"] .cvs::-webkit-scrollbar,
-html[data-platform="electron"] .thm::-webkit-scrollbar,
 html[data-platform="electron"] #pl::-webkit-scrollbar,
 html[data-platform="electron"] .dlg::-webkit-scrollbar,
 html[data-platform="electron"] .mo::-webkit-scrollbar,
 .app:not(.web) .main::-webkit-scrollbar,
-.app:not(.web) .cvs::-webkit-scrollbar,
-.app:not(.web) .thm::-webkit-scrollbar,
 .app:not(.web) #pl::-webkit-scrollbar,
 .app:not(.web) .dlg::-webkit-scrollbar,
 .app:not(.web) .mo::-webkit-scrollbar {
@@ -1849,14 +2199,10 @@ html[data-platform="electron"] .mo::-webkit-scrollbar,
 }
 
 html[data-platform="electron"] .main::-webkit-scrollbar-track,
-html[data-platform="electron"] .cvs::-webkit-scrollbar-track,
-html[data-platform="electron"] .thm::-webkit-scrollbar-track,
 html[data-platform="electron"] #pl::-webkit-scrollbar-track,
 html[data-platform="electron"] .dlg::-webkit-scrollbar-track,
 html[data-platform="electron"] .mo::-webkit-scrollbar-track,
 .app:not(.web) .main::-webkit-scrollbar-track,
-.app:not(.web) .cvs::-webkit-scrollbar-track,
-.app:not(.web) .thm::-webkit-scrollbar-track,
 .app:not(.web) #pl::-webkit-scrollbar-track,
 .app:not(.web) .dlg::-webkit-scrollbar-track,
 .app:not(.web) .mo::-webkit-scrollbar-track {
@@ -1864,14 +2210,10 @@ html[data-platform="electron"] .mo::-webkit-scrollbar-track,
 }
 
 html[data-platform="electron"] .main::-webkit-scrollbar-thumb,
-html[data-platform="electron"] .cvs::-webkit-scrollbar-thumb,
-html[data-platform="electron"] .thm::-webkit-scrollbar-thumb,
 html[data-platform="electron"] #pl::-webkit-scrollbar-thumb,
 html[data-platform="electron"] .dlg::-webkit-scrollbar-thumb,
 html[data-platform="electron"] .mo::-webkit-scrollbar-thumb,
 .app:not(.web) .main::-webkit-scrollbar-thumb,
-.app:not(.web) .cvs::-webkit-scrollbar-thumb,
-.app:not(.web) .thm::-webkit-scrollbar-thumb,
 .app:not(.web) #pl::-webkit-scrollbar-thumb,
 .app:not(.web) .dlg::-webkit-scrollbar-thumb,
 .app:not(.web) .mo::-webkit-scrollbar-thumb {
@@ -1882,14 +2224,10 @@ html[data-platform="electron"] .mo::-webkit-scrollbar-thumb,
 
 /* Reveal thumb on hover of scroll container */
 html[data-platform="electron"] .main:hover::-webkit-scrollbar-thumb,
-html[data-platform="electron"] .cvs:hover::-webkit-scrollbar-thumb,
-html[data-platform="electron"] .thm:hover::-webkit-scrollbar-thumb,
 html[data-platform="electron"] #pl:hover::-webkit-scrollbar-thumb,
 html[data-platform="electron"] .dlg:hover::-webkit-scrollbar-thumb,
 html[data-platform="electron"] .mo:hover::-webkit-scrollbar-thumb,
 .app:not(.web) .main:hover::-webkit-scrollbar-thumb,
-.app:not(.web) .cvs:hover::-webkit-scrollbar-thumb,
-.app:not(.web) .thm:hover::-webkit-scrollbar-thumb,
 .app:not(.web) #pl:hover::-webkit-scrollbar-thumb,
 .app:not(.web) .dlg:hover::-webkit-scrollbar-thumb,
 .app:not(.web) .mo:hover::-webkit-scrollbar-thumb {

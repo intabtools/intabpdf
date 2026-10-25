@@ -1,3 +1,4 @@
+// Tool module for merging multiple PDF documents with custom ordering.
 import type { ReactNode } from 'react';
 import { Layers } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';

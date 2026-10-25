@@ -9,10 +9,16 @@ import { useShell } from '../hooks/useShell';
 interface WebShellProps {
   children: ReactNode;
   onSwitchToApp?: () => void;
+  onSwitchToDesktop?: () => void;
   showAppLayout?: boolean;
 }
 
-export default function WebShell({ children, onSwitchToApp, showAppLayout = true }: WebShellProps): ReactNode {
+export default function WebShell({
+  children,
+  onSwitchToApp,
+  onSwitchToDesktop,
+  showAppLayout = true,
+}: WebShellProps): ReactNode {
   const location = useLocation();
   const { setShowAppLayout } = useShell();
 
@@ -61,7 +67,6 @@ export default function WebShell({ children, onSwitchToApp, showAppLayout = true
   }, [isPaletteOpen, showAppLayout, setShowAppLayout]);
 
   const isHomeActive = location.pathname === '/' || location.pathname.startsWith('/tool/');
-  const isViewerActive = location.pathname.startsWith('/viewer');
   const isAboutActive = location.pathname === '/about';
 
   if (!showAppLayout) {
@@ -92,13 +97,6 @@ export default function WebShell({ children, onSwitchToApp, showAppLayout = true
                 Tools
               </Link>
               <Link
-                to="/viewer"
-                className={isViewerActive ? 'on' : ''}
-                aria-current={isViewerActive ? 'page' : undefined}
-              >
-                Viewer
-              </Link>
-              <Link
                 to="/about"
                 className={isAboutActive ? 'on' : ''}
                 aria-current={isAboutActive ? 'page' : undefined}
@@ -112,15 +110,25 @@ export default function WebShell({ children, onSwitchToApp, showAppLayout = true
               >
                 Source code
               </a>
-              {onSwitchToApp && (
-                <button
-                  type="button"
-                  onClick={onSwitchToApp}
-                  title="Switch to App shell view"
-                  style={{ opacity: 0.8 }}
-                >
-                  App view
-                </button>
+              {Boolean(import.meta.env.DEV) && (onSwitchToApp || onSwitchToDesktop) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onSwitchToApp || onSwitchToDesktop}
+                    title="Switch to App shell view"
+                    style={{ opacity: 0.8 }}
+                  >
+                    App view
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSwitchToDesktop || onSwitchToApp}
+                    title="Switch to Desktop view"
+                    style={{ opacity: 0.8 }}
+                  >
+                    Desktop view
+                  </button>
+                </>
               )}
             </nav>
 
@@ -171,7 +179,6 @@ export default function WebShell({ children, onSwitchToApp, showAppLayout = true
 
             <div className="wfl">
               <Link to="/">Tools</Link>
-              <Link to="/viewer">Viewer</Link>
               <Link to="/about">About</Link>
               <a
                 href="https://github.com/intabtools/intabpdf"

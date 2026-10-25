@@ -74,16 +74,49 @@ On mobile (`android`), the navigation drawer follows specific geometry matching 
 
 ---
 
-## 4. Temporary Full-Screen PDF Mode
+## 4. Fullscreen and Distraction-Free Modes
 
-In the PDF viewer ([src/viewer/ViewerPage.tsx](file:///home/ayusman/Desktop/intabpdf/src/viewer/ViewerPage.tsx)), users can toggle full-screen reading mode:
-- Clicking the `Maximize2` / `Minimize2` button in the toolbar invokes `setShowAppLayout(false)`.
-- [src/components/AppShell.tsx](file:///home/ayusman/Desktop/intabpdf/src/components/AppShell.tsx) and [src/components/WebShell.tsx](file:///home/ayusman/Desktop/intabpdf/src/components/WebShell.tsx) hide the outer application header, sidebar, navigation rail, and bottom nav.
-- Pressing `Escape` or the Android Back button restores `showAppLayout: true` immediately.
+In the embedded PDF viewer ([src/viewer/ViewerPage.tsx](file:///home/ayusman/Desktop/intabpdf/src/viewer/ViewerPage.tsx)), full-screen reading is separated into two dedicated capabilities:
+
+1. **Window Fullscreen (`Maximize2` / `Minimize2` button, `F` key):**
+   - Invokes standard DOM `document.documentElement.requestFullscreen()` / `exitFullscreen()`.
+   - Expands the window to occupy the entire physical monitor without operating system taskbars.
+2. **Distraction-Free Mode (`Lock` / `LockOpen` button):**
+   - Calls `setShowAppLayout(false)` to cleanly hide the application header, sidebar, bottom navigation, and status bar.
+   - Preserves current scroll position, active page, and zoom factor without layout shifting.
+   - Shows a transient floating exit padlock button (`Exit distraction-free mode`) that appears upon cursor movement and fades after 2.2 seconds.
+   - Dismissible via clicking the padlock button, pressing `Escape`, or the Android Back button.
 
 ---
 
-## 5. Build Commands
+## 5. Platform PDF Viewing Strategies
+
+To best fit the constraints and strengths of each environment, InTabPDF uses tailored viewing mechanisms:
+
+### Web Browser
+- Instead of running a duplicate PDF.js rendering instance within the browser, the web platform routes viewing directly to a new browser tab via `openPdfInNewTab` ([src/platform/webPdf.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/webPdf.ts)).
+- Generates a local Blob URL appended with `#filename=${encodeURIComponent(fileName)}` so the browser's native PDF engine receives the file name.
+- Automatically tracks and revokes Blob URLs after 10 minutes or upon tab `beforeunload` to prevent memory leaks.
+- Handles popup blocking gracefully with toast notifications and direct download fallbacks.
+- The `/viewer` route is disabled on web; navigation to `/viewer` automatically redirects to `/`.
+- Responsive container geometry (`.wp`, `.whi` scaling from 1120px up to 1520px at ≥ 1600px) allowing tool-card catalogs to expand across 3 to 5 columns on wide monitors.
+
+### Electron Desktop & Capacitor Android
+- Retains the full-featured, zero-latency embedded PDF viewer (`/viewer`).
+- Responsive dashboard layout: expands across the full available content area after the sidebar with a comfortable 1560px ceiling on ultra-wide screens, scaling dynamically from 2 columns on mobile to 5 columns at 1650px and 6 columns on Full HD / collapsed sidebar.
+- Direct page-number navigation via an editable badge input (`.vtb-page-badge`), Next/Prev page toolbar buttons, and accessible keyboard navigation (`PageUp`, `PageDown`, `Home`, `End`, `ArrowUp`, `ArrowDown`).
+- Container-scroll target calculation (`scrollTop`) that bypasses compositor smooth-scroll stalls and guarantees instant, deterministic scrolling in nested scroll hierarchies.
+- Centered page-proximity tracking that accurately synchronizes current page number regardless of page aspect ratio or bottom boundary scroll limits.
+- Zoom controls spanning 25% to 400% with accessible zoom badge click-to-fit, dynamic Fit-to-Width, double-click on page canvas to toggle zoom/fit, and keyboard shortcuts (`Ctrl++`, `Ctrl+-`, `Ctrl+0`).
+- Asynchronous fulltext search with match counts (`Searching...`, `X of Y`, `No matches`), Next/Prev navigation, keyboard shortcuts (`Ctrl+F`, `Enter`, `Shift+Enter`, `Escape`), and responsive layout adapted to narrow mobile viewports.
+- Graceful Android fullscreen fallback: when `requestFullscreen()` is unsupported or throws in Capacitor WebView, automatically enters distraction-free reading mode.
+- Explicit `touch-action: pan-x pan-y pinch-zoom` for fluid mobile scrolling and touch manipulation.
+- Quick document close action returning immediately to the empty drop-zone state and thoroughly clearing memory and references.
+- Touch-friendly floating pager and thumbnail drawer on mobile viewports.
+
+---
+
+## 6. Build Commands
 
 ```bash
 # Web development server

@@ -79,7 +79,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
       onClose();
       navigate(`/tool/${t.id}`);
       if (!isToolImplemented(t.id)) {
-        showToast('Coming soon — tool is under development');
+        showToast('Coming soon: tool is under development');
       }
     },
   }));

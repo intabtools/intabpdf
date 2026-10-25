@@ -65,7 +65,13 @@ export default function ShellContainer({ children }: { children: ReactNode }): R
   return (
     <ShellContext.Provider value={{ shell, setShell, showAppLayout, setShowAppLayout }}>
       {shell === 'web' ? (
-        <WebShell onSwitchToApp={() => setShell('app')} showAppLayout={showAppLayout}>{children}</WebShell>
+        <WebShell
+          onSwitchToApp={() => setShell('app')}
+          onSwitchToDesktop={() => setShell('app')}
+          showAppLayout={showAppLayout}
+        >
+          {children}
+        </WebShell>
       ) : (
         <AppShell onSwitchToWeb={() => setShell('web')} showAppLayout={showAppLayout}>{children}</AppShell>
       )}

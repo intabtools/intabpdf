@@ -212,6 +212,17 @@ export const platform: PlatformAdapter = {
 };
 
 export type { OpenedFile, PlatformType } from './types';
+export { openPdfInNewTab, revokeAllTrackedBlobUrls, getTrackedBlobUrlCount } from './webPdf';
+
+export function openExternalUrl(url: string): void {
+    if (typeof window !== 'undefined' && window.intab?.openExternalUrl) {
+        window.intab.openExternalUrl(url);
+        return;
+    }
+    if (typeof window !== 'undefined') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+}
 
 export function getPlatformType(): PlatformType {
     if (typeof window === 'undefined') return 'web';

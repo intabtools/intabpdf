@@ -1,3 +1,4 @@
+// Pure core operation for removing specified pages from a PDF document.
 import { PDFDocument } from 'pdf-lib';
 
 export interface RemovePagesOptions {

@@ -1,3 +1,5 @@
+// Central export hub for all pure PDF core operations and worker services.
+export { formatBytes } from './formatBytes';
 export { mergePdfs } from './merge';
 
 export { rotatePdfPages } from './rotate';

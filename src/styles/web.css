@@ -564,6 +564,24 @@
   }
 }
 
+@media (min-width: 1280px) {
+  .wp,
+  .whi {
+    max-width: 1360px;
+  }
+  .wgrid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .wp,
+  .whi {
+    max-width: 1520px;
+  }
+}
+
 /* ==========================================================================
    Web-Specific Scrollbars: Useful browser-style scrolling indicators
    ========================================================================== */

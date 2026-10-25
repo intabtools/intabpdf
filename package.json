@@ -21,6 +21,7 @@
     "build": "tsc -b && vite build",
     "build:desktop": "tsc -b && vite build --mode desktop",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
     "electron": "electron .",
     "desktop:dev": "concurrently -k \"npm:dev\" \"wait-on http://localhost:5173 && electron . --dev\"",

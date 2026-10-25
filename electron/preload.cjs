@@ -44,4 +44,9 @@ contextBridge.exposeInMainWorld('intab', {
       listeners.delete(listener);
     };
   },
+  openExternalUrl: (url) => {
+    if (typeof url === 'string') {
+      ipcRenderer.send('open-external-url', url);
+    }
+  },
 });

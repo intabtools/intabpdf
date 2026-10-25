@@ -102,7 +102,7 @@ export default function App(): ReactNode {
                 <Route
                   path="/"
                   element={
-                    !isScreenEnabled('home') ? (
+                    !isScreenEnabled('home', platform) ? (
                       <Navigate to={initialDest} replace />
                     ) : initialDest !== '/' ? (
                       <Navigate to={initialDest} replace />
@@ -114,7 +114,7 @@ export default function App(): ReactNode {
                 <Route
                   path="/viewer"
                   element={
-                    isScreenEnabled('viewer') ? (
+                    isScreenEnabled('viewer', platform) ? (
                       <ViewerPage />
                     ) : (
                       <Navigate to={initialDest} replace />
@@ -124,7 +124,7 @@ export default function App(): ReactNode {
                 <Route
                   path="/about"
                   element={
-                    isScreenEnabled('about') ? (
+                    isScreenEnabled('about', platform) ? (
                       <AboutPage />
                     ) : (
                       <Navigate to={initialDest} replace />
@@ -134,7 +134,7 @@ export default function App(): ReactNode {
                 <Route
                   path="/tool/:toolId"
                   element={
-                    isScreenEnabled('tool') ? (
+                    isScreenEnabled('tool', platform) ? (
                       <ToolRouteGuard />
                     ) : (
                       <Navigate to={initialDest} replace />

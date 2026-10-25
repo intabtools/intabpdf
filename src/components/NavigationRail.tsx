@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Code2, Eye, Info, LayoutGrid, Plus } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useViewer } from '../hooks/useViewer';
@@ -12,6 +12,13 @@ export default function NavigationRail(): ReactNode {
     const file = await openPdfPicker();
     if (file) {
       navigate('/viewer');
+    }
+  };
+
+  const handleSourceCodeClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (typeof window !== 'undefined' && window.intab?.openExternalUrl) {
+      e.preventDefault();
+      window.intab.openExternalUrl('https://github.com/intabtools/intabpdf');
     }
   };
 
@@ -65,6 +72,7 @@ export default function NavigationRail(): ReactNode {
         target="_blank"
         rel="noopener noreferrer"
         className="ri"
+        onClick={handleSourceCodeClick}
         aria-label="Source code on GitHub"
       >
         <Code2 size={22} strokeWidth={1.8} />

@@ -25,13 +25,15 @@ flowchart TD
 ### Architectural Responsibilities
 
 1. **Application Configuration (`src/config/screens.ts`)**
-   - Declares enabled screens (`home`, `viewer`, `tools`, `about`).
+   - Declares enabled screens per platform (`home`, `viewer`, `tools`, `about`).
+   - The embedded `/viewer` screen is explicitly disabled on `web` (`isScreenEnabled('viewer', 'web') === false`) to eliminate redundant embedded reader overhead, while remaining active on `electron` and `android`.
    - Defines platform-specific initial destinations (`web: '/'`, `electron: '/'`, `android: '/'`).
    - Configures default shell visibility (`showAppLayout: true`).
-   - Implements `resolveDestination(path, platform)` to provide deterministic fallbacks when navigating to disabled or non-existent routes.
+   - Implements `resolveDestination(path, platform)` to provide deterministic fallbacks (e.g. redirecting `/viewer` to `/` on web).
 
 2. **Screen and Tool Registry (`src/tools/registry.ts`)**
    - Authoritative registry of all 13 PDF tools across 4 categories (`Create`, `Organize`, `Shrink and secure`, `Sign and convert`).
+   - 6 tools are fully implemented: `merge`, `rotate`, `remove-pages`, `split`, `images-to-pdf`, and `compress`.
    - Encapsulates tool metadata, icon names, action verbs, input file types, default options, and availability (`'available' | 'coming-soon'`).
    - Exposes lazy module references (`component?: () => import(...)`) for on-demand loading.
    - Enforces validation via `validateRegistry()` with runtime assertions for ID uniqueness and availability consistency.
@@ -81,6 +83,9 @@ Heavy libraries such as `pdf-lib` (~420 KB) and `pdfjs-dist` (~440 KB + 1.2 MB w
 | `MergeTool-<hash>.js` (~1.1 KB) | Merge options & execution handler | Active tool is `merge` |
 | `RotateTool-<hash>.js` (~1.1 KB) | Rotation degree picker & handler | Active tool is `rotate` |
 | `RemovePagesTool-<hash>.js` (~1.8 KB) | Page range selector & validator | Active tool is `remove-pages` |
+| `SplitTool-<hash>.js` (~1.5 KB) | Split mode & range selection | Active tool is `split` |
+| `ImagesToPdfTool-<hash>.js` (~2.5 KB) | Image reorder, preview lightbox, page setup | Active tool is `images-to-pdf` |
+| `CompressTool-<hash>.js` (~2.2 KB) | Target size input & presets | Active tool is `compress` |
 | `core-<hash>.js` (~423 KB) | `pdf-lib` manipulation engine | Any tool executes or loads core |
 | `pdfWorker-<hash>.js` (~426 KB) | Background worker executing operations | Dispatched tool operation |
 
@@ -126,9 +131,9 @@ To provide a native-quality feel across target operating systems, InTabPDF uses 
 
 | Platform | Scrollbar Presentation | Layout Characteristics |
 |---|---|---|
-| **Android / Mobile** (`android`) | Hidden scrollbar tracks (`scrollbar-width: none; ::-webkit-scrollbar { display: none }`). Natural touch fling scrolling. | Full-bleed drawer overlay under status bar (`var(--sat)`), bottom navigation above gesture inset (`var(--sab)`). |
-| **Electron Desktop** (`electron`) | Transient floating scrollbar (6px width, transparent track, thumb visible during scroll/hover). | Persistent desktop sidebar (`width: 250px`), native title bar integration, keyboard shortcuts. |
-| **Web Browser** (`web`) | Subtle browser-style scrollbar (8px width, accessible contrast). | Centered max-width container (`max-width: 1040px`), top marketing header, breadcrumbs. |
+| **Android / Mobile** (`android`) | Hidden scrollbar tracks (`scrollbar-width: none; ::-webkit-scrollbar { display: none }`). Natural touch fling scrolling. | Full-bleed drawer overlay under status bar (`var(--sat)`), bottom navigation above gesture inset (`var(--sab)`). 2-column touch-friendly tool grid. |
+| **Electron Desktop** (`electron`) | Transient floating scrollbar (6px width, transparent track, thumb visible during scroll/hover). | Persistent desktop sidebar (`width: 232px`), collapsible to 64px (`Ctrl+B`), native title bar integration, responsive 2 to 6 column dashboard grid (`max-width: 1560px`). |
+| **Web Browser** (`web`) | Subtle browser-style scrollbar (8px width, accessible contrast). | Responsive centered container (`max-width: 1120px` to `1520px` on wide screens), top sticky navigation header, breadcrumbs. |
 
 ---
 
@@ -137,3 +142,31 @@ To provide a native-quality feel across target operating systems, InTabPDF uses 
 - **Local Execution:** PDFs are loaded into browser memory buffers. No remote API endpoints or analytics trackers exist.
 - **Content Security Policy (CSP):** Enforces `default-src 'self' blob:; object-src 'none'; script-src 'self' 'wasm-unsafe-eval'`.
 - **Zero Third-Party CDNs:** Fonts, icons, and PDF worker scripts are compiled into local production assets.
+
+---
+
+## 6. Web PDF Viewing Architecture
+
+On the web platform (`platform === 'web'`), embedded PDF viewing is replaced with native browser tab viewing via `src/platform/webPdf.ts`:
+
+- **Native Browser Tab Viewing:** `openPdfInNewTab(bytes, fileName)` creates an `application/pdf` Blob URL appended with `#filename=${encodeURIComponent(fileName)}` and opens it in a new browser tab (`target="_blank"`). This allows users to leverage their browser's native viewer (with built-in printing, zooming, saving, and search) without the overhead of loading PDF.js inside the web app shell.
+- **Blob URL Lifecycle Tracking:** All generated Blob URLs are registered with a timestamp. To prevent memory leaks, URLs are automatically revoked after 10 minutes. In addition, an event listener on `beforeunload` ensures all active tracked Blob URLs are revoked when the tab unloads.
+- **Popup Blocking Graceful Handling:** If `window.open` returns `null` or is blocked by browser security settings, `openPdfInNewTab` returns `false`, enabling callers (such as `ToolPage` and `HomePage`) to show a clear user toast offering an immediate fallback download.
+
+---
+
+## 7. UI Text Selection Policy
+
+To provide a refined application feel and prevent accidental text selection during drag-and-drop, reordering, and button clicks, InTabPDF defines a deliberate selection policy in `src/styles/base.css`:
+
+- **Chrome and Interactive Elements (`user-select: none`):**
+  - Application headers, navigation bars, tab bars, and drawers.
+  - Sidebar navigation items, command palette triggers, and status bar.
+  - Action buttons, icon buttons, badges, drag handles, and reordering grips.
+  - Drop zones, tool cards, and summary stats.
+- **Selectable Content Elements (`user-select: text`):**
+  - All form controls (`input`, `textarea`, `select`).
+  - Output filename inputs (`.ofn-input`) and tool parameters.
+  - Detailed error messages, crash reports, and technical callouts.
+  - Code blocks (`code`, `pre`) and documentation snippets.
+  - PDF text layer elements (`.textLayer`) within the desktop/Android viewer.

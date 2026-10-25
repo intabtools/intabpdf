@@ -1,3 +1,4 @@
+// Tool module for rotating PDF pages in 90-degree increments.
 import type { ReactNode } from 'react';
 import { RotateCw } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';

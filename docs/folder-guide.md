@@ -65,11 +65,11 @@ intabpdf/
 - **Keep here:** The interface, one version each for web, Electron and Capacitor, and the code that detects where the app runs.
 - **Avoid:** PDF logic, tool-specific code, UI.
 
-### `src/tools/<name>/`
+### `src/tools/`
 
-- **Purpose:** Everything for one tool, so people can build tools without stepping on each other.
-- **Keep here:** `<Name>Page.tsx`, `<name>.worker.ts`, `index.ts` (id, name, icon, route) and small components used only by this tool. Outside the tool folders, `tools/` also has `registry.ts` (the list of tools) and `types.ts` (shared tool types).
-- **Avoid:** PDF logic (it goes to `core`), imports from another tool, platform checks.
+- **Purpose:** Everything for PDF tools, organized to keep tools modular and independent.
+- **Keep here:** Tool UI modules in `src/tools/modules/<ToolName>.tsx` (e.g. `MergeTool.tsx`, `RotateTool.tsx`), `registry.ts` (the central list of tools), `types.ts` (shared tool definitions and component props), and utility modules like `filename.ts` and `reorder.ts`.
+- **Avoid:** PDF byte manipulation logic (it goes to `core`), imports from another tool, platform checks.
 
 ### `src/viewer/`
 

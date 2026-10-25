@@ -23,16 +23,22 @@ describe('config/screens', () => {
     expect(getDefaultShellVisibility('android')).toBe(true);
   });
 
-  it('checks screen enabled status correctly', () => {
+  it('checks screen enabled status correctly across platforms', () => {
     expect(isScreenEnabled('home')).toBe(true);
-    expect(isScreenEnabled('viewer')).toBe(true);
     expect(isScreenEnabled('about')).toBe(true);
     expect(isScreenEnabled('tool')).toBe(true);
+    // On web, embedded viewer screen is disabled in favor of native browser viewing
+    expect(isScreenEnabled('viewer', 'web')).toBe(false);
+    expect(isScreenEnabled('viewer', 'electron')).toBe(true);
+    expect(isScreenEnabled('viewer', 'android')).toBe(true);
   });
 
   it('resolves valid destinations', () => {
     expect(resolveDestination('/', 'web')).toBe('/');
+    // Web falls back to home when attempting to navigate to embedded /viewer
+    expect(resolveDestination('/viewer', 'web')).toBe('/');
     expect(resolveDestination('/viewer', 'electron')).toBe('/viewer');
+    expect(resolveDestination('/viewer', 'android')).toBe('/viewer');
     expect(resolveDestination('/about', 'android')).toBe('/about');
     expect(resolveDestination('/tool/merge', 'web')).toBe('/tool/merge');
     expect(resolveDestination('/tool/rotate', 'electron')).toBe('/tool/rotate');
@@ -52,11 +58,11 @@ describe('config/screens', () => {
   });
 
   it('supports configuring independent initial destinations per platform and safely falls back if initial destination is invalid', () => {
-    // 1. Web configured to /viewer
+    // 1. Web configured to /about
     const origWeb = APP_CONFIG.initialDestinations.web;
-    APP_CONFIG.initialDestinations.web = '/viewer';
-    expect(getInitialDestination('web')).toBe('/viewer');
-    expect(resolveDestination('/unknown-route', 'web')).toBe('/viewer');
+    APP_CONFIG.initialDestinations.web = '/about';
+    expect(getInitialDestination('web')).toBe('/about');
+    expect(resolveDestination('/unknown-route', 'web')).toBe('/about');
     APP_CONFIG.initialDestinations.web = origWeb;
 
     // 2. Electron configured to /tool/merge

@@ -30,11 +30,21 @@
 
 ---
 
-## We are just getting started
+## Project status
 
-InTab PDF is a very new project. The desktop and Android app shells are ready, and our first release will be a simple PDF viewer. The PDF tools (merge, split and more) come after that. The design is still taking shape, so this is a great time to join and help decide how everything looks and works.
+InTab PDF provides private, local PDF tools and viewing across Web, Desktop (Electron), and Android (Capacitor).
 
-Whether you write code, design screens, test on your phone, fix a spelling mistake in the docs, or just have an idea, you are welcome here.
+### Implemented tools
+- **Merge PDF**: Combine multiple PDFs into a single document with drag-and-drop ordering.
+- **Rotate PDF**: Rotate all or selected pages in 90-degree increments.
+- **Remove Pages**: Delete individual pages or page ranges with live validation.
+- **Split PDF**: Extract page ranges or split documents into multiple PDFs.
+- **Images to PDF**: Convert JPG, PNG, and WebP images to PDF with reordering, A4/Fit sizing, and preview lightbox.
+- **Compress PDF**: Optimize PDF size by setting target file size (KB/MB) or presets.
+
+### Viewing workflow by platform
+- **Web**: Generated PDFs and opened files open directly in a new browser tab using native browser PDF capabilities, avoiding redundant embedded reader overhead.
+- **Desktop (Electron) and Mobile (Android)**: Built-in in-app PDF viewer featuring asynchronous fulltext search with match navigation, fit-to-width, zoom (25% to 400%), page thumbnail rail, document close action, and distraction-free reading mode.
 
 ## Why InTab PDF
 
@@ -57,13 +67,9 @@ We are a group of students, so the code must be easy for everyone to read and ch
 
 | Platform | Technology | Status |
 |---|---|---|
-| Web | Vite + React + TypeScript | Just starting |
-| Desktop | Electron | Shell and icons ready, packages build.  |
-| Android | Capacitor | Shell and icons ready, packages build. |
-
-## First release: a PDF viewer
-
-We want something useful in people's hands early. So the first release is a simple PDF viewer for the desktop and Android apps: open a PDF, read it, zoom, move between pages. No editing yet. The tools follow in later releases. The reasons are in [decision 013](https://github.com/intabtools/intabpdf/blob/main/docs/decisions.md).
+| Web | Vite + React + TypeScript | Fully functional client-side tools with native tab PDF viewing |
+| Desktop | Electron | Fully functional with embedded PDF viewer and offline tools |
+| Android | Capacitor | Fully functional mobile app with embedded viewer and offline tools |
 
 ## Quick start
 
@@ -101,6 +107,7 @@ You do not need to read everything. Start with the first two files and come back
 | [platforms.md](https://github.com/intabtools/intabpdf/blob/main/docs/platforms.md) | Web, desktop and Android plans |
 | [maintainer-guide.md](https://github.com/intabtools/intabpdf/blob/main/docs/maintainer-guide.md) | For people who review PRs and make releases |
 | [decisions.md](https://github.com/intabtools/intabpdf/blob/main/docs/decisions.md) | Why we made some key choices |
+| [api-reference.md](https://github.com/intabtools/intabpdf/blob/main/docs/api-reference.md) | Technical reference for types, interfaces, worker protocols |
 
 ## Security
 
