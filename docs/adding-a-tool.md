@@ -1,157 +1,185 @@
-# Adding a new tool
+# Adding a New Tool to InTabPDF
 
-Each tool lives in its own folder. This way two people can build two different tools without touching the same files.
+InTabPDF uses a modular, plug-and-play architecture for all PDF tools. Adding a new tool requires no changes to the app router, navigation layout, or platform shells.
 
-No tool exists yet. Our first release is the PDF viewer, which is a screen and not a tool (see [decision 013](decisions.md)), so it is not the reference either. When the Merge tool is ready, it will become the reference to copy from. Until then, this page shows the idea using a small `rotate` tool as an example.
+---
 
-## The steps
+## 1. Overview of Steps
 
 ```mermaid
 flowchart LR
-    A["1. Core function and test"] --> B["2. Worker"]
-    B --> C["3. Page"]
-    C --> D["4. Tool definition"]
-    D --> E["5. Register"]
-    E --> F["6. Check and open PR"]
+    A["1. Core function in src/core/"] --> B["2. Unit test in src/core/"]
+    B --> C["3. Worker dispatch in src/core/worker/"]
+    C --> D["4. Tool UI Module in src/tools/modules/"]
+    D --> E["5. Register in src/tools/registry.ts"]
+    E --> F["6. Verify build & tests"]
 ```
 
-## Step 1: Write the logic in `core`
+---
 
-Create `src/core/rotate.ts`. It should be a pure function: bytes in, bytes out.
+## 2. Step-by-Step Implementation Guide
 
-```ts
-// src/core/rotate.ts
-import { PDFDocument, degrees } from "pdf-lib";
+### Step 1: Implement the Pure PDF Operation in `src/core/`
 
-export async function rotatePages(
-  input: Uint8Array,
-  angle: 90 | 180 | 270,
+Create or extend a function in `src/core/` (e.g., `src/core/compress.ts`). The function must be pure: accept byte buffers and options, and return a transformed `Uint8Array`.
+
+```typescript
+// src/core/compress.ts
+import { PDFDocument } from 'pdf-lib';
+
+export interface CompressOptions {
+  shrinkImages?: boolean;
+}
+
+export async function compressPdf(
+  buffer: Uint8Array,
+  options?: CompressOptions
 ): Promise<Uint8Array> {
-  const doc = await PDFDocument.load(input);
-  doc.getPages().forEach((page) => {
-    page.setRotation(degrees((page.getRotation().angle + angle) % 360));
-  });
-  return doc.save();
+  const doc = await PDFDocument.load(buffer);
+  // Perform PDF compression or stripping operations
+  return await doc.save({ useObjectStreams: true });
 }
 ```
 
-Then write a test next to it:
+Export the function from [src/core/index.ts](file:///home/ayusman/Desktop/intabpdf/src/core/index.ts):
+```typescript
+export * from './compress';
+```
 
-```ts
-// src/core/rotate.test.ts
-import { describe, it, expect } from "vitest";
-import { rotatePages } from "./rotate";
+### Step 2: Write Unit Tests
 
-describe("rotatePages", () => {
-  it("rotates every page", async () => { /* ... */ });
-  it("throws a clear error for a corrupt file", async () => { /* ... */ });
+Add unit tests in [src/core/pdf.test.ts](file:///home/ayusman/Desktop/intabpdf/src/core/pdf.test.ts) using `vitest`:
+```typescript
+describe('compressPdf', () => {
+  it('compresses a PDF document and produces valid output', async () => {
+    const testPdf = await createTestPdf(3);
+    const compressed = await compressPdf(testPdf);
+    expect(compressed).toBeInstanceOf(Uint8Array);
+    expect(compressed.byteLength).toBeGreaterThan(0);
+  });
 });
 ```
 
-Good things to remember for this step:
+### Step 3: Add to the Web Worker and Processing Service
 
-- Add a one or two line comment at the top of the file saying what it does.
-- No React, no `window`, no `document`, no platform code.
-- Do not change the input array. Return a new one.
-- Throw an `Error` with a message that a normal user can understand.
+Update [src/core/worker/service.ts](file:///home/ayusman/Desktop/intabpdf/src/core/worker/service.ts):
+1. Add the operation key to `PdfOperation`:
+   ```typescript
+   export type PdfOperation = 'merge' | 'rotate' | 'remove-pages' | 'compress';
+   ```
+2. Define the payload structure in `OperationPayloads`:
+   ```typescript
+   export interface OperationPayloads {
+     // ...
+     compress: { buffer: Uint8Array; options?: CompressOptions };
+   }
+   ```
+3. Add the operation to `executeOnMainThread()` in `service.ts`.
+4. Update [src/core/worker/pdfWorker.ts](file:///home/ayusman/Desktop/intabpdf/src/core/worker/pdfWorker.ts) in the worker message handler switch block.
 
-## Step 2: Create the worker
+### Step 4: Create the Tool UI Module in `src/tools/modules/`
 
-Create `src/tools/rotate/rotate.worker.ts`. Keep it thin. It only receives a message, calls `core` and replies.
+Create `src/tools/modules/CompressTool.tsx`. This module renders tool-specific options and executes the job via `pdfProcessingService`:
 
-```ts
-// src/tools/rotate/rotate.worker.ts
-import { rotatePages } from "../../core/rotate";
+```tsx
+import type { ReactNode } from 'react';
+import OutputFilenameInput from '../../components/OutputFilenameInput';
+import type { ToolComponentProps } from '../types';
+import { pdfProcessingService } from '../../core/worker/service';
 
-self.onmessage = async (e: MessageEvent) => {
-  const { id, payload } = e.data;
-  try {
-    const result = await rotatePages(payload.bytes, payload.angle);
-    self.postMessage({ id, ok: true, result }, [result.buffer]);
-  } catch (err) {
-    self.postMessage({ id, ok: false, error: (err as Error).message });
-  }
-};
+export default function CompressTool({
+  tool,
+  stagedFiles,
+  optionsState,
+  onOptionsChange,
+  onExecute,
+  isProcessing,
+  outputBaseName,
+  onOutputBaseNameChange,
+  defaultBaseName,
+  outputExtension,
+}: ToolComponentProps): ReactNode {
+  const handleRun = () => {
+    onExecute(async () => {
+      const buffer = stagedFiles[0].bytes;
+
+      return await pdfProcessingService.execute('compress', {
+        buffer,
+        options: {
+          shrinkImages: optionsState['shrink'],
+        },
+      });
+    });
+  };
+
+  return (
+    <div className="card opts">
+      <b>{tool.name} options</b>
+      {/* Tool options checkboxes or sliders */}
+
+      <OutputFilenameInput
+        value={outputBaseName ?? ''}
+        onChange={onOutputBaseNameChange ?? (() => {})}
+        placeholder={defaultBaseName ?? 'compressed-document'}
+        extension={outputExtension ?? '.pdf'}
+      />
+
+      <button
+        type="button"
+        className="cta"
+        onClick={handleRun}
+        disabled={isProcessing || stagedFiles.length === 0}
+      >
+        Compress PDF
+      </button>
+    </div>
+  );
+}
 ```
 
-## Step 3: Create the page
+### Step 5: Register the Tool in `src/tools/registry.ts`
 
-Create `src/tools/rotate/RotatePage.tsx`. Use the shared `ToolLayout`, `DropZone` and hooks once they exist. The page only handles the screen: choosing files, showing progress, showing errors and a download button.
-
-## Step 4: Create the tool definition
-
-```ts
-// src/tools/rotate/index.ts (an idea, not final)
-import { RotateCw } from "lucide-react";
-import type { ToolDefinition } from "../types";
-
-export const rotate: ToolDefinition = {
-  id: "rotate",
-  name: "Rotate pages",
-  description: "Turn pages left or right.",
-  icon: RotateCw,
-  route: "/rotate",
-  component: () => import("./RotatePage"), // loaded only when opened
-};
+Find or declare your tool definition in [src/tools/registry.ts](file:///home/ayusman/Desktop/intabpdf/src/tools/registry.ts):
+```typescript
+{
+  id: 'compress',
+  name: 'Compress',
+  description: 'Shrink file size without losing quality',
+  category: 'Shrink and secure',
+  icon: 'file-down',
+  fileType: 'pdf',
+  actionVerb: 'Compress',
+  noun: 'file',
+  outputName: 'compressed.pdf',
+  availability: 'available', // change from 'coming-soon' to 'available'
+  component: () => import('./modules/CompressTool'),
+  options: [
+    { id: 'shrink', label: 'Compress images', description: 'Downsample large photos', defaultValue: true },
+  ],
+}
 ```
 
-## Step 5: Register the tool
+Once registered in [src/tools/registry.ts](file:///home/ayusman/Desktop/intabpdf/src/tools/registry.ts), the tool is immediately active. The application shell and [src/pages/ToolPage.tsx](file:///home/ayusman/Desktop/intabpdf/src/pages/ToolPage.tsx) resolve the lazy component wrapper automatically via [`getToolComponent(tool)`](file:///home/ayusman/Desktop/intabpdf/src/tools/registry.ts#L254-L265) without requiring edits to page files, navigation rails, or routing definitions.
 
-Add one line to `src/tools/registry.ts`:
+---
 
-```ts
-import { rotate } from "./rotate";
+## 3. Verification
 
-export const tools = [merge, split, rotate];
-```
-
-The home grid and the route are created automatically.
-
-## Step 6: Check and open a pull request
-
-Run these commands (whatever is available at the moment):
+Always run the verification suite to ensure zero regressions:
 
 ```bash
+# 1. Type check and linting
 npm run lint
+
+# 2. Unit and worker tests
+npx vitest run
+
+# 3. Production Vite build (verifies dynamic chunk splitting)
 npm run build
-npm test
+
+# 4. Electron desktop build
+npm run build:desktop
+
+# 5. Android native Java compile
+cd android && ./gradlew compileDebugJavaWithJavac
 ```
-
-Then look at the checklist below and open your PR. Do not worry if you miss something. We will help in the review.
-
-## Checklist
-
-**Code**
-
-- [ ] PDF logic is in `core/`, not in the component
-- [ ] The `core` function has a test for a normal file and a bad file (empty, corrupt or password protected)
-- [ ] Heavy work runs in a worker
-- [ ] The tool does not import from another tool
-
-**Privacy**
-
-- [ ] No network calls, no analytics, no remote fonts or scripts
-- [ ] No file data is saved after the user closes the tool
-
-**User experience**
-
-- [ ] Shows progress for slow jobs
-- [ ] Shows a clear message when something fails
-- [ ] Works on a small mobile screen
-- [ ] Buttons and inputs have labels and work with the keyboard
-- [ ] Tried with a big PDF if you can
-
-**Project**
-
-- [ ] New library (if any) is checked with the [dependency checklist](dependencies.md)
-- [ ] Commit messages follow the [convention](commit-conventions.md)
-
-## Common mistakes
-
-| Mistake | Fix |
-|---|---|
-| Calling `pdf-lib` directly inside the page | Move it to `core` and call it from the worker |
-| Using `window` or `document` in `core` | Remove it. `core` should also run in Node tests |
-| Copying code from another tool | Move the shared code to `core`, `components` or `hooks` |
-| Forgetting to transfer the buffer | Pass `[result.buffer]` as the second argument to `postMessage` |
-| Loading the full PDF library in the main bundle | Use a dynamic `import()` for the page |

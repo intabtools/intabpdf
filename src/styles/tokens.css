@@ -1,55 +1,82 @@
-/* design tokens: colors, font and sizes for light and dark mode */
+/* design tokens: colors, fonts, spacing, shadows, and radii for light and dark mode */
 
 :root {
-    /* surfaces */
-    --header: #E2E7FA;
-    --background: #F2F4FA;
-    --surface: #FFFFFF;
-    --surface-2: #E7EAF5;
+  /* surfaces */
+  --header: #E2E7FA;
+  --background: #F2F4FA;
+  --surface: #FFFFFF;
+  --surface-2: #E7EAF5;
 
-    /* text and lines */
-    --text: #0E1330;
-    --text-muted: #5A6180;
-    --border: #D9DDEC;
+  /* text and lines */
+  --text: #0E1330;
+  --text-muted: #5A6180;
+  --border: #D9DDEC;
 
-    /* accent */
-    --accent: #0B2EA8;
-    --button: #0B2EA8;
-    --accent-soft: #E4E9FF;
-    --banner: #0B2EA8;
+  /* accent and buttons */
+  --accent: #0B2EA8;
+  --button: #0B2EA8;
+  --accent-soft: #E4E9FF;
+  --banner: #0B2EA8;
 
-    /* success */
-    --success: #16794A;
-    --success-soft: #DDF3E6;
+  /* success */
+  --success: #16794A;
+  --success-soft: #DDF3E6;
 
-    /* fonts */
-    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* fonts */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-    /* corner sizes */
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 14px;
+  /* corner sizes */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-sheet: 24px;
+  --radius-pill: 9999px;
 
+  /* shadows */
+  --shadow-sm: 0 1px 3px rgba(10, 15, 40, 0.08);
+  --shadow-md: 0 10px 30px rgba(10, 20, 60, 0.16);
+  --shadow-lg: 0 20px 56px rgba(10, 15, 40, 0.25);
+  --shadow-drawer: 0 0 50px rgba(0, 0, 0, 0.4);
+
+  /* aliases matching concept art classes */
+  --hd: var(--header);
+  --bg: var(--background);
+  --sf: var(--surface);
+  --s2: var(--surface-2);
+  --tx: var(--text);
+  --mu: var(--text-muted);
+  --ol: var(--border);
+  --ac: var(--accent);
+  --fill: var(--button);
+  --acs: var(--accent-soft);
+  --ok: var(--success);
+  --oks: var(--success-soft);
+  --hero: var(--banner);
+  --mono: var(--font-mono);
 }
 
 :root[data-theme="dark"] {
-    --header: #181D2F;
-    --background: #0A0C14;
-    --surface: #10131D;
-    --surface-2: #181C29;
+  --header: #181D2F;
+  --background: #0A0C14;
+  --surface: #10131D;
+  --surface-2: #181C29;
 
-    --text: #E8EBF5;
-    --text-muted: #8C94B0;
-    --border: #212638;
+  --text: #E8EBF5;
+  --text-muted: #8C94B0;
+  --border: #212638;
 
-    --accent: #AAB8FF;
-    --button: #4F63F0;
-    --accent-soft: rgba(170, 184, 255, 0.12);
-    --banner: #14208A;
+  --accent: #AAB8FF;
+  --button: #4F63F0;
+  --accent-soft: rgba(170, 184, 255, 0.12);
+  --banner: #14208A;
 
-    --success: #6FD3A0;
-    --success-soft: rgba(63, 185, 120, 0.16);
+  --success: #6FD3A0;
+  --success-soft: rgba(63, 185, 120, 0.16);
 
-
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 24px 60px rgba(0, 0, 0, 0.6);
+  --shadow-drawer: 0 0 50px rgba(0, 0, 0, 0.7);
 }

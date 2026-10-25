@@ -1,0 +1,620 @@
+/* Refined PDF Viewer styles matching InTabPDF.html concept art */
+
+.viewer-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: var(--background);
+  color: var(--text);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Outer layout wrapper */
+.vwx {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Viewer Toolbar (.vtb from InTabPDF.html) */
+.vtb {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 10px;
+  min-height: 45px;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  flex: none;
+  z-index: 5;
+}
+
+.vtb em {
+  font-style: normal;
+  font-size: 12px;
+  min-width: 48px;
+  text-align: center;
+  color: var(--text);
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.vtb .zoom-badge {
+  font-style: normal;
+  font-size: 12px;
+  min-width: 44px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.vtb .zoom-badge:hover {
+  background-color: var(--surface-2);
+  border-color: var(--border);
+}
+
+.vtb .zoom-badge.is-fit {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.vtb .vtb-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.vtb .vtb-open-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vtb .vtb-status-msg {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding-left: 6px;
+}
+
+.vtb .ib.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.vtb .sep {
+  width: 1px;
+  height: 18px;
+  background-color: var(--border);
+  margin: 0 8px;
+  flex: none;
+}
+
+.vtb .sp {
+  flex: 1;
+}
+
+.vtb .file-tag {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 4px;
+}
+
+/* Viewer Body: Thumbnails + Canvas Viewport (.vwr) */
+.vwr {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Left thumbnail sidebar (.thm) */
+.thm {
+  display: none;
+  width: 110px;
+  padding: 12px;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--surface);
+  border-right: 1px solid var(--border);
+  flex: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+@container app (min-width: 900px) {
+  .thm {
+    width: 128px;
+  }
+}
+
+@media (min-width: 900px) {
+  .thm {
+    width: 128px;
+  }
+}
+
+.tn {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.1s;
+}
+
+.tn:hover {
+  transform: translateY(-1px);
+}
+
+.tn .pg-thumb {
+  background: #ffffff;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(10, 20, 50, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root[data-theme="dark"] .tn .pg-thumb {
+  filter: brightness(0.92);
+}
+
+.tn.on .pg-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tn span {
+  display: block;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-family: var(--font-mono);
+}
+
+.tn.on span {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Scrollable canvas viewport (.cvs) */
+.cvs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background-color: var(--surface-2);
+  padding: 18px 16px 48px;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  overscroll-behavior: auto;
+}
+
+.cvs.fit-mode {
+  overflow-x: hidden;
+}
+
+.cvs.manual-zoom-mode {
+  overflow-x: auto;
+}
+
+.cvs::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.cvs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cvs::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: var(--radius-pill);
+  transition: background-color 0.18s ease;
+}
+
+.cvs:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
+.cvs::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted) !important;
+}
+
+.cvs::-webkit-scrollbar-thumb:active {
+  background: var(--accent) !important;
+}
+
+/* Mobile & Android: completely hide persistent scrollbar, preserve touch scrolling */
+html[data-platform="android"] .cvs,
+html[data-platform="android"] .thm {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html[data-platform="android"] .cvs::-webkit-scrollbar,
+html[data-platform="android"] .thm::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+@media (max-width: 519.98px) {
+  .app:not(.web) .cvs,
+  .app:not(.web) .thm {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .app:not(.web) .cvs::-webkit-scrollbar,
+  .app:not(.web) .thm::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+/* Web mode: visible browser-style scrollbar */
+.web .cvs::-webkit-scrollbar,
+.web .thm::-webkit-scrollbar,
+html[data-shell="web"] .cvs::-webkit-scrollbar,
+html[data-shell="web"] .thm::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  display: block;
+}
+
+.web .cvs::-webkit-scrollbar-thumb,
+.web .thm::-webkit-scrollbar-thumb,
+html[data-shell="web"] .cvs::-webkit-scrollbar-thumb,
+html[data-shell="web"] .thm::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-xs);
+}
+
+:root[data-theme="dark"] .cvs {
+  background-color: #07080e;
+}
+
+/* Individual page container (.pg) */
+.pg-item {
+  margin: 0 auto 18px;
+  background-color: #ffffff;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(10, 20, 60, 0.22);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  pointer-events: auto;
+  overscroll-behavior: auto;
+  flex: none;
+}
+
+.pg-item canvas {
+  pointer-events: auto;
+  overscroll-behavior: auto;
+  display: block;
+}
+
+:root[data-theme="dark"] .pg-item {
+  filter: brightness(0.92);
+}
+
+.pg-placeholder {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Mobile floating page indicator pill (.pl from InTabPDF.html) */
+.pl {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--text);
+  color: var(--background);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+  font: 12px/1 var(--font-mono);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  z-index: 20;
+}
+
+.pl button {
+  background: none;
+  border: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  border-radius: 50%;
+  transition: background-color 0.12s;
+}
+
+.pl button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.pl button:disabled {
+  opacity: 0.3;
+}
+
+.pl span {
+  padding: 0 4px;
+  user-select: none;
+}
+
+/* Empty state viewport & card */
+.empty-viewport {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.empty-card {
+  width: 100%;
+  max-width: 540px;
+}
+
+/* Loading & Error States */
+.viewer-state-box {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.viewer-state-box h3 {
+  margin: 12px 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.viewer-state-box p {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.viewer-state-box.error {
+  color: var(--text);
+}
+
+.viewer-state-box .state-err-icon {
+  color: #e81123;
+}
+
+.viewer-state-box .cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: var(--radius-sm);
+  border: 0;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.viewer-state-box .cta:hover {
+  opacity: 0.92;
+}
+
+.vtb-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: vtb-spin 0.75s linear infinite;
+}
+
+@keyframes vtb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fullscreen floating unlock button */
+.padlock-top {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.padlock-top.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -10px);
+}
+
+.padlock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background-color: var(--text);
+  color: var(--background);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.error-box {
+  max-width: 540px;
+  margin: 20px auto;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid #e81123;
+  background-color: rgba(232, 17, 35, 0.1);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+/* Breakpoint rules for Viewer Toolbar & Thumbnails */
+@container app (min-width: 520px) {
+  .vtb {
+    display: flex;
+  }
+  .thm.visible {
+    display: flex;
+  }
+  .pl {
+    display: none;
+  }
+}
+
+@media (min-width: 520px) {
+  .vtb {
+    display: flex;
+  }
+  .thm.visible {
+    display: flex;
+  }
+  .pl {
+    display: none;
+  }
+}
+
+/* Mobile Thumbnails Drawer Sheet */
+.mobile-thm-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  animation: fade-in 0.15s ease-out;
+}
+
+.mobile-thm-sheet {
+  width: min(300px, 80vw);
+  height: 100%;
+  background-color: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 51;
+  animation: slide-in-right 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-thm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.mobile-thm-header h3 {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.mobile-thm-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+html[data-platform="android"] .mobile-thm-list {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html[data-platform="android"] .mobile-thm-list::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+@media (max-width: 519.98px) {
+  .mobile-thm-list {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .mobile-thm-list::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
