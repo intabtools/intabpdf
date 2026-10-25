@@ -29,3 +29,5 @@ dist-ssr
 .env.*
 !.env.example
 
+/InTabPDF.html
+/InTabPDF_UI_Design_Spec_v2.md
