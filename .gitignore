@@ -12,6 +12,8 @@ dist
 release
 dist-ssr
 *.local
+UI
+artifacts
 
 # Editor directories and files
 .vscode/*
