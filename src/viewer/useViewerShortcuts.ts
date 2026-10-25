@@ -45,10 +45,12 @@ export function useViewerShortcuts({
 
       if (e.key === 'Escape') {
         if (isSearchOpen) {
+          e.preventDefault();
           setIsSearchOpen(false);
           return;
         }
         if (mobileThumbnailsOpen) {
+          e.preventDefault();
           setMobileThumbnailsOpen(false);
           return;
         }
@@ -58,6 +60,7 @@ export function useViewerShortcuts({
           return;
         }
         if (isDistractionFree) {
+          e.preventDefault();
           exitDistractionFree();
           return;
         }

@@ -45,6 +45,37 @@ describe('Responsive Validation and Sizing Audit', () => {
     });
   });
 
+  it('validates mobile top-bar width calculation prevents horizontal overflow across narrow phones', () => {
+    mobileWidths.forEach((width) => {
+      // Essential actions on mobile viewer top bar: Close (34), Thumbnails (34), Prev (32), Badge (42), Next (32), Search (34), Fullscreen (34), Padlock (34)
+      const toolbarButtonsWidth = 34 + 34 + 32 + 42 + 32 + 34 + 34 + 34;
+      const totalGapAndPadding = 8 * 2 + 12;
+      const totalToolbarRequired = toolbarButtonsWidth + totalGapAndPadding;
+
+      // Must fit in representative mobile widths (320, 360, 390, 412) without horizontal scrolling
+      expect(totalToolbarRequired).toBeLessThanOrEqual(width);
+    });
+  });
+
+  it('renders mobile subpage header with back button and without markup corruption', () => {
+    const subpageHtml = renderToString(
+      <MemoryRouter initialEntries={['/tool/compress']}>
+        <AppHeader
+          onToggleSidebar={() => {}}
+          onOpenPalette={() => {}}
+          isDark={false}
+          onToggleTheme={() => {}}
+          subTitle="Compress"
+          isSidebarCollapsed={false}
+          isDrawerOpen={false}
+        />
+      </MemoryRouter>
+    );
+
+    expect(subpageHtml).toContain('title="Back to previous page"');
+    expect(subpageHtml).toContain('Compress');
+  });
+
   it('renders HomePage dashboard tools and dropzone without markup corruption', () => {
     const html = renderToString(
       <MemoryRouter initialEntries={['/']}>

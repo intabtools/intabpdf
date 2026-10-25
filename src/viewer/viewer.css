@@ -594,16 +594,70 @@
   font-size: 13.5px;
 }
 
+.zoom-label-full {
+  display: inline;
+}
+
+.zoom-label-compact {
+  display: none;
+}
+
 /* Breakpoint rules for Viewer Toolbar & Thumbnails */
 @container app (max-width: 519.98px) {
+  .vtb {
+    overflow-x: hidden;
+    padding: 4px calc(6px + env(safe-area-inset-right, 0px)) 4px calc(6px + env(safe-area-inset-left, 0px));
+    gap: 2px;
+    justify-content: space-between;
+  }
   .vtb .vtb-desktop-toggle {
-    display: none;
+    display: none !important;
+  }
+  .vtb .zoom-badge {
+    min-width: 34px;
+    padding: 2px 4px;
+    font-size: 11px;
+  }
+  .zoom-label-full {
+    display: none !important;
+  }
+  .zoom-label-compact {
+    display: inline !important;
   }
 }
 
 @media (max-width: 519.98px) {
+  .vtb {
+    overflow-x: hidden;
+    padding: 4px calc(6px + env(safe-area-inset-right, 0px)) 4px calc(6px + env(safe-area-inset-left, 0px));
+    gap: 2px;
+    justify-content: space-between;
+  }
   .vtb .vtb-desktop-toggle {
-    display: none;
+    display: none !important;
+  }
+  .vtb .zoom-badge {
+    min-width: 34px;
+    padding: 2px 4px;
+    font-size: 11px;
+  }
+  .zoom-label-full {
+    display: none !important;
+  }
+  .zoom-label-compact {
+    display: inline !important;
+  }
+}
+
+@container app (max-width: 359.98px) {
+  .vtb .zoom-badge {
+    display: none !important;
+  }
+}
+
+@media (max-width: 359.98px) {
+  .vtb .zoom-badge {
+    display: none !important;
   }
 }
 
@@ -650,6 +704,7 @@
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   z-index: 51;
   animation: slide-in-right 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.25);
@@ -659,7 +714,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 14px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -879,6 +934,32 @@ html[data-platform="android"] .mobile-thm-list::-webkit-scrollbar {
 .viewer-shell.is-fullscreen .viewer-search-bar {
   top: max(60px, calc(env(safe-area-inset-top) + 52px));
   right: max(16px, env(safe-area-inset-right));
+}
+
+@container app (max-width: 519.98px) {
+  .viewer-pill-label {
+    display: none;
+  }
+  .viewer-pill-br {
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 46px);
+    right: max(12px, env(safe-area-inset-right));
+  }
+  .viewer-pill-bc {
+    bottom: max(14px, env(safe-area-inset-bottom));
+  }
+  .viewer-pill-tl {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+  }
+  .viewer-pill-tr {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+  .viewer-shell.is-fullscreen .viewer-search-bar {
+    top: max(56px, calc(env(safe-area-inset-top) + 48px));
+    left: 12px;
+    right: 12px;
+  }
 }
 
 @media (max-width: 519.98px) {

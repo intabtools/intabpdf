@@ -206,15 +206,20 @@ export default function ViewerPage(): ReactNode {
           onOpenPalette={handleOpenPalette}
           onCloseDocument={() => void handleCloseDocument()}
           showThumbnails={showThumbnails}
-          onToggleThumbnails={() =>
-            setShowThumbnails((prev) => {
-              const next = !prev;
-              if (!isFullscreen) {
-                normalThumbnailsRef.current = next;
-              }
-              return next;
-            })
-          }
+          mobileThumbnailsOpen={mobileThumbnailsOpen}
+          onToggleThumbnails={() => {
+            if (typeof window !== 'undefined' && window.innerWidth < 520) {
+              setMobileThumbnailsOpen((prev) => !prev);
+            } else {
+              setShowThumbnails((prev) => {
+                const next = !prev;
+                if (!isFullscreen) {
+                  normalThumbnailsRef.current = next;
+                }
+                return next;
+              });
+            }
+          }}
           currentPage={currentPage}
           numPages={numPages}
           onJumpToPage={jumpToPage}

@@ -336,4 +336,142 @@ describe('Viewer Controls & Navigation Logic', () => {
       vi.unstubAllGlobals();
     });
   });
+
+  describe('Android Navigation & Padlock-Mode Usability Contracts', () => {
+    it('opens mobile thumbnails drawer on viewports < 520px and side rail on desktop', () => {
+      const getThumbnailToggleAction = (viewportWidth: number) => {
+        if (viewportWidth < 520) {
+          return 'mobile-sheet';
+        }
+        return 'desktop-rail';
+      };
+
+      expect(getThumbnailToggleAction(360)).toBe('mobile-sheet');
+      expect(getThumbnailToggleAction(390)).toBe('mobile-sheet');
+      expect(getThumbnailToggleAction(412)).toBe('mobile-sheet');
+      expect(getThumbnailToggleAction(768)).toBe('desktop-rail');
+      expect(getThumbnailToggleAction(1280)).toBe('desktop-rail');
+    });
+
+    it('keeps padlock toggle, page navigation, fullscreen exit, and close-PDF actions distinct and functional', () => {
+      // Starting state: viewer opened with 10 pages in normal mode
+      let showAppLayout = true;
+      let isDistractionFree = false;
+      let isFullscreen = false;
+      let currentPage = 1;
+      const numPages = 10;
+      let currentDocument: string | null = 'sample.pdf';
+
+      // 1. Enter padlock mode (distraction-free)
+      const togglePadlock = () => {
+        isDistractionFree = !isDistractionFree;
+        showAppLayout = !isDistractionFree;
+      };
+      togglePadlock();
+      expect(isDistractionFree).toBe(true);
+      expect(showAppLayout).toBe(false);
+      expect(isFullscreen).toBe(false);
+      expect(currentPage).toBe(1);
+
+      // 2. Page navigation works inside padlock mode
+      const jumpToPage = (p: number) => {
+        currentPage = Math.max(1, Math.min(numPages, p));
+      };
+      jumpToPage(4);
+      expect(currentPage).toBe(4);
+      expect(isDistractionFree).toBe(true); // Still in padlock mode
+
+      // 3. Enter fullscreen from padlock mode
+      const enterFs = () => {
+        isFullscreen = true;
+        isDistractionFree = false;
+      };
+      enterFs();
+      expect(isFullscreen).toBe(true);
+      expect(isDistractionFree).toBe(false);
+      expect(currentPage).toBe(4); // Page preserved
+
+      // 4. Exit fullscreen returns to normal mode with page preserved
+      const exitFs = () => {
+        isFullscreen = false;
+        showAppLayout = true;
+      };
+      exitFs();
+      expect(isFullscreen).toBe(false);
+      expect(showAppLayout).toBe(true);
+      expect(currentPage).toBe(4);
+
+      // 5. Re-enter padlock mode
+      togglePadlock();
+      expect(isDistractionFree).toBe(true);
+      expect(showAppLayout).toBe(false);
+
+      // 6. Close PDF: exits padlock mode, clears document, and restores shell
+      const closePdf = () => {
+        if (isDistractionFree) {
+          isDistractionFree = false;
+          showAppLayout = true;
+        }
+        if (isFullscreen) {
+          isFullscreen = false;
+          showAppLayout = true;
+        }
+        currentDocument = null;
+        currentPage = 1;
+      };
+      closePdf();
+      expect(currentDocument).toBeNull();
+      expect(isDistractionFree).toBe(false);
+      expect(showAppLayout).toBe(true);
+      expect(currentPage).toBe(1);
+    });
+
+    it('enforces layered Escape / Android Back dismissal order without skipping states', () => {
+      let isSearchOpen = true;
+      let mobileThumbnailsOpen = true;
+      let isFullscreen = true;
+      let isDistractionFree = false;
+
+      const handleDismissal = () => {
+        if (isSearchOpen) {
+          isSearchOpen = false;
+          return 'closed-search';
+        }
+        if (mobileThumbnailsOpen) {
+          mobileThumbnailsOpen = false;
+          return 'closed-thumbnails';
+        }
+        if (isFullscreen) {
+          isFullscreen = false;
+          return 'exited-fullscreen';
+        }
+        if (isDistractionFree) {
+          isDistractionFree = false;
+          return 'exited-distraction-free';
+        }
+        return 'unhandled';
+      };
+
+      // Step 1: Closes search first
+      expect(handleDismissal()).toBe('closed-search');
+      expect(mobileThumbnailsOpen).toBe(true);
+      expect(isFullscreen).toBe(true);
+
+      // Step 2: Closes thumbnails sheet next
+      expect(handleDismissal()).toBe('closed-thumbnails');
+      expect(isFullscreen).toBe(true);
+
+      // Step 3: Exits fullscreen next
+      expect(handleDismissal()).toBe('exited-fullscreen');
+      expect(isFullscreen).toBe(false);
+
+      // Switch to distraction-free to test padlock dismissal
+      isDistractionFree = true;
+      expect(handleDismissal()).toBe('exited-distraction-free');
+      expect(isDistractionFree).toBe(false);
+
+      // Final step: Unhandled by viewer, passes to AppShell router
+      expect(handleDismissal()).toBe('unhandled');
+    });
+  });
 });

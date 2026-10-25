@@ -120,6 +120,16 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
 
     let cleanup: (() => void) | undefined;
     App.addListener('backButton', () => {
+      const escapeEvent = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(escapeEvent);
+      if (escapeEvent.defaultPrevented) {
+        return;
+      }
+
       if (!showAppLayout) {
         setShowAppLayout(true);
       } else if (isPaletteOpen) {

@@ -281,6 +281,9 @@ code,
   font-weight: 650;
   color: var(--text);
   font-size: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sub .hb {
@@ -1588,9 +1591,12 @@ details p {
   .hdr {
     background: var(--header);
     border-bottom: 0;
-    padding: env(safe-area-inset-top, 0px) 8px 0 4px;
+    padding: env(safe-area-inset-top, 0px) calc(8px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
     min-height: 60px;
     height: calc(60px + env(safe-area-inset-top, 0px));
+  }
+  .sub .mn {
+    display: none !important;
   }
   .hdr .ib:active {
     background: color-mix(in srgb, var(--text) 10%, transparent);
@@ -1640,9 +1646,12 @@ details p {
   .hdr {
     background: var(--header);
     border-bottom: 0;
-    padding: env(safe-area-inset-top, 0px) 8px 0 4px;
+    padding: env(safe-area-inset-top, 0px) calc(8px + env(safe-area-inset-right, 0px)) 0 calc(4px + env(safe-area-inset-left, 0px));
     min-height: 60px;
     height: calc(60px + env(safe-area-inset-top, 0px));
+  }
+  .sub .mn {
+    display: none !important;
   }
   .hdr .ib:active {
     background: color-mix(in srgb, var(--text) 10%, transparent);

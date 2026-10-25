@@ -24,6 +24,7 @@ interface ViewerToolbarProps {
   onOpenPalette: () => void;
   onCloseDocument: () => void;
   showThumbnails: boolean;
+  mobileThumbnailsOpen?: boolean;
   onToggleThumbnails: () => void;
   currentPage: number;
   numPages: number;
@@ -58,6 +59,7 @@ export default function ViewerToolbar({
   onOpenPalette,
   onCloseDocument,
   showThumbnails,
+  mobileThumbnailsOpen = false,
   onToggleThumbnails,
   currentPage,
   numPages,
@@ -116,7 +118,7 @@ export default function ViewerToolbar({
         <>
           <button
             type="button"
-            className="ib sm"
+            className="ib sm vtb-desktop-toggle"
             onClick={onOpenClick}
             aria-label="Open another PDF"
             title="Open another PDF"
@@ -134,19 +136,27 @@ export default function ViewerToolbar({
             <X size={18} strokeWidth={2} />
           </button>
 
-          <i className="sep" />
+          <i className="sep vtb-desktop-toggle" />
 
           <button
             type="button"
-            className={`ib sm ${showThumbnails ? 'active' : ''}`}
+            className={`ib sm ${showThumbnails || mobileThumbnailsOpen ? 'active' : ''}`}
             onClick={onToggleThumbnails}
-            aria-label={showThumbnails ? 'Hide page thumbnails' : 'Show page thumbnails'}
-            title={showThumbnails ? 'Hide page thumbnails' : 'Show page thumbnails'}
+            aria-label={
+              showThumbnails || mobileThumbnailsOpen
+                ? 'Hide page thumbnails'
+                : 'Show page thumbnails'
+            }
+            title={
+              showThumbnails || mobileThumbnailsOpen
+                ? 'Hide page thumbnails'
+                : 'Show page thumbnails'
+            }
           >
             <LayoutGrid size={16} strokeWidth={1.8} />
           </button>
 
-          <i className="sep" />
+          <i className="sep vtb-desktop-toggle" />
 
           <ViewerPageNavigation
             currentPage={currentPage}
@@ -161,11 +171,11 @@ export default function ViewerToolbar({
             onStartPageEdit={onStartPageEdit}
           />
 
-          <i className="sep" />
+          <i className="sep vtb-desktop-toggle" />
 
           <button
             type="button"
-            className="ib sm"
+            className="ib sm vtb-desktop-toggle"
             onClick={onZoomOut}
             disabled={zoom <= 25 && !isFitToWidth}
             aria-label="Zoom out"
@@ -188,11 +198,16 @@ export default function ViewerToolbar({
                 : `Zoom level: ${zoom}% - click to fit to width`
             }
           >
-            {isFitToWidth ? `Fit (${Math.round(fitScale * 100)}%)` : `${zoom}%`}
+            <span className="zoom-label-full">
+              {isFitToWidth ? `Fit (${Math.round(fitScale * 100)}%)` : `${zoom}%`}
+            </span>
+            <span className="zoom-label-compact">
+              {isFitToWidth ? 'Fit' : `${zoom}%`}
+            </span>
           </button>
           <button
             type="button"
-            className="ib sm"
+            className="ib sm vtb-desktop-toggle"
             onClick={onZoomIn}
             disabled={zoom >= 400 && !isFitToWidth}
             aria-label="Zoom in"
@@ -229,7 +244,7 @@ export default function ViewerToolbar({
 
           <button
             type="button"
-            className={`ib sm ${autoHideControls ? 'active' : ''}`}
+            className={`ib sm vtb-desktop-toggle ${autoHideControls ? 'active' : ''}`}
             onClick={onToggleAutoHide}
             aria-label={
               autoHideControls
