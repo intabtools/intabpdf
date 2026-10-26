@@ -27,7 +27,7 @@ export default function ShellContainer({ children }: { children: ReactNode }): R
     }
 
     // 3. Default to 'app' shell for InTabPDF desktop/mobile application
-    return 'app';
+    return getPlatformType() === 'web' ? 'web' : 'app';
   });
 
   const [showAppLayout, setShowAppLayout] = useState<boolean>(() => {
