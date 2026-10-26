@@ -25,9 +25,26 @@ export interface PageSize {
   height: number;
 }
 
-export async function loadPdf(bytes: Uint8Array): Promise<PdfDocument> {
+export interface LoadPdfOptions {
+  onPassword?: (
+    updatePassword: (password: string | Error) => void,
+    reason: number,
+  ) => void;
+  onLoadingTask?: (loadingTask: pdfjsLib.PDFDocumentLoadingTask) => void;
+}
+
+export async function loadPdf(
+  bytes: Uint8Array,
+  options?: LoadPdfOptions,
+): Promise<PdfDocument> {
   // Copy the bytes so PDF.js transferring data to its worker cannot detach the caller's buffer.
   const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
+  if (options?.onLoadingTask) {
+    options.onLoadingTask(loadingTask);
+  }
+  if (options?.onPassword) {
+    loadingTask.onPassword = options.onPassword;
+  }
   try {
     const doc = await loadingTask.promise;
     loadingTasks.set(doc, loadingTask);

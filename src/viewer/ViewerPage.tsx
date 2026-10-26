@@ -10,6 +10,7 @@ import ViewerFullscreenControls from './ViewerFullscreenControls';
 import ViewerSearchBar from './ViewerSearchBar';
 import ViewerThumbnails from './ViewerThumbnails';
 import ViewerPagesView from './ViewerPagesView';
+import PasswordDialog from '../components/PasswordDialog';
 import { createPdfLinkService } from './pdfLinks';
 import { useViewerFullscreen } from './useViewerFullscreen';
 import { useViewerZoom } from './useViewerZoom';
@@ -40,6 +41,9 @@ export default function ViewerPage(): ReactNode {
     isLoading,
     setLoading,
     error,
+    passwordPrompt,
+    submitPassword,
+    cancelPassword,
     handleOpenClick,
     handleFilesDropped,
     handleDrop,
@@ -360,6 +364,16 @@ export default function ViewerPage(): ReactNode {
           linkService={linkService}
         />
       </div>
+
+      {passwordPrompt && (
+        <PasswordDialog
+          fileName={passwordPrompt.fileName}
+          isIncorrect={passwordPrompt.isIncorrect}
+          isSubmitting={passwordPrompt.isSubmitting}
+          onSubmit={submitPassword}
+          onCancel={cancelPassword}
+        />
+      )}
     </div>
   );
 }
