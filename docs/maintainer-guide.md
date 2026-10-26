@@ -169,6 +169,8 @@ Before releasing:
 - [ ] Android: APK built, signed with the release key and installed on a real phone (a low-end one if possible)
 - [ ] Android: a PDF opened from the file manager opens in InTab PDF
 - [ ] Android: no new permissions in the manifest compared with the last release
+- [ ] Web: Cloudflare Pages deployment built successfully (`npm run build`, output `dist`)
+- [ ] Web: SPA rewrites verified (`/* /index.html 200` in `_redirects`) and `/robots.txt`, `/sitemap.xml`, `/about` load cleanly
 - [ ] Changelog written in simple words
 - [ ] Version bumped with a `release:` commit and tagged
 - [ ] Docs updated

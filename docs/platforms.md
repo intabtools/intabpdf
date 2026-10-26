@@ -151,3 +151,68 @@ npm run dist
 # Android native Java compilation
 cd android && ./gradlew compileDebugJavaWithJavac
 ```
+
+---
+
+## 8. Web Deployment & Hosting (Cloudflare Pages)
+
+The web edition of InTabPDF is deployed as a static client-side application via Cloudflare Pages connected to the GitHub repository.
+
+### Cloudflare Pages Configuration
+
+- **Connected Repository:** `https://github.com/intabtools/intabpdf`
+- **Production Branch:** `main` (auto-deploys on push; pull requests receive isolated preview deployments)
+- **Framework Preset:** `None` (or `Vite`)
+- **Build Command:** `npm run build` (`tsc -b && vite build`)
+- **Build Output Directory:** `dist`
+- **Environment Variables:**
+  - `NODE_VERSION`: `20` (Node.js 18+ or 20+ LTS required)
+
+### SPA Routing & Redirects
+
+Because InTabPDF uses HTML5 History API (`BrowserRouter`) on the web platform, direct browser visits or crawler requests to deep URLs (e.g. `/tool/merge` or `/about`) must serve `index.html`.
+The static rewrite rule is managed via [public/_redirects](file:///home/ayusman/Desktop/intabpdf/public/_redirects):
+
+```
+/* /index.html 200
+```
+
+Vite automatically copies this file to `dist/_redirects` during `npm run build`.
+
+### Deployment URLs & Custom Domains
+
+1. **Free `pages.dev` Subdomain:**
+   Cloudflare Pages automatically assigns `<project-name>.pages.dev` (e.g. `https://intabpdf.pages.dev`).
+2. **Custom Domain:**
+   Custom domains (e.g. `https://intabpdf.com`) can be configured at any time under **Cloudflare Pages Dashboard → Project Settings → Custom Domains**. Cloudflare manages SSL/TLS certificates and global CDN edge routing automatically.
+3. **Production URL & Sitemap Updates:**
+   Once the canonical production domain is assigned:
+   - Update the base URL `<loc>` entries in [public/sitemap.xml](file:///home/ayusman/Desktop/intabpdf/public/sitemap.xml).
+   - Uncomment the `Sitemap:` reference in [public/robots.txt](file:///home/ayusman/Desktop/intabpdf/public/robots.txt).
+   - Add `<link rel="canonical" href="https://<your-domain>/" />` to `index.html`.
+
+### Deployment Verification & Troubleshooting
+
+- **Verification:**
+  1. Navigate to the deployment URL (`https://<project>.pages.dev`).
+  2. Verify that homepage tools, the about page (`/about`), and direct tool links (`/tool/merge`, `/tool/compress`) load with HTTP 200 on hard refresh.
+  3. Verify that `/robots.txt`, `/sitemap.xml`, and `/favicon.svg` are reachable.
+  4. Open the browser DevTools Network tab, upload or process a sample PDF, and confirm **zero outbound network requests** are made with document data.
+- **Troubleshooting Failed Builds:**
+  - *TypeScript Errors (`tsc -b`):* Run `npm run build` locally to identify type mismatch errors before pushing.
+  - *Node Version Warning:* Ensure `NODE_VERSION: 20` is configured in Cloudflare Pages environment variables.
+  - *Missing Assets / 404 on Refresh:* Ensure `public/_redirects` is in place with `/* /index.html 200`.
+
+### Implemented Tools vs. Coming Soon Status
+
+The web production deployment includes 6 fully implemented, client-side tools and 7 tools marked "Coming soon":
+
+| Implemented (Live) | Coming Soon (Guarded & Redirects to Home) |
+|---|---|
+| **Merge** (`/tool/merge`) | **Text to PDF** (`/tool/text-to-pdf`) |
+| **Split** (`/tool/split`) | **Reorder pages** (`/tool/reorder`) |
+| **Compress** (`/tool/compress`) | **Protect** (`/tool/protect`) |
+| **Rotate pages** (`/tool/rotate`) | **Unlock** (`/tool/unlock`) |
+| **Remove pages** (`/tool/remove-pages`) | **Sign** (`/tool/sign`) |
+| **Images to PDF** (`/tool/images-to-pdf`) | **PDF to images** (`/tool/pdf-to-images`) |
+| | **Extract text** (`/tool/extract-text`) |

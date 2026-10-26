@@ -42,6 +42,8 @@ InTab PDF provides private, local PDF tools and viewing across Web, Desktop (Ele
 - **Images to PDF**: Convert JPG, PNG, and WebP images to PDF with reordering, A4/Fit sizing, and preview lightbox.
 - **Compress PDF**: Optimize PDF size by setting target file size (KB/MB) or presets.
 
+*Coming soon in upcoming updates:* Text to PDF, Reorder pages, Protect, Unlock, Sign, PDF to images, and Extract text.
+
 ### Viewing workflow by platform
 - **Web**: Generated PDFs and opened files open directly in a new browser tab using native browser PDF capabilities, avoiding redundant embedded reader overhead.
 - **Desktop (Electron) and Mobile (Android)**: Built-in in-app PDF viewer featuring asynchronous fulltext search with match navigation, fit-to-width, zoom (25% to 400%), page thumbnail rail, document close action, and distraction-free reading mode.
@@ -65,15 +67,15 @@ We are a group of students, so the code must be easy for everyone to read and ch
 
 ## Platforms
 
-| Platform | Technology | Status |
-|---|---|---|
-| Web | Vite + React + TypeScript | Fully functional client-side tools with native tab PDF viewing |
-| Desktop | Electron | Fully functional with embedded PDF viewer and offline tools |
-| Android | Capacitor | Fully functional mobile app with embedded viewer and offline tools |
+| Platform | Technology | Deployment / Packaging | Status |
+|---|---|---|---|
+| Web | Vite + React + TypeScript | Static site on Cloudflare Pages (`dist/`) | Fully functional client-side tools with native tab PDF viewing |
+| Desktop | Electron | NSIS/ZIP (Windows), AppImage/DEB/RPM (Linux) | Fully functional with embedded PDF viewer and offline tools |
+| Android | Capacitor | Android APK | Fully functional mobile app with embedded viewer and offline tools |
 
 ## Quick start
 
-You need [Node.js](https://nodejs.org) (current LTS).
+You need [Node.js](https://nodejs.org) (v18+ or v20+ LTS).
 
 ```bash
 git clone https://github.com/intabtools/intabpdf.git
@@ -82,7 +84,24 @@ npm install
 npm run dev
 ```
 
-The app may not show much yet, and that is okay. We are building it step by step.
+### Contributor commands
+
+```bash
+# Run unit and integration tests
+npm test
+
+# Check code formatting and linting
+npm run lint
+
+# Build web application for production
+npm run build
+
+# Preview production web build locally
+npm run preview
+
+# Build desktop application for Electron
+npm run build:desktop
+```
 
 ## Want to help?
 
