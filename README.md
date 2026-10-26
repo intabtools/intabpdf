@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/intabtools/intabpdf/actions/workflows/build.yml"><img src="https://github.com/intabtools/intabpdf/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status of main"></a>
-  <!--<a href="https://github.com/intabtools/intabpdf/releases/latest"><img src="https://img.shields.io/github/v/release/intabtools/intabpdf?include_prereleases&label=latest" alt="Latest release"></a> -->
+  <a href="https://github.com/intabtools/intabpdf/releases/latest"><img src="https://img.shields.io/github/v/release/intabtools/intabpdf?include_prereleases&label=latest" alt="Latest release"></a>
 </p>
 
 <p align="center">
