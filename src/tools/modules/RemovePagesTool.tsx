@@ -89,11 +89,14 @@ export default function RemovePagesTool({
           flexDirection: 'column',
           alignItems: 'flex-start',
           gap: '8px',
+          width: '100%',
+          minWidth: 0,
+          boxSizing: 'border-box',
         }}
       >
-        <span>
+        <span style={{ width: '100%', minWidth: 0 }}>
           Page numbers or ranges to remove
-          <small>
+          <small style={{ minWidth: 0, wordBreak: 'break-word' }}>
             {effectivePageCount !== null
               ? `Document has ${effectivePageCount} ${effectivePageCount === 1 ? 'page' : 'pages'}. Enter page numbers or ranges (e.g. 1-3, 5)`
               : 'Enter page numbers or ranges (e.g. 1-3, 5)'}
@@ -106,6 +109,8 @@ export default function RemovePagesTool({
           placeholder="e.g. 1-3, 5"
           style={{
             width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
             padding: '6px 10px',
             borderRadius: 'var(--radius-sm)',
             border: validation?.error
@@ -128,10 +133,14 @@ export default function RemovePagesTool({
               color: 'var(--text-muted)',
               fontSize: '12px',
               lineHeight: '1.4',
+              width: '100%',
+              minWidth: 0,
             }}
           >
             <Info size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
-            <span>This document has only 1 page. A PDF must have at least one remaining page, so pages cannot be removed.</span>
+            <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
+              This document has only 1 page. A PDF must have at least one remaining page, so pages cannot be removed.
+            </span>
           </div>
         )}
 
@@ -144,11 +153,13 @@ export default function RemovePagesTool({
               color: '#E81123',
               fontSize: '12px',
               lineHeight: '1.4',
+              width: '100%',
+              minWidth: 0,
             }}
             role="alert"
           >
             <AlertCircle size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
-            <span>{effectivePageError}</span>
+            <span style={{ minWidth: 0, wordBreak: 'break-word' }}>{effectivePageError}</span>
           </div>
         )}
 
@@ -163,11 +174,13 @@ export default function RemovePagesTool({
                   color: '#E81123',
                   fontSize: '12px',
                   lineHeight: '1.4',
+                  width: '100%',
+                  minWidth: 0,
                 }}
                 role="alert"
               >
                 <AlertCircle size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
-                <span>{validation.error}</span>
+                <span style={{ minWidth: 0, wordBreak: 'break-word' }}>{validation.error}</span>
               </div>
             ) : validation && validation.pageNumbers.length > 0 ? (
               <div
@@ -177,10 +190,12 @@ export default function RemovePagesTool({
                   alignItems: 'center',
                   color: 'var(--accent)',
                   fontSize: '12px',
+                  width: '100%',
+                  minWidth: 0,
                 }}
               >
                 <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
-                <span>
+                <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
                   Will remove {validation.pageNumbers.length}{' '}
                   {validation.pageNumbers.length === 1 ? 'page' : 'pages'} (
                   {validation.pageNumbers.join(', ')}). {validation.remainingCount}{' '}
@@ -196,10 +211,14 @@ export default function RemovePagesTool({
                   color: 'var(--text-muted)',
                   fontSize: '12px',
                   lineHeight: '1.4',
+                  width: '100%',
+                  minWidth: 0,
                 }}
               >
                 <Info size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
-                <span>Enter page numbers or ranges like 1-3, 5 to select pages for removal.</span>
+                <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
+                  Enter page numbers or ranges like 1-3, 5 to select pages for removal.
+                </span>
               </div>
             )}
           </>
@@ -226,7 +245,7 @@ export default function RemovePagesTool({
         );
       })}
 
-      <div style={{ marginTop: '6px', marginBottom: '8px' }}>
+      <div style={{ marginTop: '6px', marginBottom: '8px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -241,8 +260,8 @@ export default function RemovePagesTool({
         onClick={handleRun}
         disabled={isProcessing || !isValidToRemove}
       >
-        <Trash2 size={16} />
-        <span>
+        <Trash2 size={16} style={{ flexShrink: 0 }} />
+        <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.3 }}>
           {isProcessing ? 'Removing...' : 'Remove pages from file'}
         </span>
       </button>

@@ -28,7 +28,15 @@ function ThumbnailPreview({ file }: { file: StagedFile }): ReactNode {
     <img
       ref={imgRef}
       alt={file.name}
-      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '2px' }}
+      style={{
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        objectFit: 'cover',
+        borderRadius: '2px',
+      }}
     />
   );
 }
@@ -126,7 +134,18 @@ export default function StagedFileList({
                 draggable={false}
               >
                 <div className="pg">
-                  <div className="pgi" style={{ overflow: 'hidden' }}>
+                  <div
+                    className="pgi"
+                    style={{
+                      overflow: 'hidden',
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                    }}
+                  >
                     <ThumbnailPreview file={file} />
                   </div>
                 </div>
@@ -134,16 +153,28 @@ export default function StagedFileList({
             </span>
 
             <span className="nm">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, maxWidth: '100%' }}>
                 {toolId === 'images-to-pdf' && (
                   <span
                     className="badge-page"
                     title={`Page ${index + 1} of ${stagedFiles.length} in output PDF`}
+                    style={{ flexShrink: 0 }}
                   >
                     Page {index + 1}
                   </span>
                 )}
-                <b title={file.name}>{file.name}</b>
+                <b
+                  title={file.name}
+                  style={{
+                    minWidth: 0,
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {file.name}
+                </b>
               </div>
               <small>{formatBytes(file.size)}</small>
             </span>

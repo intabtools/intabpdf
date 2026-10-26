@@ -15,7 +15,7 @@ export default function ToolMissingState({
   if (!tool) {
     return (
       <div className="cnt">
-        <div className="card busy">
+        <div className="card busy" style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <b>Tool not found</b>
           <p className="lede">The requested tool does not exist.</p>
           <button type="button" className="cta" onClick={onNavigateHome}>
@@ -28,7 +28,7 @@ export default function ToolMissingState({
 
   return (
     <div className="cnt">
-      <div className="card busy" style={{ textAlign: 'center', padding: '36px 20px' }}>
+      <div className="card busy" style={{ textAlign: 'center', padding: '36px 20px', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
         <ToolIcon name={tool.icon} size={36} />
         <b style={{ fontSize: '18px', marginTop: '12px' }}>{tool.name}</b>
         <p className="lede" style={{ margin: '8px 0 20px' }}>

@@ -30,11 +30,16 @@ export default function SplitRangeInput({
         alignItems: 'flex-start',
         gap: '8px',
         marginTop: '8px',
+        width: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
       }}
     >
-      <span style={{ width: '100%' }}>
+      <span style={{ width: '100%', minWidth: 0 }}>
         Page ranges to extract
-        <small>Specify ranges separated by commas (e.g. 1-3, 4-6, 8)</small>
+        <small style={{ minWidth: 0, wordBreak: 'break-word' }}>
+          Specify ranges separated by commas (e.g. 1-3, 4-6, 8)
+        </small>
       </span>
       <input
         type="text"
@@ -44,6 +49,8 @@ export default function SplitRangeInput({
         disabled={disabled}
         style={{
           width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
           padding: '8px 12px',
           borderRadius: 'var(--radius-sm)',
           border: `1px solid ${rangeValidation.error ? '#E81123' : 'var(--border)'}`,
@@ -64,11 +71,13 @@ export default function SplitRangeInput({
             color: '#E81123',
             fontSize: '12px',
             lineHeight: '1.4',
+            width: '100%',
+            minWidth: 0,
           }}
           role="alert"
         >
           <AlertCircle size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
-          <span>{rangeValidation.error}</span>
+          <span style={{ minWidth: 0, wordBreak: 'break-word' }}>{rangeValidation.error}</span>
         </div>
       ) : (
         activeRanges.length > 0 && (
@@ -79,10 +88,12 @@ export default function SplitRangeInput({
               alignItems: 'center',
               color: 'var(--accent)',
               fontSize: '12px',
+              width: '100%',
+              minWidth: 0,
             }}
           >
             <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
-            <span>
+            <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
               Will create {activeRanges.length} {activeRanges.length === 1 ? 'file' : 'files'}:{' '}
               {activeRanges
                 .map((r) => (r.start === r.end ? `page ${r.start}` : `pages ${r.start}-${r.end}`))
@@ -101,10 +112,12 @@ export default function SplitRangeInput({
             color: 'var(--text-muted)',
             fontSize: '12px',
             lineHeight: '1.4',
+            width: '100%',
+            minWidth: 0,
           }}
         >
           <Info size={14} style={{ marginTop: '2px', flexShrink: 0 }} />
-          <span>
+          <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
             Pages not in any range ({rangeValidation.omittedPages.join(', ')}) will be omitted from the output.
           </span>
         </div>

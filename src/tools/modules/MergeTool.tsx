@@ -54,7 +54,7 @@ export default function MergeTool({
         );
       })}
 
-      <div style={{ marginTop: '6px', marginBottom: '8px' }}>
+      <div style={{ marginTop: '6px', marginBottom: '8px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -69,8 +69,8 @@ export default function MergeTool({
         onClick={handleRun}
         disabled={isProcessing || stagedFiles.length === 0}
       >
-        <Layers size={16} />
-        <span>
+        <Layers size={16} style={{ flexShrink: 0 }} />
+        <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.3 }}>
           {isProcessing ? 'Merging...' : `Merge ${stagedFiles.length} files`}
         </span>
       </button>

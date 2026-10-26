@@ -32,12 +32,15 @@ export default function ToolStatusCards({
             borderColor: '#E81123',
             background: 'rgba(232, 17, 35, 0.08)',
             marginBottom: '16px',
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
           }}
           role="alert"
         >
-          <AlertCircle size={28} color="#E81123" />
+          <AlertCircle size={28} color="#E81123" style={{ flexShrink: 0 }} />
           <b style={{ marginTop: '8px', color: '#E81123' }}>Operation failed</b>
-          <p className="lede" style={{ margin: '4px 0 14px' }}>
+          <p className="lede" style={{ margin: '4px 0 14px', wordBreak: 'break-word', minWidth: 0, maxWidth: '100%' }}>
             {errorMessage}
           </p>
           <button
@@ -46,8 +49,8 @@ export default function ToolStatusCards({
             onClick={onClearError}
             style={{ background: 'var(--text)' }}
           >
-            <RotateCcw size={16} />
-            <span>Try again</span>
+            <RotateCcw size={16} style={{ flexShrink: 0 }} />
+            <span style={{ minWidth: 0, textAlign: 'center' }}>Try again</span>
           </button>
         </div>
       )}

@@ -894,10 +894,18 @@ code,
 
 .tp {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
   max-width: 1240px;
   margin: 0 auto;
+}
+
+.tp > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .card {
@@ -914,6 +922,9 @@ code,
   padding: 10px 10px 10px 12px;
   margin-bottom: 8px;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
 }
 
@@ -1120,6 +1131,12 @@ code,
 .fi .nm {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+}
+
+.fi .nm > div {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .fi b {
@@ -1129,6 +1146,8 @@ code,
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13.5px;
+  min-width: 0;
+  flex: 1;
 }
 
 .fi small {
@@ -1166,6 +1185,9 @@ code,
 
 .opts {
   padding: 4px 16px 16px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sw {
@@ -1175,6 +1197,12 @@ code,
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+
+.sw > span:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .sw:last-of-type {
@@ -1227,6 +1255,9 @@ code,
   justify-content: center;
   gap: 8px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-top: 16px;
   padding: 12px;
   border: 0;
@@ -1236,6 +1267,12 @@ code,
   font-weight: 600;
   font-size: 14.5px;
   transition: filter 0.15s, transform 0.12s;
+}
+
+.cta span {
+  min-width: 0;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .cta:hover:not(:disabled) {
@@ -1262,6 +1299,9 @@ code,
   text-align: center;
   max-width: 620px;
   margin: 0 auto;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .busy b {
@@ -1282,6 +1322,9 @@ code,
   max-width: 620px;
   margin: 0 auto;
   text-align: left;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .done b {
@@ -1640,6 +1683,23 @@ details p {
   .hdr.hdr-viewer .hc {
     display: none !important;
   }
+  .opts {
+    padding: 4px 12px 14px;
+  }
+  .busy {
+    padding: 24px 14px;
+  }
+  .done {
+    padding: 20px 14px;
+  }
+  .fi {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .cta {
+    font-size: 13.5px;
+    padding: 11px 12px;
+  }
 }
 
 @media (max-width: 519.98px) {
@@ -1694,6 +1754,23 @@ details p {
   }
   .hdr.hdr-viewer .hc {
     display: none !important;
+  }
+  .opts {
+    padding: 4px 12px 14px;
+  }
+  .busy {
+    padding: 24px 14px;
+  }
+  .done {
+    padding: 20px 14px;
+  }
+  .fi {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .cta {
+    font-size: 13.5px;
+    padding: 11px 12px;
   }
 }
 

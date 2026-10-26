@@ -1,17 +1,33 @@
 // Pure core operation for local, client-side PDF document compression with target size support.
 import {
+  decodePDFRawStream,
   EncryptedPDFError,
+  PDFArray,
   PDFDict,
   PDFDocument,
   PDFName,
   PDFNumber,
+  PDFObject,
   PDFRawStream,
 } from 'pdf-lib';
-import { recompressJpegBytes } from './image-compression';
+import {
+  recompressJpegBytes,
+  recompressRasterPixels,
+  undoPngPredictor,
+  undoTiffPredictor,
+} from './image-compression';
+import { analyzePdfDocument } from './document-analysis';
 
 export { recompressJpegBytes } from './image-compression';
+export { analyzePdfDocument } from './document-analysis';
 
-export type CompressionPreset = 'light' | 'balanced' | 'strong';
+export type CompressionPreset =
+  | 'light'
+  | 'balanced'
+  | 'strong'
+  | 'recommended'
+  | 'smaller'
+  | 'high-quality';
 
 export interface CompressOptions {
   preset?: CompressionPreset;
@@ -28,6 +44,104 @@ export interface CompressionStats {
   isAlreadyOptimized: boolean;
   targetBytes?: number;
   targetAchieved?: boolean;
+}
+
+/**
+ * Checks whether a PDF stream filter contains DCTDecode (JPEG compression).
+ */
+function isDctDecodeFilter(filter: PDFObject | undefined): boolean {
+  if (!filter) return false;
+  if (filter instanceof PDFName) {
+    const s = filter.asString();
+    return s === '/DCTDecode' || s === 'DCTDecode';
+  }
+  if (filter instanceof PDFArray) {
+    return filter.asArray().some((item) => {
+      if (item instanceof PDFName) {
+        const s = item.asString();
+        return s === '/DCTDecode' || s === 'DCTDecode';
+      }
+      return false;
+    });
+  }
+  const str = filter.toString();
+  return str === '/DCTDecode' || str.includes('DCTDecode');
+}
+
+/**
+ * Checks whether a PDF stream filter contains FlateDecode (deflate compression).
+ */
+function isFlateDecodeFilter(filter: PDFObject | undefined): boolean {
+  if (!filter) return false;
+  if (filter instanceof PDFName) {
+    const s = filter.asString();
+    return s === '/FlateDecode' || s === 'FlateDecode';
+  }
+  if (filter instanceof PDFArray) {
+    return filter.asArray().some((item) => {
+      if (item instanceof PDFName) {
+        const s = item.asString();
+        return s === '/FlateDecode' || s === 'FlateDecode';
+      }
+      return false;
+    });
+  }
+  const str = filter.toString();
+  return str === '/FlateDecode' || str.includes('FlateDecode');
+}
+
+/**
+ * Checks whether a PDF indirect object represents an Image XObject.
+ */
+function isImageSubtype(subtype: PDFObject | undefined): boolean {
+  if (!subtype) return false;
+  if (subtype instanceof PDFName) {
+    const s = subtype.asString();
+    return s === '/Image' || s === 'Image';
+  }
+  return subtype.toString() === '/Image';
+}
+
+interface ColorSpaceInfo {
+  isSupported: boolean;
+  colors: number;
+  isCmyk?: boolean;
+}
+
+/**
+ * Validates and extracts color components from a PDF ColorSpace object.
+ * Safely rejects unsupported or complex color spaces (e.g. Indexed palettes, Separation, Pattern)
+ * to avoid image distortion or stream corruption.
+ */
+function parseColorSpaceInfo(cs: PDFObject | undefined): ColorSpaceInfo {
+  if (!cs) return { isSupported: true, colors: 3 }; // Default DeviceRGB
+  if (cs instanceof PDFName) {
+    const s = cs.asString().toLowerCase();
+    if (s === '/devicergb' || s === 'devicergb') return { isSupported: true, colors: 3 };
+    if (s === '/devicegray' || s === 'devicegray') return { isSupported: true, colors: 1 };
+    if (s === '/devicecmyk' || s === 'devicecmyk') return { isSupported: true, colors: 4, isCmyk: true };
+    return { isSupported: false, colors: 0 };
+  }
+  if (cs instanceof PDFArray) {
+    const first = cs.asArray()[0];
+    if (first instanceof PDFName) {
+      const s = first.asString().toLowerCase();
+      // Indexed, Separation, Pattern, Lab, etc. are NOT direct continuous-tone arrays
+      if (s.includes('indexed') || s.includes('separation') || s.includes('pattern') || s.includes('lab')) {
+        return { isSupported: false, colors: 0 };
+      }
+      if (s.includes('calgray')) return { isSupported: true, colors: 1 };
+      if (s.includes('calrgb')) return { isSupported: true, colors: 3 };
+    }
+  }
+  const str = cs.toString().toLowerCase();
+  if (str.includes('indexed') || str.includes('separation') || str.includes('pattern') || str.includes('lab')) {
+    return { isSupported: false, colors: 0 };
+  }
+  if (str.includes('gray')) return { isSupported: true, colors: 1 };
+  if (str.includes('cmyk')) return { isSupported: true, colors: 4, isCmyk: true };
+  if (str.includes('rgb')) return { isSupported: true, colors: 3 };
+  return { isSupported: false, colors: 0 };
 }
 
 /**
@@ -78,44 +192,123 @@ async function runCompressionPass(
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.load(buffer, { ignoreEncryption: false });
 
-  // 1. Process embedded JPEG images (/Filter /DCTDecode)
+  // Process embedded raster images: both DCTDecode (JPEG) and FlateDecode (uncompressed/zlib bitmaps)
   const objects = doc.context.enumerateIndirectObjects();
   for (const [ref, obj] of objects) {
     if (!(obj instanceof PDFRawStream) || !obj.dict) continue;
 
     const subtype = obj.dict.get(PDFName.of('Subtype'));
-    if (!subtype || subtype.toString() !== '/Image') continue;
+    if (!isImageSubtype(subtype)) continue;
 
     const filter = obj.dict.get(PDFName.of('Filter'));
-    if (!filter || filter.toString() !== '/DCTDecode') continue;
-
     const existingBytes = obj.getContents();
     if (!existingBytes || existingBytes.byteLength === 0) continue;
 
-    // Verify JPEG magic bytes 0xFF 0xD8
-    if (existingBytes.length < 4 || existingBytes[0] !== 0xff || existingBytes[1] !== 0xd8) {
+    const hasSMask = obj.dict.has(PDFName.of('SMask'));
+    // If image has a soft mask, avoid downscaling to keep aspect and mask alignment 100% matched
+    const effectiveMaxDim = hasSMask ? undefined : settings.maxDimension;
+
+    // 1. Process DCTDecode images (JPEG)
+    if (isDctDecodeFilter(filter)) {
+      if (existingBytes.length >= 4 && existingBytes[0] === 0xff && existingBytes[1] === 0xd8) {
+        try {
+          const recompressed = await recompressJpegBytes(
+            existingBytes,
+            settings.quality,
+            effectiveMaxDim
+          );
+          if (recompressed && recompressed.bytes.byteLength < existingBytes.byteLength) {
+            obj.dict.set(PDFName.of('Width'), PDFNumber.of(recompressed.width));
+            obj.dict.set(PDFName.of('Height'), PDFNumber.of(recompressed.height));
+            const newStream = PDFRawStream.of(obj.dict, recompressed.bytes);
+            doc.context.assign(ref, newStream);
+          }
+        } catch {
+          // If recompression fails, keep original image intact
+        }
+      }
       continue;
     }
 
-    try {
-      const recompressed = await recompressJpegBytes(
-        existingBytes,
-        settings.quality,
-        settings.maxDimension
-      );
-      // Strictly only replace if newly re-encoded version is smaller than existing stream
-      if (recompressed && recompressed.bytes.byteLength < existingBytes.byteLength) {
-        obj.dict.set(PDFName.of('Width'), PDFNumber.of(recompressed.width));
-        obj.dict.set(PDFName.of('Height'), PDFNumber.of(recompressed.height));
-        const newStream = PDFRawStream.of(obj.dict, recompressed.bytes);
-        doc.context.assign(ref, newStream);
+    // 2. Process FlateDecode continuous-tone images (converts bloated raw RGB/Gray scans into JPEG)
+    if (isFlateDecodeFilter(filter) || !filter) {
+      const bpcObj = obj.dict.get(PDFName.of('BitsPerComponent'));
+      const bitsPerComponent = bpcObj instanceof PDFNumber ? bpcObj.asNumber() : 8;
+
+      // Only recompress 8-bit continuous tone images (never 1-bit monochrome scans/faxes)
+      if (bitsPerComponent === 8) {
+        const wObj = obj.dict.get(PDFName.of('Width'));
+        const hObj = obj.dict.get(PDFName.of('Height'));
+        const width = wObj instanceof PDFNumber ? wObj.asNumber() : 0;
+        const height = hObj instanceof PDFNumber ? hObj.asNumber() : 0;
+
+        if (width > 0 && height > 0) {
+          const csObj = obj.dict.get(PDFName.of('ColorSpace'));
+          const csInfo = parseColorSpaceInfo(csObj);
+          if (!csInfo.isSupported) {
+            continue; // Safely preserve original stream (e.g. Indexed palette or Separation)
+          }
+
+          try {
+            const decodedStream = decodePDFRawStream(obj);
+            const decodedBytes = decodedStream.decode();
+            let rawPixels: Uint8Array = new Uint8Array(
+              decodedBytes.buffer,
+              decodedBytes.byteOffset,
+              decodedBytes.byteLength
+            );
+
+            // Undo predictor if present
+            const decodeParms = obj.dict.get(PDFName.of('DecodeParms'));
+            if (decodeParms instanceof PDFDict) {
+              const predObj = decodeParms.get(PDFName.of('Predictor'));
+              const predictor = predObj instanceof PDFNumber ? predObj.asNumber() : 1;
+              if (predictor === 2) {
+                rawPixels = undoTiffPredictor(rawPixels, width, height, csInfo.colors, bitsPerComponent);
+              } else if (predictor >= 10) {
+                rawPixels = undoPngPredictor(rawPixels, width, height, csInfo.colors, bitsPerComponent);
+              }
+            }
+
+            // Verify reconstructed buffer matches expected byte dimensions
+            const expectedBytes = width * height * csInfo.colors;
+            if (rawPixels.byteLength !== expectedBytes) {
+              continue; // Buffer dimension mismatch, safely keep original stream
+            }
+
+            const recompressed = await recompressRasterPixels(
+              rawPixels,
+              width,
+              height,
+              csInfo.colors,
+              settings.quality,
+              effectiveMaxDim,
+              csInfo.isCmyk
+            );
+
+            // Strictly only replace if re-encoded version is smaller than existing stream
+            if (recompressed && recompressed.bytes.byteLength < existingBytes.byteLength) {
+              obj.dict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+              obj.dict.delete(PDFName.of('DecodeParms'));
+              obj.dict.set(PDFName.of('Width'), PDFNumber.of(recompressed.width));
+              obj.dict.set(PDFName.of('Height'), PDFNumber.of(recompressed.height));
+              obj.dict.set(
+                PDFName.of('ColorSpace'),
+                csInfo.colors === 1 ? PDFName.of('DeviceGray') : PDFName.of('DeviceRGB')
+              );
+              obj.dict.set(PDFName.of('BitsPerComponent'), PDFNumber.of(8));
+              const newStream = PDFRawStream.of(obj.dict, recompressed.bytes);
+              doc.context.assign(ref, newStream);
+            }
+          } catch {
+            // Keep original stream if decoding or recompression encounters issues
+          }
+        }
       }
-    } catch {
-      // If recompression fails for an individual image, keep original image intact
     }
   }
 
-  // 2. Strip redundant metadata if enabled
+  // 3. Strip redundant metadata if enabled (strictly preserves /Annots, links, and page structures)
   if (settings.stripMetadata) {
     try {
       const rootRef = doc.context.trailerInfo.Root;
@@ -135,16 +328,21 @@ async function runCompressionPass(
     }
   }
 
-  // 3. Save with Flate object streams enabled
-  return await doc.save({ useObjectStreams: true });
+  // 4. Save with Flate object streams enabled, comparing with non-object-stream to pick smallest
+  const withObjStreams = await doc.save({ useObjectStreams: true, addDefaultPage: false });
+  if (withObjStreams.byteLength < buffer.byteLength) {
+    return withObjStreams;
+  }
+  const withoutObjStreams = await doc.save({ useObjectStreams: false, addDefaultPage: false });
+  return withoutObjStreams.byteLength < withObjStreams.byteLength ? withoutObjStreams : withObjStreams;
 }
 
 /**
  * Compresses a PDF document.
- * If options.targetBytes is specified, executes an iterative bounded compression strategy
- * to approach the desired size while preserving best visual quality.
+ * If options.targetBytes is specified, executes an intelligent bounded compression strategy
+ * guided by document content analysis to reach the target size while maximizing visual quality.
  * If options.preset is specified, executes a single-pass preset compression.
- * Guarantees that the returned PDF bytes are never larger than the input.
+ * Guarantees that the returned PDF bytes are valid and never larger than the input.
  */
 export async function compressPdf(
   buffer: Uint8Array,
@@ -175,12 +373,13 @@ export async function compressPdf(
   }
 
   const targetBytes = options?.targetBytes;
+  const analysis = await analyzePdfDocument(buffer);
 
   // -------------------------------------------------------------
-  // STRATEGY A: Target File Size Iterative Bounded Compression
+  // STRATEGY A: Target File Size Adaptive Bounded Compression
   // -------------------------------------------------------------
   if (targetBytes !== undefined && targetBytes > 0) {
-    // If original is already within target bytes, run light structural pass
+    // 1. If original is already within target bytes, run light structural pass
     if (buffer.byteLength <= targetBytes) {
       const lightResult = await runCompressionPass(buffer, {
         quality: 0.85,
@@ -190,67 +389,151 @@ export async function compressPdf(
       return lightResult.byteLength < buffer.byteLength ? lightResult : buffer;
     }
 
-    // Inspect if document contains any JPEG images
-    const initialDoc = await PDFDocument.load(buffer);
-    let hasJpegImages = false;
-    for (const [, obj] of initialDoc.context.enumerateIndirectObjects()) {
-      if (obj instanceof PDFRawStream && obj.dict) {
-        const subtype = obj.dict.get(PDFName.of('Subtype'));
-        const filter = obj.dict.get(PDFName.of('Filter'));
-        if (subtype?.toString() === '/Image' && filter?.toString() === '/DCTDecode') {
-          hasJpegImages = true;
-          break;
-        }
-      }
-    }
-
     const shouldDownsample = options?.downsampleImages !== false;
     const shouldStrip = options?.stripMetadata !== false;
 
-    // Bounded search stages: progressively increases compression only as needed
-    const stages: PassSettings[] = [
-      // Stage 0: Gentle structural cleanup & high image quality (0.85, no downsample)
-      { quality: 0.85, maxDimension: undefined, stripMetadata: shouldStrip },
-      // Stage 1: Balanced (0.70, max 1600px)
-      { quality: 0.70, maxDimension: shouldDownsample ? 1600 : undefined, stripMetadata: shouldStrip },
-      // Stage 2: Moderate (0.55, max 1280px)
-      { quality: 0.55, maxDimension: shouldDownsample ? 1280 : undefined, stripMetadata: shouldStrip },
-      // Stage 3: Strong (0.40, max 1000px)
-      { quality: 0.40, maxDimension: shouldDownsample ? 1000 : undefined, stripMetadata: shouldStrip },
-      // Stage 4: Maximum safe compression (0.30, max 800px)
-      { quality: 0.30, maxDimension: shouldDownsample ? 800 : undefined, stripMetadata: shouldStrip },
-    ];
+    // Check if document has compressible raster images
+    const hasCompressibleImages = analysis.jpegCount > 0 || analysis.flateCount > 0;
+
+    // Calculate budget for images
+    const structuralEst = Math.min(analysis.structuralBytes, Math.round(targetBytes * 0.4));
+    const availableImageBudget = Math.max(1024, targetBytes - structuralEst);
+    const requiredImageRatio =
+      analysis.totalImageBytes > 0 ? availableImageBudget / analysis.totalImageBytes : 1;
+
+    // Build adaptive stages tailored to the target budget
+    const stages: PassSettings[] = [];
+
+    if (requiredImageRatio > 0.65) {
+      stages.push({
+        quality: 0.80,
+        maxDimension: shouldDownsample ? 1920 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.70,
+        maxDimension: shouldDownsample ? 1600 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.55,
+        maxDimension: shouldDownsample ? 1280 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.40,
+        maxDimension: shouldDownsample ? 1000 : undefined,
+        stripMetadata: shouldStrip,
+      });
+    } else if (requiredImageRatio > 0.35) {
+      stages.push({
+        quality: 0.70,
+        maxDimension: shouldDownsample ? 1600 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.55,
+        maxDimension: shouldDownsample ? 1280 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.40,
+        maxDimension: shouldDownsample ? 1000 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.30,
+        maxDimension: shouldDownsample ? 800 : undefined,
+        stripMetadata: shouldStrip,
+      });
+    } else if (requiredImageRatio > 0.15) {
+      stages.push({
+        quality: 0.55,
+        maxDimension: shouldDownsample ? 1280 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.42,
+        maxDimension: shouldDownsample ? 1000 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.30,
+        maxDimension: shouldDownsample ? 800 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.22,
+        maxDimension: shouldDownsample ? 650 : undefined,
+        stripMetadata: shouldStrip,
+      });
+    } else {
+      stages.push({
+        quality: 0.45,
+        maxDimension: shouldDownsample ? 1000 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.32,
+        maxDimension: shouldDownsample ? 800 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.24,
+        maxDimension: shouldDownsample ? 650 : undefined,
+        stripMetadata: shouldStrip,
+      });
+      stages.push({
+        quality: 0.18,
+        maxDimension: shouldDownsample ? 500 : undefined,
+        stripMetadata: shouldStrip,
+      });
+    }
 
     let bestOutput: Uint8Array = buffer;
     let bestSize = buffer.byteLength;
+    let consecutiveNoImprovementCount = 0;
 
     for (let i = 0; i < stages.length; i++) {
       const stage = stages[i];
 
-      // If document has no JPEG images, stages 1-4 cannot produce further reduction
-      if (!hasJpegImages && i > 0) {
+      // If document has no raster images, subsequent image stages cannot reduce further
+      if (!hasCompressibleImages && i > 0) {
         break;
       }
 
       const passResult = await runCompressionPass(buffer, stage);
 
       if (passResult.byteLength < bestSize) {
+        const improvement = bestSize - passResult.byteLength;
         bestOutput = passResult;
         bestSize = passResult.byteLength;
+        consecutiveNoImprovementCount = 0;
+
+        // If output meets or beats target, stop immediately to preserve best visual fidelity!
+        if (bestSize <= targetBytes) {
+          break;
+        }
+
+        if (improvement < buffer.byteLength * 0.005) {
+          consecutiveNoImprovementCount++;
+        }
+      } else {
+        consecutiveNoImprovementCount++;
       }
 
-      // If output meets or beats target, stop immediately!
-      if (bestSize <= targetBytes) {
+      if (consecutiveNoImprovementCount >= 2 && i >= 2) {
         break;
       }
+    }
 
-      // If Stage 1 produced no improvement over Stage 0, images couldn't be compressed
-      if (i === 1 && passResult.byteLength >= bestSize && hasJpegImages) {
-        // Test stage 2 once; if still no improvement, terminate search
+    // Integrity safety: verify PDF structure before returning
+    try {
+      if (bestOutput !== buffer) {
+        await PDFDocument.load(bestOutput, { ignoreEncryption: true });
       }
-      if (i === 2 && passResult.byteLength >= bestSize) {
-        break;
-      }
+    } catch {
+      return buffer;
     }
 
     return bestOutput;
@@ -259,23 +542,28 @@ export async function compressPdf(
   // -------------------------------------------------------------
   // STRATEGY B: Preset-Based Single-Pass Compression
   // -------------------------------------------------------------
-  const preset: CompressionPreset = options?.preset || 'balanced';
-  const shouldDownsample = options?.downsampleImages ?? (preset !== 'light');
-  const shouldStripMeta = options?.stripMetadata ?? (preset !== 'light');
+  const preset: CompressionPreset = options?.preset || 'recommended';
+  const shouldDownsample =
+    options?.downsampleImages ?? (preset !== 'light' && preset !== 'high-quality');
+  const shouldStripMeta =
+    options?.stripMetadata ?? (preset !== 'light' && preset !== 'high-quality');
 
   let quality: number;
   let maxDim: number | undefined;
 
   switch (preset) {
     case 'light':
+    case 'high-quality':
       quality = 0.85;
       maxDim = undefined;
       break;
     case 'strong':
-      quality = 0.50;
+    case 'smaller':
+      quality = 0.48;
       maxDim = shouldDownsample ? 1024 : undefined;
       break;
     case 'balanced':
+    case 'recommended':
     default:
       quality = 0.70;
       maxDim = shouldDownsample ? 1600 : undefined;

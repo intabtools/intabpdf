@@ -110,8 +110,19 @@ export default function SplitTool({
 
   return (
     <div className="card opts">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-        <b>Split options</b>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '8px',
+          marginBottom: '8px',
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        <b style={{ minWidth: 0 }}>Split options</b>
         {pageCount !== null && (
           <span
             style={{
@@ -121,6 +132,7 @@ export default function SplitTool({
               background: 'var(--surface-2)',
               color: 'var(--text-muted)',
               border: '1px solid var(--border)',
+              flexShrink: 0,
             }}
           >
             {pageCount} {pageCount === 1 ? 'page' : 'pages'} total
@@ -133,7 +145,7 @@ export default function SplitTool({
           style={{
             display: 'flex',
             gap: '8px',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             padding: '8px 12px',
             borderRadius: 'var(--radius-sm)',
             background: 'rgba(232, 17, 35, 0.08)',
@@ -141,11 +153,14 @@ export default function SplitTool({
             color: '#E81123',
             fontSize: '13px',
             marginBottom: '12px',
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
           }}
           role="alert"
         >
-          <AlertCircle size={16} />
-          <span>{pageError}</span>
+          <AlertCircle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+          <span style={{ minWidth: 0, wordBreak: 'break-word' }}>{pageError}</span>
         </div>
       )}
 
@@ -186,21 +201,26 @@ export default function SplitTool({
           style={{
             display: 'flex',
             gap: '8px',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             padding: '8px 12px',
             borderRadius: 'var(--radius-sm)',
             background: 'var(--surface-2)',
             color: 'var(--text-muted)',
             fontSize: '13px',
             marginTop: '8px',
+            width: '100%',
+            minWidth: 0,
+            boxSizing: 'border-box',
           }}
         >
-          <Info size={16} />
-          <span>Every page will be saved as an individual single-page PDF ({pageCount} files).</span>
+          <Info size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+          <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
+            Every page will be saved as an individual single-page PDF ({pageCount} files).
+          </span>
         </div>
       )}
 
-      <div style={{ marginTop: '10px', marginBottom: '4px' }}>
+      <div style={{ marginTop: '10px', marginBottom: '4px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -217,8 +237,8 @@ export default function SplitTool({
         disabled={isProcessing || !isValidToSplit}
         style={{ marginTop: '12px' }}
       >
-        <Files size={16} />
-        <span>
+        <Files size={16} style={{ flexShrink: 0 }} />
+        <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.3 }}>
           {isProcessing
             ? 'Splitting PDF...'
             : isOnePerPage

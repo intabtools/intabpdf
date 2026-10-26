@@ -56,7 +56,7 @@ export default function RotateTool({
         );
       })}
 
-      <div style={{ marginTop: '6px', marginBottom: '8px' }}>
+      <div style={{ marginTop: '6px', marginBottom: '8px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -71,8 +71,8 @@ export default function RotateTool({
         onClick={handleRun}
         disabled={isProcessing || stagedFiles.length === 0}
       >
-        <RotateCw size={16} />
-        <span>
+        <RotateCw size={16} style={{ flexShrink: 0 }} />
+        <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.3 }}>
           {isProcessing ? 'Rotating...' : 'Rotate file'}
         </span>
       </button>

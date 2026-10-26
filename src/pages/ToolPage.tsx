@@ -260,6 +260,16 @@ export default function ToolPage(): ReactNode {
             setStatus('idle');
             setOutputBytes(null);
           }}
+          onClearFiles={() => {
+            setStagedFiles([]);
+            setStatus('idle');
+            setOutputBytes(null);
+            setErrorMessage(null);
+            setIsSaved(false);
+            setExtraState({});
+            setCustomFileName('');
+            setPreviewIndex(null);
+          }}
         />
       )}
 
@@ -276,7 +286,7 @@ export default function ToolPage(): ReactNode {
 
       {status !== 'done' && stagedFiles.length > 0 && (
         <div className="tp">
-          <div>
+          <div style={{ minWidth: 0, maxWidth: '100%', width: '100%' }}>
             <StagedFileList
               toolId={tool.id}
               stagedFiles={stagedFiles}

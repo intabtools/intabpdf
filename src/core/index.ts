@@ -42,12 +42,23 @@ export {
   compressPdf,
   calculateCompressionStats,
   recompressJpegBytes,
+  analyzePdfDocument,
 } from './compress';
+export {
+  undoPngPredictor,
+  undoTiffPredictor,
+  recompressRasterPixels,
+} from './image-compression';
 export type {
   CompressionPreset,
   CompressOptions,
   CompressionStats,
 } from './compress';
+export type {
+  DocumentContentType,
+  DocumentAnalysis,
+  ImageStreamInfo,
+} from './document-analysis';
 
 export { pdfProcessingService } from './worker/service';
 export type { PdfOperation, OperationPayloads } from './worker/service';
