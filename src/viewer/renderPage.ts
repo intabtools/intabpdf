@@ -2,6 +2,12 @@
 import './pdfjs-polyfills';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import {
+  buildPageTextCache,
+  clearTextCache,
+  getCachedPageText,
+  setCachedPageText,
+} from './textCache';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -33,6 +39,7 @@ export async function loadPdf(bytes: Uint8Array): Promise<PdfDocument> {
 
 /** Destroy a document through the PDF.js loading task that created it. */
 export async function destroyPdf(doc: PdfDocument): Promise<void> {
+  clearTextCache(doc);
   const loadingTask = loadingTasks.get(doc);
   if (!loadingTask) return;
   loadingTasks.delete(doc);
@@ -103,9 +110,25 @@ export function renderPageTextLayer(
     container.innerHTML = '';
     container.style.width = `${Math.floor(viewport.width)}px`;
     container.style.height = `${Math.floor(viewport.height)}px`;
+    container.style.setProperty('--scale-factor', `${viewport.scale}`);
+    container.style.setProperty('--total-scale-factor', `${viewport.scale}`);
+    container.style.setProperty('--scale-round-x', '1px');
+    container.style.setProperty('--scale-round-y', '1px');
 
     const textContentSource = await page.getTextContent();
     if (cancelled) return;
+
+    if (
+      textContentSource &&
+      Array.isArray(textContentSource.items) &&
+      !getCachedPageText(doc, pageNumber)
+    ) {
+      setCachedPageText(
+        doc,
+        pageNumber,
+        buildPageTextCache(pageNumber, textContentSource.items),
+      );
+    }
 
     try {
       textLayerInstance = new pdfjsLib.TextLayer({

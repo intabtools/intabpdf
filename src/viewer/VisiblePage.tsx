@@ -47,13 +47,18 @@ export default function VisiblePage({
     return () => observer.disconnect();
   }, [scrollRootRef]);
 
+  const appliedQueryRef = useRef<string>('');
+  const appliedLayerReadyRef = useRef<number>(-1);
+
   // Canvas drawing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!isVisible || !canvas) return;
 
+    let active = true;
     const job = drawPageOnCanvas(doc, pageNumber, canvas, scale);
     job.promise.catch((error: unknown) => {
+      if (!active) return;
       if (
         error instanceof Error &&
         (error.name === 'RenderingCancelledException' || error.name === 'AbortException')
@@ -63,7 +68,10 @@ export default function VisiblePage({
       console.error(`Failed to render PDF page ${pageNumber}:`, error);
     });
 
-    return () => job.cancel();
+    return () => {
+      active = false;
+      job.cancel();
+    };
   }, [doc, pageNumber, scale, isVisible]);
 
   // Text layer rendering
@@ -71,12 +79,15 @@ export default function VisiblePage({
     const textLayer = textLayerRef.current;
     if (!isVisible || !textLayer) return;
 
+    let active = true;
     const job = renderPageTextLayer(doc, pageNumber, textLayer, scale);
     job.promise
       .then(() => {
+        if (!active) return;
         setTextLayerReady((v) => v + 1);
       })
       .catch((error: unknown) => {
+        if (!active) return;
         if (
           error instanceof Error &&
           (error.name === 'RenderingCancelledException' || error.name === 'AbortException')
@@ -85,16 +96,21 @@ export default function VisiblePage({
         }
       });
 
-    return () => job.cancel();
+    return () => {
+      active = false;
+      job.cancel();
+    };
   }, [doc, pageNumber, scale, isVisible]);
 
-  // Visible search highlights application
+  // Visible search highlights application with fast active-match toggling
   useEffect(() => {
     const container = textLayerRef.current;
     if (!container) return;
 
     const q = searchQuery.trim().toLowerCase();
-    const spans = Array.from(container.querySelectorAll<HTMLSpanElement>('span'));
+    const spans = Array.from(
+      container.querySelectorAll<HTMLSpanElement>('span:not(.markedContent)')
+    );
 
     if (!q) {
       spans.forEach((span) => {
@@ -103,6 +119,35 @@ export default function VisiblePage({
           delete span.dataset.rawText;
         }
       });
+      appliedQueryRef.current = '';
+      appliedLayerReadyRef.current = textLayerReady;
+      return;
+    }
+
+    // Fast-path: if the highlights for this query and text layer are already rendered,
+    // only update the active-match class without destroying or re-creating DOM nodes
+    if (
+      appliedQueryRef.current === q &&
+      appliedLayerReadyRef.current === textLayerReady
+    ) {
+      const currentActive = container.querySelector<HTMLElement>('.search-highlight.active-match');
+      if (currentActive && currentActive.dataset.matchId !== String(currentMatchIndex)) {
+        currentActive.classList.remove('active-match');
+      }
+
+      if (currentMatchIndex >= 0) {
+        const nextActive = container.querySelector<HTMLElement>(
+          `.search-highlight[data-match-id="${currentMatchIndex}"]`
+        );
+        if (nextActive && !nextActive.classList.contains('active-match')) {
+          nextActive.classList.add('active-match');
+          try {
+            nextActive.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          } catch {
+            // ignore
+          }
+        }
+      }
       return;
     }
 
@@ -136,12 +181,15 @@ export default function VisiblePage({
         mark.textContent = matchedText;
 
         const currentMatch = pageMatches[pageMatchCounter];
-        if (currentMatch && currentMatch.id === currentMatchIndex) {
-          mark.classList.add('active-match');
-          try {
-            mark.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-          } catch {
-            // ignore
+        if (currentMatch) {
+          mark.dataset.matchId = String(currentMatch.id);
+          if (currentMatch.id === currentMatchIndex) {
+            mark.classList.add('active-match');
+            try {
+              mark.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } catch {
+              // ignore
+            }
           }
         }
         pageMatchCounter++;
@@ -155,6 +203,9 @@ export default function VisiblePage({
         span.appendChild(document.createTextNode(rawText.slice(lastIndex)));
       }
     }
+
+    appliedQueryRef.current = q;
+    appliedLayerReadyRef.current = textLayerReady;
   }, [searchQuery, matches, currentMatchIndex, pageNumber, textLayerReady]);
 
   return (

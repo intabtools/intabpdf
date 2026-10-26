@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import type { PdfDocument } from './renderPage';
 import type { SearchMatch } from './types';
+import { extractPageText } from './textCache';
 
 interface UseViewerSearchOptions {
   pdfDoc: PdfDocument | null;
@@ -36,7 +37,7 @@ export function useViewerSearch({
   const [isSearching, setIsSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Text search asynchronously across loaded document pages
+  // Text search asynchronously across loaded document pages with cached text and event-loop yielding
   useEffect(() => {
     const q = searchQuery.trim().toLowerCase();
     let active = true;
@@ -55,19 +56,33 @@ export function useViewerSearch({
       try {
         const foundMatches: SearchMatch[] = [];
         let matchId = 0;
+        let lastYield = performance.now();
+
         for (let p = 1; p <= pdfDoc.numPages; p++) {
           if (!active) return;
-          const page = await pdfDoc.getPage(p);
-          const content = await page.getTextContent();
+
+          // Yield to event loop periodically to keep UI responsive on large documents
+          if (p % 25 === 0 || performance.now() - lastYield > 20) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            if (!active) return;
+            lastYield = performance.now();
+          }
+
+          const pageText = await extractPageText(pdfDoc, p);
+          if (!active) return;
+
+          // Fast rejection: skip pages that do not contain the query string
+          if (!pageText.fullLowerText.includes(q)) continue;
+
           let matchOnPage = 0;
-          for (const item of content.items) {
-            if (!('str' in item)) continue;
-            const str = (item as { str: string }).str;
-            if (!str) continue;
-            const lower = str.toLowerCase();
+          for (const item of pageText.lowerItems) {
             let pos = 0;
-            while ((pos = lower.indexOf(q, pos)) !== -1) {
-              foundMatches.push({ id: matchId++, pageNumber: p, matchIndexOnPage: matchOnPage++ });
+            while ((pos = item.indexOf(q, pos)) !== -1) {
+              foundMatches.push({
+                id: matchId++,
+                pageNumber: p,
+                matchIndexOnPage: matchOnPage++,
+              });
               pos += q.length;
             }
           }
@@ -87,7 +102,7 @@ export function useViewerSearch({
         setMatches([]);
         setIsSearching(false);
       }
-    }, 200);
+    }, 150);
 
     return () => {
       active = false;

@@ -45,3 +45,17 @@ if (!U8Proto.toHex) {
       .join('');
   };
 }
+
+const M = Math as unknown as {
+  sumPrecise?: (iterable: Iterable<number>) => number;
+};
+
+if (typeof M.sumPrecise !== 'function') {
+  M.sumPrecise = function (iterable: Iterable<number>): number {
+    let sum = 0;
+    for (const val of iterable) {
+      sum += Number(val);
+    }
+    return sum;
+  };
+}

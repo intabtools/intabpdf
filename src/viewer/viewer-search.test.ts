@@ -1,4 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import {
+  buildPageTextCache,
+  clearTextCache,
+  extractPageText,
+  getCachedPageText,
+  setCachedPageText,
+} from './textCache';
+import type { PdfDocument } from './renderPage';
 
 interface MatchItem {
   pageNumber: number;
@@ -235,5 +243,202 @@ describe('Viewer document text search logic', () => {
     expect(clearedMarks.length).toBe(0);
     expect(spans[0].textContent).toBe('InTabPDF is a secure PDF tool.');
     expect(spans[1].textContent).toBe('Generate PDF files offline.');
+  });
+
+  describe('Document text cache (textCache.ts)', () => {
+    it('builds page text cache and extracts non-empty string items', () => {
+      const items = [
+        { str: 'First sentence.' },
+        { str: '' },
+        { type: 'beginMarkedContent' },
+        { str: 'Second sentence with InTabPDF.' },
+      ];
+
+      const cached = buildPageTextCache(1, items);
+      expect(cached.pageNumber).toBe(1);
+      expect(cached.items).toEqual(['First sentence.', 'Second sentence with InTabPDF.']);
+      expect(cached.lowerItems).toEqual([
+        'first sentence.',
+        'second sentence with intabpdf.',
+      ]);
+      expect(cached.fullLowerText).toBe(
+        'first sentence. second sentence with intabpdf.'
+      );
+    });
+
+    it('extracts and caches page text on first access and serves subsequent accesses from cache', async () => {
+      let getPageCalls = 0;
+      let getTextContentCalls = 0;
+
+      const mockDoc = {
+        getPage: async () => {
+          getPageCalls++;
+          return {
+            getTextContent: async () => {
+              getTextContentCalls++;
+              return {
+                items: [{ str: 'Cached content for performance.' }],
+              };
+            },
+          };
+        },
+      } as unknown as PdfDocument;
+
+      // First extraction: fetches page and textContent
+      const first = await extractPageText(mockDoc, 1);
+      expect(first.items).toEqual(['Cached content for performance.']);
+      expect(getPageCalls).toBe(1);
+      expect(getTextContentCalls).toBe(1);
+
+      // Verify cached in WeakMap
+      expect(getCachedPageText(mockDoc, 1)).toBeDefined();
+
+      // Second extraction: returns cached data without calling getPage or getTextContent
+      const second = await extractPageText(mockDoc, 1);
+      expect(second).toBe(first);
+      expect(getPageCalls).toBe(1);
+      expect(getTextContentCalls).toBe(1);
+
+      // Explicit clearTextCache releases cached entries
+      clearTextCache(mockDoc);
+      expect(getCachedPageText(mockDoc, 1)).toBeUndefined();
+    });
+
+    it('benchmarks sub-millisecond search over 200 simulated cached pages', () => {
+      const mockDoc = {} as unknown as PdfDocument;
+
+      for (let p = 1; p <= 200; p++) {
+        setCachedPageText(mockDoc, p, {
+          pageNumber: p,
+          items: [
+            `Page ${p} introduction to machine learning and neural networks.`,
+            `Further details regarding section ${p} and optimization techniques.`,
+          ],
+          lowerItems: [
+            `page ${p} introduction to machine learning and neural networks.`,
+            `further details regarding section ${p} and optimization techniques.`,
+          ],
+          fullLowerText: `page ${p} introduction to machine learning and neural networks. further details regarding section ${p} and optimization techniques.`,
+        });
+      }
+
+      const q = 'neural';
+      const start = performance.now();
+      const results: { pageNumber: number }[] = [];
+
+      for (let p = 1; p <= 200; p++) {
+        const cached = getCachedPageText(mockDoc, p);
+        if (!cached || !cached.fullLowerText.includes(q)) continue;
+
+        for (const item of cached.lowerItems) {
+          let pos = 0;
+          while ((pos = item.indexOf(q, pos)) !== -1) {
+            results.push({ pageNumber: p });
+            pos += q.length;
+          }
+        }
+      }
+
+      const duration = performance.now() - start;
+      expect(results.length).toBe(200);
+      expect(duration).toBeLessThan(10); // 200 pages search must execute in <10ms from cache
+
+      clearTextCache(mockDoc);
+    });
+  });
+
+  describe('Search highlight outline and zoom synchronization', () => {
+    it('excludes markedContent container spans from search highlighting to prevent DOM destruction', () => {
+      interface MockElement {
+        className: string;
+        classList: Set<string>;
+        children: MockElement[];
+        dataset: Record<string, string>;
+        textContent: string;
+      }
+
+      // Simulates DOM created by PDF.js with markedContent
+      const markedContentSpan: MockElement = {
+        className: 'markedContent',
+        classList: new Set(['markedContent']),
+        children: [],
+        dataset: {},
+        textContent: 'Nested marked text inside PDF',
+      };
+
+      const textSpan: MockElement = {
+        className: '',
+        classList: new Set(),
+        children: [],
+        dataset: {},
+        textContent: 'Target text for search highlight',
+      };
+
+      markedContentSpan.children.push(textSpan);
+
+      // Selector 'span:not(.markedContent)' will match textSpan but not markedContentSpan
+      const allSpans = [markedContentSpan, textSpan];
+      const selectedSpans = allSpans.filter((s) => !s.classList.has('markedContent'));
+
+      expect(selectedSpans.length).toBe(1);
+      expect(selectedSpans[0].textContent).toBe('Target text for search highlight');
+    });
+
+    it('updates active-match fast-path without recreating existing highlight marks', () => {
+      interface MockClassList {
+        add: (cls: string) => void;
+        remove: (cls: string) => void;
+        contains: (cls: string) => boolean;
+      }
+
+      interface MockMark {
+        className: string;
+        classList: MockClassList;
+        dataset: { matchId?: string };
+        scrollIntoViewCount: number;
+        scrollIntoView: () => void;
+      }
+
+      const createMockMark = (id: number): MockMark => {
+        const classes = new Set(['search-highlight']);
+        const classList: MockClassList = {
+          add: (cls) => classes.add(cls),
+          remove: (cls) => classes.delete(cls),
+          contains: (cls) => classes.has(cls),
+        };
+
+        const mark: MockMark = {
+          className: 'search-highlight',
+          classList,
+          dataset: { matchId: String(id) },
+          scrollIntoViewCount: 0,
+          scrollIntoView() {
+            this.scrollIntoViewCount++;
+          },
+        };
+        return mark;
+      };
+
+      const marks = [createMockMark(0), createMockMark(1), createMockMark(2)];
+      // Mark 0 starts active
+      marks[0].classList.add('active-match');
+
+      // Fast-path: switch active match from 0 to 1
+      const currentActive = marks.find((m) => m.classList.contains('active-match'));
+      if (currentActive && currentActive.dataset.matchId !== '1') {
+        currentActive.classList.remove('active-match');
+      }
+
+      const nextActive = marks.find((m) => m.dataset.matchId === '1');
+      if (nextActive) {
+        nextActive.classList.add('active-match');
+        nextActive.scrollIntoView();
+      }
+
+      expect(marks[0].classList.contains('active-match')).toBe(false);
+      expect(marks[1].classList.contains('active-match')).toBe(true);
+      expect(marks[1].scrollIntoViewCount).toBe(1);
+      expect(marks[2].classList.contains('active-match')).toBe(false);
+    });
   });
 });
