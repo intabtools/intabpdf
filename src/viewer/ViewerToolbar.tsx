@@ -91,7 +91,7 @@ export default function ViewerToolbar({
       {!pdfDoc ? (
         <>
           {isLoading ? (
-            <span className="vtb-status-msg">Opening document...</span>
+            <span className="vtb-status-msg">Opening PDF…</span>
           ) : (
             <button
               type="button"

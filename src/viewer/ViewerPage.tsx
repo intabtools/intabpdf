@@ -37,6 +37,7 @@ export default function ViewerPage(): ReactNode {
     currentPage,
     setCurrentPage,
     isLoading,
+    setLoading,
     error,
     handleOpenClick,
     handleFilesDropped,
@@ -175,6 +176,11 @@ export default function ViewerPage(): ReactNode {
     zoomOut,
     toggleFitOrZoom,
   });
+
+  const handleReturnHome = useCallback(async () => {
+    await resetDocumentState();
+    navigate('/');
+  }, [resetDocumentState, navigate]);
 
   return (
     <div
@@ -333,7 +339,9 @@ export default function ViewerPage(): ReactNode {
           effectiveScale={effectiveScale}
           onScroll={handleScroll}
           onOpenClick={() => void handleOpenClick()}
+          onFilesDroppedStart={() => setLoading(true)}
           onFilesDropped={handleFilesDropped}
+          onReturnHome={() => void handleReturnHome()}
           onDoubleClickPage={toggleFitOrZoom}
           searchQuery={searchQuery}
           matches={matches}

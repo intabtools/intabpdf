@@ -273,7 +273,7 @@ code,
   font-style: normal;
   font-weight: 400;
   color: var(--text-muted);
-  margin-left: 2px;
+  margin-left: -2px;
 }
 
 .hc {

@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { useShell } from '../hooks/useShell';
+import { ViewerContext } from '../viewer/viewerContextDef';
+import { ProcessingContext } from './processingContextDef';
+import PdfLoadingScreen from '../viewer/PdfLoadingScreen';
+import ProcessingLoadingScreen from './ProcessingLoadingScreen';
 import AppHeader from './AppHeader';
 import BottomNav from './BottomNav';
 import CommandPalette from './CommandPalette';
@@ -159,6 +163,11 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
 
   const isSubPage = location.pathname !== '/';
   const isViewerPage = location.pathname.startsWith('/viewer');
+  const viewer = useContext(ViewerContext);
+  const processing = useContext(ProcessingContext);
+  const isViewerLoading = viewer?.isLoading ?? false;
+  const isProcessingActive = processing?.isProcessing ?? false;
+  const isFullScreenOverlay = isViewerLoading || isProcessingActive;
 
   // Derive page title for breadcrumb
   let subTitle: string | undefined;
@@ -178,9 +187,16 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
     <div
       className={`app ${isSubPage ? 'sub' : ''} ${isDrawerOpen ? 'dr' : ''} ${
         isSidebarCollapsed ? 'sc' : ''
-      } ${!showAppLayout ? 'full-bleed' : ''} ${isViewerPage ? 'is-viewer' : ''}`}
+      } ${!showAppLayout || isFullScreenOverlay ? 'full-bleed' : ''} ${isViewerPage ? 'is-viewer' : ''} ${
+        isViewerLoading ? 'is-loading-pdf' : ''
+      } ${isProcessingActive ? 'is-loading-processing' : ''}`}
     >
-      {showAppLayout && (
+      {isViewerLoading && <PdfLoadingScreen message="Opening PDF…" />}
+      {!isViewerLoading && isProcessingActive && (
+        <ProcessingLoadingScreen message={processing?.message || 'Processing PDF…'} />
+      )}
+
+      {showAppLayout && !isFullScreenOverlay && (
         <AppHeader
           onToggleSidebar={handleToggleMenu}
           onOpenPalette={() => setIsPaletteOpen(true)}
@@ -193,20 +209,25 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
       )}
 
       <div className="body">
-        {showAppLayout && !isViewerPage && <NavigationRail />}
-        {showAppLayout && !isViewerPage && (
+        {showAppLayout && !isViewerPage && !isFullScreenOverlay && <NavigationRail />}
+        {showAppLayout && !isViewerPage && !isFullScreenOverlay && (
           <Sidebar
             onCloseDrawer={() => setIsDrawerOpen(false)}
             isCollapsed={isSidebarCollapsed}
           />
         )}
-        <main className={`main ${isViewerPage ? 'flush' : ''}`} id="main-content">
+        <main
+          className={`main ${isViewerPage ? 'flush' : ''}`}
+          id="main-content"
+          style={isFullScreenOverlay ? { display: 'none' } : undefined}
+          aria-hidden={isFullScreenOverlay ? true : undefined}
+        >
           <div className={`an ${isViewerPage ? 'flush-wrap' : ''}`}>{children}</div>
         </main>
       </div>
 
-      {showAppLayout && <BottomNav />}
-      {showAppLayout && <StatusBar onSwitchToWeb={onSwitchToWeb} />}
+      {showAppLayout && !isFullScreenOverlay && <BottomNav />}
+      {showAppLayout && !isFullScreenOverlay && <StatusBar onSwitchToWeb={onSwitchToWeb} />}
 
       <CommandPalette
         isOpen={isPaletteOpen}

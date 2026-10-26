@@ -22,7 +22,9 @@ interface ViewerPagesViewProps {
   effectiveScale: number;
   onScroll: () => void;
   onOpenClick: () => void;
+  onFilesDroppedStart?: () => void;
   onFilesDropped: (files: OpenedFile[]) => void;
+  onReturnHome?: () => void;
   onDoubleClickPage: () => void;
   searchQuery: string;
   matches: SearchMatch[];
@@ -42,7 +44,9 @@ export default function ViewerPagesView({
   effectiveScale,
   onScroll,
   onOpenClick,
+  onFilesDroppedStart,
   onFilesDropped,
+  onReturnHome,
   onDoubleClickPage,
   searchQuery,
   matches,
@@ -55,10 +59,28 @@ export default function ViewerPagesView({
       onScroll={onScroll}
     >
       {isLoading && !pdfDoc && (
-        <div className="viewer-state-box loading" role="status" aria-live="polite">
-          <div className="vtb-spinner" />
-          <h3>Opening document...</h3>
-          <p>Reading PDF pages.</p>
+        <div className="pdf-loading-view" role="status" aria-live="polite">
+          <div className="pdf-loading-spinner" aria-hidden="true">
+            <svg viewBox="0 0 48 48" className="pdf-spinner-svg">
+              <circle
+                className="pdf-spinner-track"
+                cx="24"
+                cy="24"
+                r="18"
+                fill="none"
+                strokeWidth="4"
+              />
+              <circle
+                className="pdf-spinner-arc"
+                cx="24"
+                cy="24"
+                r="18"
+                fill="none"
+                strokeWidth="4"
+              />
+            </svg>
+          </div>
+          <span className="pdf-loading-text">Opening PDF…</span>
         </div>
       )}
 
@@ -67,9 +89,16 @@ export default function ViewerPagesView({
           <AlertTriangle size={36} className="state-err-icon" />
           <h3>Could not open PDF</h3>
           <p>{error}</p>
-          <button type="button" className="cta" onClick={onOpenClick}>
-            Choose another file
-          </button>
+          <div className="viewer-error-actions">
+            <button type="button" className="cta" onClick={onOpenClick}>
+              Choose another file
+            </button>
+            {onReturnHome && (
+              <button type="button" className="vtb-btn" onClick={onReturnHome}>
+                Return to home
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -80,6 +109,7 @@ export default function ViewerPagesView({
               title="Open PDF file"
               subtitle="Choose a PDF from your device or drop it here to read."
               ctaText="Choose file"
+              onFilesSelectedStart={onFilesDroppedStart}
               onFilesSelected={onFilesDropped}
             />
           </div>

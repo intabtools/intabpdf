@@ -12,7 +12,7 @@ import { TOOL_CATEGORIES, getToolsByCategory, isToolImplemented } from '../tools
 
 export default function HomePage(): ReactNode {
   const navigate = useNavigate();
-  const { loadFile } = useViewer();
+  const { loadFile, setIsLoading } = useViewer();
   const { shell } = useShell();
   const { showToast } = useToast();
 
@@ -29,10 +29,13 @@ export default function HomePage(): ReactNode {
         if (!opened) {
           showToast('Pop-up was blocked. Please allow pop-ups for this site.');
         }
+        setIsLoading(false);
       } else {
         loadFile(files[0]);
         navigate('/viewer');
       }
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -71,6 +74,9 @@ export default function HomePage(): ReactNode {
             subtitle="or choose files from your device"
             ctaText="Choose files"
             accept="application/pdf,.pdf"
+            onFilesSelectedStart={() => {
+              setIsLoading(true);
+            }}
             onFilesSelected={handleFilesSelected}
           />
         </section>
@@ -184,6 +190,10 @@ export default function HomePage(): ReactNode {
         ctaText="Choose files"
         accept="application/pdf,.pdf"
         multiple={false}
+        onFilesSelectedStart={() => {
+          setIsLoading(true);
+          navigate('/viewer');
+        }}
         onFilesSelected={handleFilesSelected}
       />
 

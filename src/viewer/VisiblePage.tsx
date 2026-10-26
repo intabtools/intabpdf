@@ -18,7 +18,9 @@ export default function VisiblePage({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(
+    () => pageNumber === 1 || typeof IntersectionObserver === 'undefined'
+  );
   const [textLayerReady, setTextLayerReady] = useState(0);
 
   const width = Math.max(1, Math.round(baseSize.width * scale));
@@ -27,11 +29,17 @@ export default function VisiblePage({
   // Render canvas and textlayer only for pages near the visible scroll area
   useEffect(() => {
     const element = containerRef.current;
-    const root = scrollRootRef.current;
-    if (!element || !root) return;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
 
+    const root = scrollRootRef?.current || null;
     const observer = new IntersectionObserver(
-      ([entry]) => setIsVisible(entry.isIntersecting),
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.target === element) {
+            setIsVisible(entry.isIntersecting);
+          }
+        }
+      },
       { root, rootMargin: '400px 0px' },
     );
 

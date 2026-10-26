@@ -1,5 +1,5 @@
 // Screen component for staging files, executing operations, and downloading results for PDF tools.
-import { Suspense, createElement, useEffect, useMemo, useState } from 'react';
+import { Suspense, createElement, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import DropZone from '../components/DropZone';
@@ -7,6 +7,7 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 import { useShell } from '../hooks/useShell';
 import { useToast } from '../hooks/useToast';
 import { useViewer } from '../hooks/useViewer';
+import { useProcessing } from '../hooks/useProcessing';
 import { getPlatformType, openPdfInNewTab, platform } from '../platform';
 import type { OpenedFile } from '../platform';
 import {
@@ -23,12 +24,33 @@ import ToolStatusCards from './tool/ToolStatusCards';
 import ToolWebLayout from './tool/ToolWebLayout';
 import { useFileReorder } from './tool/useFileReorder';
 
+function getOperationMessage(toolId: string): string {
+  switch (toolId) {
+    case 'images-to-pdf':
+      return 'Creating PDF…';
+    case 'compress':
+      return 'Compressing PDF…';
+    case 'merge':
+      return 'Merging PDFs…';
+    case 'split':
+      return 'Splitting PDF…';
+    case 'rotate':
+      return 'Rotating pages…';
+    case 'remove-pages':
+      return 'Removing pages…';
+    default:
+      return 'Processing PDF…';
+  }
+}
+
 export default function ToolPage(): ReactNode {
   const { toolId } = useParams<{ toolId: string }>();
   const navigate = useNavigate();
   const { loadFile } = useViewer();
   const { shell } = useShell();
   const { showToast } = useToast();
+  const { startProcessing, stopProcessing, runWithProcessing } = useProcessing();
+  const activeImportReqRef = useRef<number | null>(null);
 
   const tool = getToolById(toolId || '');
   const isImplemented = tool ? isToolImplemented(tool.id) : false;
@@ -101,7 +123,27 @@ export default function ToolPage(): ReactNode {
     return <ToolMissingState tool={tool} onNavigateHome={() => navigate('/')} />;
   }
 
+  const handleFilesSelectedStart = (files: FileList | File[]) => {
+    const isImageTool = tool?.id === 'images-to-pdf' || tool?.fileType === 'img';
+    const message = isImageTool
+      ? files.length > 1
+        ? 'Importing photos…'
+        : 'Preparing images…'
+      : files.length > 1
+      ? 'Importing files…'
+      : 'Preparing file…';
+    activeImportReqRef.current = startProcessing(message);
+  };
+
+  const handleFilesSelectedEnd = () => {
+    if (activeImportReqRef.current !== null) {
+      stopProcessing(activeImportReqRef.current);
+      activeImportReqRef.current = null;
+    }
+  };
+
   const handleFilesAdded = (files: OpenedFile[]) => {
+    handleFilesSelectedEnd();
     const newItems: StagedFile[] = files.map((f, i) => ({
       id: `${f.name}-${Date.now()}-${i}`,
       name: f.name,
@@ -129,8 +171,10 @@ export default function ToolPage(): ReactNode {
     setErrorMessage(null);
     setIsSaved(false);
 
+    const message = tool ? getOperationMessage(tool.id) : 'Processing PDF…';
+
     try {
-      const result = await runner();
+      const result = await runWithProcessing(message, runner);
       setOutputBytes(result);
       setStatus('done');
     } catch (err) {
@@ -221,6 +265,7 @@ export default function ToolPage(): ReactNode {
           subtitle={tool.description}
           multiple={tool.id === 'merge' || tool.id === 'images-to-pdf'}
           accept={acceptTypes}
+          onFilesSelectedStart={handleFilesSelectedStart}
           onFilesSelected={handleFilesAdded}
         />
       )}
@@ -253,6 +298,7 @@ export default function ToolPage(): ReactNode {
               ctaText="Add"
               multiple={true}
               accept={acceptTypes}
+              onFilesSelectedStart={handleFilesSelectedStart}
               onFilesSelected={handleFilesAdded}
               className="add"
             />

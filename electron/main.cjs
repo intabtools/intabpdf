@@ -242,6 +242,18 @@ if (!gotLock) {
       win.focus();
     }
   });
+  ipcMain.on('has-pending-file', (event) => {
+    if (!win || win.isDestroyed()) {
+      event.returnValue = false;
+      return;
+    }
+    if (event.sender !== win.webContents) {
+      event.returnValue = false;
+      return;
+    }
+    event.returnValue = pendingFiles.length > 0;
+  });
+
   // Safely open the canonical repository externally via IPC from our trusted main frame.
   ipcMain.on('open-external-url', (event, rawUrl) => {
     if (!win || win.isDestroyed()) return;

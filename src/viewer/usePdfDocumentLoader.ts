@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
 import { useViewer } from '../hooks/useViewer';
-import type { OpenedFile } from '../platform';
+import { platform, type OpenedFile } from '../platform';
 import {
   destroyPdf,
   getPageSize,
@@ -20,6 +20,7 @@ export interface UsePdfDocumentLoaderResult {
   currentPage: number;
   setCurrentPage: (page: number) => void;
   isLoading: boolean;
+  setLoading: (loading: boolean) => void;
   error: string | null;
   openDocument: (file: OpenedFile) => Promise<void>;
   handleOpenClick: () => Promise<void>;
@@ -29,79 +30,107 @@ export interface UsePdfDocumentLoaderResult {
 }
 
 export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
-  const { currentFile, setCurrentFile, loadFile, openPdfPicker } = useViewer();
+  const {
+    currentFile,
+    setCurrentFile,
+    loadFile,
+    openPdfPicker,
+    isLoading: contextLoading,
+    setIsLoading: setContextLoading,
+  } = useViewer();
 
   const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(null);
   const [fileName, setFileName] = useState('');
   const [pageSizes, setPageSizes] = useState<PageSize[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  const [internalLoading, setInternalLoading] = useState(() => Boolean(currentFile && !pdfDoc));
   const [error, setError] = useState<string | null>(null);
+
+  const setLoading = useCallback(
+    (loading: boolean) => {
+      setInternalLoading(loading);
+      setContextLoading(loading);
+    },
+    [setContextLoading]
+  );
+
+  const isLoading = contextLoading || internalLoading;
 
   const loadRequestRef = useRef(0);
   const lastOpenedFileRef = useRef<OpenedFile | null>(null);
 
-  const openDocument = useCallback(async (file: OpenedFile) => {
-    const requestId = ++loadRequestRef.current;
-    let doc: PdfDocument | null = null;
-    let adopted = false;
-    setPdfDoc(null);
-    setPageSizes([]);
-    setFileName(file.name);
-    setCurrentPage(1);
-    setIsLoading(true);
-    setError(null);
+  const openDocument = useCallback(
+    async (file: OpenedFile) => {
+      const requestId = ++loadRequestRef.current;
+      let doc: PdfDocument | null = null;
+      let adopted = false;
+      setPdfDoc(null);
+      setPageSizes([]);
+      setFileName(file.name);
+      setCurrentPage(1);
+      setLoading(true);
+      setError(null);
 
-    try {
-      doc = await loadPdf(file.bytes);
-      const firstSize =
-        doc.numPages > 0 ? await getPageSize(doc, 1) : DEFAULT_PAGE_SIZE;
+      try {
+        doc = await loadPdf(file.bytes);
+        const firstSize =
+          doc.numPages > 0 ? await getPageSize(doc, 1) : DEFAULT_PAGE_SIZE;
 
-      if (requestId !== loadRequestRef.current) {
-        void destroyPdf(doc).catch(() => undefined);
-        return;
+        if (requestId !== loadRequestRef.current) {
+          void destroyPdf(doc).catch(() => undefined);
+          return;
+        }
+
+        setPdfDoc(doc);
+        adopted = true;
+        setPageSizes(Array.from({ length: doc.numPages }, () => firstSize));
+
+        const activeDoc = doc;
+        void Promise.all(
+          Array.from({ length: activeDoc.numPages }, async (_, index) => {
+            try {
+              return await getPageSize(activeDoc, index + 1);
+            } catch {
+              return firstSize;
+            }
+          }),
+        ).then((sizes) => {
+          if (requestId === loadRequestRef.current) setPageSizes(sizes);
+        });
+      } catch (loadError) {
+        if (doc && !adopted) {
+          void destroyPdf(doc).catch(() => undefined);
+        }
+        if (requestId === loadRequestRef.current) {
+          console.error('Failed to open PDF:', loadError);
+          setPdfDoc(null);
+          setPageSizes([]);
+          setError(
+            'Could not open this PDF. Check whether the file is damaged, unsupported, or password-protected.',
+          );
+        }
+      } finally {
+        if (requestId === loadRequestRef.current) {
+          setLoading(false);
+        }
       }
+    },
+    [setLoading]
+  );
 
-      setPdfDoc(doc);
-      adopted = true;
-      setPageSizes(Array.from({ length: doc.numPages }, () => firstSize));
-      setIsLoading(false);
-
-      const activeDoc = doc;
-      void Promise.all(
-        Array.from({ length: activeDoc.numPages }, async (_, index) => {
-          try {
-            return await getPageSize(activeDoc, index + 1);
-          } catch {
-            return firstSize;
-          }
-        }),
-      ).then((sizes) => {
-        if (requestId === loadRequestRef.current) setPageSizes(sizes);
-      });
-    } catch (loadError) {
-      if (doc && !adopted) {
-        void destroyPdf(doc).catch(() => undefined);
-      }
-      if (requestId === loadRequestRef.current) {
-        console.error('Failed to open PDF:', loadError);
-        setPdfDoc(null);
-        setPageSizes([]);
-        setError(
-          'Could not open this PDF. Check whether the file is damaged, unsupported, or password-protected.',
-        );
-        setIsLoading(false);
-      }
-    }
-  }, []);
+  useEffect(() => {
+    return platform.onFileOpenError?.((err: string) => {
+      setPdfDoc(null);
+      setPageSizes([]);
+      setError(err || 'Could not open this PDF. Check whether the file is damaged, unsupported, or accessible.');
+      setLoading(false);
+    });
+  }, [setLoading]);
 
   useEffect(() => {
     if (currentFile && currentFile !== lastOpenedFileRef.current) {
       lastOpenedFileRef.current = currentFile;
-      const timer = setTimeout(() => {
-        void openDocument(currentFile);
-      }, 0);
-      return () => clearTimeout(timer);
+      void openDocument(currentFile);
     }
   }, [currentFile, openDocument]);
 
@@ -120,15 +149,22 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
   }, [pdfDoc]);
 
   const handleOpenClick = async () => {
-    const file = await openPdfPicker();
-    if (file) {
-      loadFile(file);
+    const file = await openPdfPicker(() => {
+      setLoading(true);
+      setError(null);
+    });
+    if (!file) {
+      setLoading(false);
     }
   };
 
   const handleFilesDropped = (files: OpenedFile[]) => {
     if (files.length > 0) {
+      setLoading(true);
+      setError(null);
       loadFile(files[0]);
+    } else {
+      setLoading(false);
     }
   };
 
@@ -144,8 +180,12 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
       setPdfDoc(null);
       setPageSizes([]);
       setError('Please choose a PDF file.');
+      setLoading(false);
       return;
     }
+
+    setLoading(true);
+    setError(null);
 
     try {
       const buffer = await dropped.arrayBuffer();
@@ -159,6 +199,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
       setPdfDoc(null);
       setPageSizes([]);
       setError('Could not read that file. Please try selecting it again.');
+      setLoading(false);
     }
   };
 
@@ -171,11 +212,12 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     setFileName('');
     setPageSizes([]);
     setCurrentPage(1);
-    setIsLoading(false);
+    setLoading(false);
     setError(null);
     setCurrentFile(null);
     lastOpenedFileRef.current = null;
-  }, [pdfDoc, setCurrentFile]);
+    platform.clearPendingFile?.();
+  }, [pdfDoc, setCurrentFile, setLoading]);
 
   return {
     pdfDoc,
@@ -184,6 +226,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     currentPage,
     setCurrentPage,
     isLoading,
+    setLoading,
     error,
     openDocument,
     handleOpenClick,

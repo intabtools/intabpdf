@@ -5,23 +5,44 @@ import { Directory, Filesystem } from '@capacitor/filesystem';
 import './electron';
 import type { OpenedFile, PlatformAdapter, PlatformType } from './types';
 
-function pickPdfFromInput(): Promise<OpenedFile | null> {
+function pickPdfFromInput(onStart?: (fileName: string) => void): Promise<OpenedFile | null> {
     return new Promise((resolve) => {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'application/pdf,.pdf';
+        input.style.display = 'none';
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.appendChild(input);
+        }
+
+        let settled = false;
+        const finish = (result: OpenedFile | null) => {
+            if (settled) return;
+            settled = true;
+            if (input.parentNode) {
+                input.parentNode.removeChild(input);
+            }
+            resolve(result);
+        };
 
         input.onchange = async () => {
             const file = input.files?.[0];
             if (!file) {
-                resolve(null);
+                finish(null);
                 return;
             }
-            const buffer = await file.arrayBuffer();
-            resolve({ name: file.name, bytes: new Uint8Array(buffer) });
+            onStart?.(file.name);
+            await new Promise((r) => setTimeout(r, 0));
+            try {
+                const buffer = await file.arrayBuffer();
+                finish({ name: file.name, bytes: new Uint8Array(buffer) });
+            } catch (err) {
+                console.error('Failed to read file:', err);
+                finish(null);
+            }
         };
 
-        input.oncancel = () => resolve(null);
+        input.oncancel = () => finish(null);
         input.click();
     });
 }
@@ -66,6 +87,49 @@ function extractFilename(uri: string): string {
 }
 
 async function readNativeUri(uri: string): Promise<OpenedFile | null> {
+    // 1. Android NativeIntent bridge: fastest, direct streaming into internal cache, zero Base64
+    if (typeof window !== 'undefined' && window.NativeIntent?.resolveNativePdf) {
+        try {
+            const raw = window.NativeIntent.resolveNativePdf(uri);
+            if (raw) {
+                const info = JSON.parse(raw);
+                if (info.success && info.fileUrl) {
+                    const converted = Capacitor.convertFileSrc(info.fileUrl);
+                    const resp = await fetch(converted);
+                    if (!resp.ok) {
+                        throw new Error(`Failed to fetch cached PDF (HTTP ${resp.status})`);
+                    }
+                    const buf = await resp.arrayBuffer();
+                    return {
+                        name: info.name || extractFilename(uri),
+                        bytes: new Uint8Array(buf),
+                    };
+                } else if (info.error) {
+                    throw new Error(info.error);
+                }
+            }
+        } catch (nativeErr: unknown) {
+            console.error('NativeIntent.resolveNativePdf failed:', nativeErr);
+            throw nativeErr;
+        }
+    }
+
+    // 2. Direct fetch fallback via Capacitor convertFileSrc
+    try {
+        const converted = Capacitor.convertFileSrc(uri);
+        const resp = await fetch(converted);
+        if (resp.ok) {
+            const buf = await resp.arrayBuffer();
+            return {
+                name: extractFilename(uri),
+                bytes: new Uint8Array(buf),
+            };
+        }
+    } catch (fetchErr) {
+        console.warn('Direct fetch fallback failed:', fetchErr);
+    }
+
+    // 3. Fallback to Filesystem.readFile
     try {
         const result = await Filesystem.readFile({ path: uri });
         let bytes: Uint8Array;
@@ -81,25 +145,38 @@ async function readNativeUri(uri: string): Promise<OpenedFile | null> {
             name: extractFilename(uri),
             bytes,
         };
-    } catch (err) {
-        console.warn('Native Filesystem.readFile failed, trying fetch fallback:', err);
-        try {
-            const resp = await fetch(uri);
-            const buf = await resp.arrayBuffer();
-            return {
-                name: extractFilename(uri),
-                bytes: new Uint8Array(buf),
-            };
-        } catch (fetchErr) {
-            console.error('Failed to read native PDF URI:', fetchErr);
-            return null;
-        }
+    } catch (fsErr) {
+        console.error('Filesystem.readFile fallback failed:', fsErr);
     }
+
+    return null;
 }
 
 // Manage listeners across platforms (Electron and Capacitor)
 const fileListeners = new Set<(file: OpenedFile) => void>();
+const fileStartListeners = new Set<(fileName: string) => void>();
+const fileErrorListeners = new Set<(error: string) => void>();
 const bufferedFiles: OpenedFile[] = [];
+
+function dispatchFileStart(fileName: string) {
+    for (const listener of fileStartListeners) {
+        try {
+            listener(fileName);
+        } catch (err) {
+            console.error('File start listener threw error:', err);
+        }
+    }
+}
+
+function dispatchFileError(error: string) {
+    for (const listener of fileErrorListeners) {
+        try {
+            listener(error);
+        } catch (err) {
+            console.error('File error listener threw error:', err);
+        }
+    }
+}
 
 function dispatchFile(file: OpenedFile) {
     if (fileListeners.size === 0) {
@@ -115,35 +192,117 @@ function dispatchFile(file: OpenedFile) {
     }
 }
 
+let activeLaunchUri: string | null = null;
+let lastConsumedUri: string | null = null;
+let lastConsumedTime = 0;
+
+export async function handleLaunchUri(uri: string): Promise<void> {
+    if (!uri) return;
+
+    const now = Date.now();
+    // Prevent duplicate handling if already running or consumed within the last 3 seconds
+    if (activeLaunchUri === uri || (lastConsumedUri === uri && (now - lastConsumedTime) < 3000)) {
+        return;
+    }
+
+    activeLaunchUri = uri;
+    dispatchFileStart(extractFilename(uri));
+
+    try {
+        const file = await readNativeUri(uri);
+        if (file) {
+            lastConsumedUri = uri;
+            lastConsumedTime = Date.now();
+            dispatchFile(file);
+        } else {
+            dispatchFileError('Could not open this PDF. Check whether the file is damaged, unsupported, or accessible.');
+        }
+    } catch (err: unknown) {
+        console.error('Failed to read launch PDF:', err);
+        const msg = err instanceof Error ? err.message : 'Could not open this PDF. Check whether the file is damaged, unsupported, or accessible.';
+        dispatchFileError(msg);
+    } finally {
+        activeLaunchUri = null;
+    }
+}
+
 // Initialize native Capacitor handlers if on a native platform
 if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
-    // Warm start: intent arrives while app is already open/in background
+    // Warm start: intent arrives while app is already open/in background (also handles retained cold-start event)
     App.addListener('appUrlOpen', async (data) => {
         if (data.url && (data.url.toLowerCase().endsWith('.pdf') || data.url.startsWith('content://') || data.url.startsWith('file://'))) {
-            const file = await readNativeUri(data.url);
-            if (file) {
-                dispatchFile(file);
-            }
+            await handleLaunchUri(data.url);
         }
     }).catch((err) => {
         console.warn('Failed to attach appUrlOpen listener:', err);
     });
 
-    // Cold start: app opened directly via file intent
+    // Cold start: check NativeIntent bridge first
+    if (window.NativeIntent?.getPendingPdf) {
+        const pending = window.NativeIntent.getPendingPdf();
+        if (pending) {
+            void handleLaunchUri(pending);
+        }
+    }
+
+    // Cold start: App.getLaunchUrl fallback
     App.getLaunchUrl().then(async (launchUrl) => {
         if (launchUrl?.url && (launchUrl.url.toLowerCase().endsWith('.pdf') || launchUrl.url.startsWith('content://') || launchUrl.url.startsWith('file://'))) {
-            const file = await readNativeUri(launchUrl.url);
-            if (file) {
-                dispatchFile(file);
-            }
+            await handleLaunchUri(launchUrl.url);
         }
     }).catch((err) => {
         console.warn('Failed to retrieve cold-start launch URL:', err);
     });
 }
 
+let pendingLaunchFileConsumed = false;
+
 export const platform: PlatformAdapter = {
+    hasPendingFile() {
+        if (pendingLaunchFileConsumed) return false;
+        if (typeof window !== 'undefined') {
+            if (window.intab?.hasPendingPdf) {
+                const has = Boolean(window.intab.hasPendingPdf());
+                if (has) {
+                    pendingLaunchFileConsumed = true;
+                    return true;
+                }
+            }
+            if (window.NativeIntent?.hasPendingPdf) {
+                const has = Boolean(window.NativeIntent.hasPendingPdf());
+                if (has) {
+                    pendingLaunchFileConsumed = true;
+                    return true;
+                }
+            }
+        }
+        return false;
+    },
+
+    clearPendingFile() {
+        pendingLaunchFileConsumed = false;
+        lastConsumedUri = null;
+        lastConsumedTime = 0;
+        if (typeof window !== 'undefined') {
+            window.NativeIntent?.clearPendingPdf?.();
+        }
+    },
+
     pickPdfFile: pickPdfFromInput,
+
+    onFileOpenStart(handler) {
+        fileStartListeners.add(handler);
+        return () => {
+            fileStartListeners.delete(handler);
+        };
+    },
+
+    onFileOpenError(handler) {
+        fileErrorListeners.add(handler);
+        return () => {
+            fileErrorListeners.delete(handler);
+        };
+    },
 
     onFileOpened(handler) {
         // Register listener

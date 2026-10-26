@@ -28,8 +28,12 @@ export default function AppHeader({
   const isSubPage = location.pathname !== '/';
   const isViewerPage = location.pathname.startsWith('/viewer');
 
+  const headerClasses = ['hdr', isSubPage ? 'sub' : '', isViewerPage ? 'hdr-viewer' : '']
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <header className={`hdr ${isSubPage ? 'sub' : ''} ${isViewerPage ? 'hdr-viewer' : ''}`}>
+    <header className={headerClasses}>
       {!isViewerPage && (
         <button
           type="button"

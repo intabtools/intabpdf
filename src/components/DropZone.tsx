@@ -10,6 +10,7 @@ interface DropZoneProps {
   accept?: string;
   multiple?: boolean;
   onFilesSelected?: (files: OpenedFile[]) => void;
+  onFilesSelectedStart?: (files: FileList | File[]) => void;
   className?: string;
 }
 
@@ -20,30 +21,42 @@ export default function DropZone({
   accept = 'application/pdf,.pdf',
   multiple = false,
   onFilesSelected,
+  onFilesSelectedStart,
   className = '',
 }: DropZoneProps): ReactNode {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFileList = async (fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0 || !onFilesSelected) return;
+    if (!fileList || fileList.length === 0 || !onFilesSelected) {
+      return;
+    }
+    // Yield to the event loop so the browser paints the loading screen immediately
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const openedFiles: OpenedFile[] = [];
 
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
-      try {
-        const buffer = await file.arrayBuffer();
-        openedFiles.push({
-          name: file.name,
-          bytes: new Uint8Array(buffer),
-        });
-      } catch (err) {
-        console.error(`Failed to read file ${file.name}:`, err);
+    try {
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        try {
+          const buffer = await file.arrayBuffer();
+          openedFiles.push({
+            name: file.name,
+            bytes: new Uint8Array(buffer),
+          });
+        } catch (err) {
+          console.error(`Failed to read file ${file.name}:`, err);
+        }
       }
-    }
 
-    if (openedFiles.length > 0) {
-      onFilesSelected(openedFiles);
+      if (openedFiles.length > 0) {
+        onFilesSelected(openedFiles);
+      } else {
+        onFilesSelected([]);
+      }
+    } catch (err) {
+      console.error('Failed to process file list:', err);
+      onFilesSelected([]);
     }
   };
 
@@ -63,6 +76,9 @@ export default function DropZone({
   const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onFilesSelectedStart?.(e.dataTransfer.files);
+    }
     void processFileList(e.dataTransfer.files);
   };
 
@@ -81,7 +97,12 @@ export default function DropZone({
         accept={accept}
         multiple={multiple}
         style={{ display: 'none' }}
-        onChange={(e) => void processFileList(e.target.files)}
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            onFilesSelectedStart?.(e.target.files);
+          }
+          void processFileList(e.target.files);
+        }}
       />
       <span className="di">
         <FileText size={22} />

@@ -22,6 +22,14 @@ ipcRenderer.on('open-pdf', (_event, file) => {
 });
 
 contextBridge.exposeInMainWorld('intab', {
+  hasPendingPdf: () => {
+    try {
+      if (backlog.length > 0) return true;
+      return Boolean(ipcRenderer.sendSync('has-pending-file'));
+    } catch {
+      return false;
+    }
+  },
   onOpenPdf: (callback) => {
     if (typeof callback !== 'function') {
       throw new TypeError('onOpenPdf expects a callback function');

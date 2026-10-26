@@ -1,5 +1,5 @@
 // Web layout shell for standalone browser usage with sticky navigation header, breadcrumbs, and footer.
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Moon, Search, Sun } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
@@ -7,6 +7,10 @@ import CommandPalette from './CommandPalette';
 import Logo from './Logo';
 import { useShell } from '../hooks/useShell';
 import { APP_VERSION } from '../config';
+import { ViewerContext } from '../viewer/viewerContextDef';
+import { ProcessingContext } from './processingContextDef';
+import PdfLoadingScreen from '../viewer/PdfLoadingScreen';
+import ProcessingLoadingScreen from './ProcessingLoadingScreen';
 
 interface WebShellProps {
   children: ReactNode;
@@ -70,19 +74,32 @@ export default function WebShell({
 
   const isHomeActive = location.pathname === '/' || location.pathname.startsWith('/tool/');
   const isAboutActive = location.pathname === '/about';
-
-  if (!showAppLayout) {
-    return (
-      <div className="app web full-bleed" style={{ height: '100%', overflow: 'hidden' }}>
-        {children}
-      </div>
-    );
-  }
+  const viewer = useContext(ViewerContext);
+  const processing = useContext(ProcessingContext);
+  const isViewerLoading = viewer?.isLoading ?? false;
+  const isProcessingActive = processing?.isProcessing ?? false;
+  const isFullScreenOverlay = isViewerLoading || isProcessingActive;
 
   return (
-    <div className="app web">
-      <div className="wscroll" id="m">
-        <header className="wh">
+    <div
+      className={`app web ${!showAppLayout || isFullScreenOverlay ? 'full-bleed' : ''} ${
+        isViewerLoading ? 'is-loading-pdf' : ''
+      } ${isProcessingActive ? 'is-loading-processing' : ''}`}
+      style={!showAppLayout ? { height: '100%', overflow: 'hidden' } : undefined}
+    >
+      {isViewerLoading && <PdfLoadingScreen message="Opening PDF…" />}
+      {!isViewerLoading && isProcessingActive && (
+        <ProcessingLoadingScreen message={processing?.message || 'Processing PDF…'} />
+      )}
+
+      <div
+        className="wscroll"
+        id="m"
+        style={isFullScreenOverlay ? { display: 'none' } : undefined}
+        aria-hidden={isFullScreenOverlay ? true : undefined}
+      >
+        {showAppLayout && !isFullScreenOverlay && (
+          <header className="wh">
           <div className="whi">
             <Link to="/" className="wlogo" aria-label="InTab PDF home">
               <Logo size={30} />
@@ -166,9 +183,11 @@ export default function WebShell({
             </button>
           </div>
         </header>
+      )}
 
-        <main className="wmain">{children}</main>
+      <main className="wmain">{children}</main>
 
+      {showAppLayout && !isFullScreenOverlay && (
         <footer className="wf">
           <div className="wp wfi">
             <div className="wfa">
@@ -194,6 +213,7 @@ export default function WebShell({
             <small className="wfc">MIT license, version {APP_VERSION}</small>
           </div>
         </footer>
+      )}
       </div>
 
       <CommandPalette
