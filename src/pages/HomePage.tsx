@@ -68,17 +68,6 @@ export default function HomePage(): ReactNode {
               </span>
             </div>
           </div>
-
-          <DropZone
-            title="Drop PDF files here"
-            subtitle="or choose files from your device"
-            ctaText="Choose files"
-            accept="application/pdf,.pdf"
-            onFilesSelectedStart={() => {
-              setIsLoading(true);
-            }}
-            onFilesSelected={handleFilesSelected}
-          />
         </section>
 
         {/* All Tools Catalog */}

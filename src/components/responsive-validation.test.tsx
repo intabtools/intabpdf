@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import HomePage from '../pages/HomePage';
 import { ToastProvider } from './ToastContext';
 import { ViewerProvider } from '../viewer/ViewerContext';
+import { ShellContext } from './shellContextDef';
 
 describe('Responsive Validation and Sizing Audit', () => {
   const desktopWidths = [900, 1024, 1280, 1440, 1650, 1920];
@@ -152,6 +153,45 @@ describe('Responsive Validation and Sizing Audit', () => {
     expect(html).toContain('Compress');
     expect(html).toContain('Rotate pages');
     expect(html).toContain('Split');
+  });
+
+  it('renders web Tools homepage with hero headline and pills but without obsolete dropzone panel', () => {
+    const html = renderToString(
+      <MemoryRouter initialEntries={['/']}>
+        <ShellContext.Provider
+          value={{
+            shell: 'web',
+            setShell: () => {},
+            showAppLayout: true,
+            setShowAppLayout: () => {},
+          }}
+        >
+          <ToastProvider>
+            <ViewerProvider>
+              <HomePage />
+            </ViewerProvider>
+          </ToastProvider>
+        </ShellContext.Provider>
+      </MemoryRouter>
+    );
+
+    // Hero headline and privacy badges must be present
+    expect(html).toContain('PDF tools that never leave your device');
+    expect(html).toContain('Merge, split, compress and sign PDFs in your browser.');
+    expect(html).toContain('No uploads');
+    expect(html).toContain('No account');
+    expect(html).toContain('No ads');
+    expect(html).toContain('Open source');
+
+    // Obsolete web homepage dropzone must NOT be present
+    expect(html).not.toContain('Drop PDF files here');
+    expect(html).not.toContain('or choose files from your device');
+
+    // Tool catalog must still be rendered
+    expect(html).toContain('All tools');
+    expect(html).toContain('Pick a tool, add your files, save the result.');
+    expect(html).toContain('Merge');
+    expect(html).toContain('Compress');
   });
 
   it('renders Header across both expanded and collapsed desktop states', () => {
