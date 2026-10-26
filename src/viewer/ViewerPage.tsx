@@ -1,5 +1,5 @@
 // Screen component coordinating PDF viewer lifecycle, platform integrations, and sub-views.
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useShell } from '../hooks/useShell';
@@ -10,6 +10,7 @@ import ViewerFullscreenControls from './ViewerFullscreenControls';
 import ViewerSearchBar from './ViewerSearchBar';
 import ViewerThumbnails from './ViewerThumbnails';
 import ViewerPagesView from './ViewerPagesView';
+import { createPdfLinkService } from './pdfLinks';
 import { useViewerFullscreen } from './useViewerFullscreen';
 import { useViewerZoom } from './useViewerZoom';
 import { useViewerSearch } from './useViewerSearch';
@@ -94,6 +95,15 @@ export default function ViewerPage(): ReactNode {
     scrollRootRef,
   });
 
+  const linkService = useMemo(
+    () => (pdfDoc ? createPdfLinkService(pdfDoc, jumpToPage) : undefined),
+    [pdfDoc, jumpToPage]
+  );
+
+  useEffect(() => {
+    linkService?.setCurrentPage(currentPage);
+  }, [linkService, currentPage]);
+
   const {
     zoom,
     isFitToWidth,
@@ -104,6 +114,7 @@ export default function ViewerPage(): ReactNode {
     toggleFitOrZoom,
   } = useViewerZoom({
     pageSizes,
+    currentPage,
     cvsWidth,
     scrollRootRef,
     pagesWrapperRef,
@@ -346,6 +357,7 @@ export default function ViewerPage(): ReactNode {
           searchQuery={searchQuery}
           matches={matches}
           currentMatchIndex={currentMatchIndex}
+          linkService={linkService}
         />
       </div>
     </div>

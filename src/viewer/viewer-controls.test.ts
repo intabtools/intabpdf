@@ -1,14 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isScreenEnabled, resolveDestination } from '../config/screens';
 import { openPdfInNewTab, revokeAllTrackedBlobUrls, getTrackedBlobUrlCount } from '../platform/webPdf';
+import { calculateFitScale } from './useViewerZoom';
 
 const ZOOM_STEPS = [25, 50, 75, 100, 125, 150, 200, 300, 400];
-
-function calculateFitScale(containerWidth: number, firstPageWidth: number): number {
-  if (containerWidth <= 0) return 1;
-  const availableWidth = Math.max(120, containerWidth - 36);
-  return Math.min(3.0, Math.max(0.15, availableWidth / firstPageWidth));
-}
 
 function calculateNextZoom(currentScalePercent: number): number {
   const next = ZOOM_STEPS.find((step) => step > currentScalePercent);
@@ -88,17 +83,22 @@ describe('Viewer Controls & Navigation Logic', () => {
   describe('Zoom & Fit-to-Width Scaling', () => {
     it('computes dynamic fit scale based on viewport container width', () => {
       const standardA4Width = 595;
+      const landscapeA4Width = 842;
 
-      // Mobile phone width (360px container -> available 324px)
+      // Mobile phone width (360px container -> available 360px)
       const phoneScale = calculateFitScale(360, standardA4Width);
-      expect(phoneScale).toBeCloseTo(324 / 595, 2);
+      expect(phoneScale).toBeCloseTo(360 / 595, 2);
 
-      // Desktop width (1000px container -> available 964px)
+      // Mobile phone landscape page (360px container -> available 360px)
+      const phoneLandscapeScale = calculateFitScale(360, landscapeA4Width);
+      expect(phoneLandscapeScale).toBeCloseTo(360 / 842, 2);
+
+      // Desktop width (1000px container -> available 1000px)
       const desktopScale = calculateFitScale(1000, standardA4Width);
-      expect(desktopScale).toBeCloseTo(964 / 595, 2);
+      expect(desktopScale).toBeCloseTo(1000 / 595, 2);
 
-      // Extremely narrow container respects minimum bound 0.15
-      expect(calculateFitScale(50, standardA4Width)).toBe(0.20168067226890757); // 120 / 595
+      // Extremely narrow container respects minimum bound width 120
+      expect(calculateFitScale(50, standardA4Width)).toBe(120 / 595);
 
       // Zero width falls back to 1.0
       expect(calculateFitScale(0, standardA4Width)).toBe(1.0);

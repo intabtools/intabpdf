@@ -369,12 +369,25 @@ export type { OpenedFile, PlatformType, SaveFileResult } from './types';
 export { openPdfInNewTab, revokeAllTrackedBlobUrls, getTrackedBlobUrlCount } from './webPdf';
 
 export function openExternalUrl(url: string): void {
+    if (!url || typeof url !== 'string') return;
+    const trimmed = url.trim();
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            console.warn('Blocked opening non-HTTP(S) external URL:', trimmed);
+            return;
+        }
+    } catch {
+        console.warn('Blocked opening invalid external URL:', trimmed);
+        return;
+    }
+
     if (typeof window !== 'undefined' && window.intab?.openExternalUrl) {
-        window.intab.openExternalUrl(url);
+        window.intab.openExternalUrl(trimmed);
         return;
     }
     if (typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(trimmed, '_blank', 'noopener,noreferrer');
     }
 }
 

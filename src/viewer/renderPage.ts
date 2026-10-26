@@ -8,6 +8,7 @@ import {
   getCachedPageText,
   setCachedPageText,
 } from './textCache';
+import type { PdfLinkService } from './pdfLinks';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -159,6 +160,142 @@ export function renderPageTextLayer(
       cancelled = true;
       try {
         textLayerInstance?.cancel();
+      } catch {
+        // ignore
+      }
+    },
+  };
+}
+
+export function renderPageAnnotationLayer(
+  doc: PdfDocument,
+  pageNumber: number,
+  container: HTMLDivElement,
+  scale: number,
+  linkService: PdfLinkService,
+): { promise: Promise<void>; cancel: () => void } {
+  let cancelled = false;
+  let annotationLayerInstance: pdfjsLib.AnnotationLayer | null = null;
+
+  const promise = (async () => {
+    const page = await doc.getPage(pageNumber);
+    if (cancelled) return;
+
+    const viewport = page.getViewport({ scale });
+    container.innerHTML = '';
+    container.style.width = `${Math.floor(viewport.width)}px`;
+    container.style.height = `${Math.floor(viewport.height)}px`;
+    container.style.setProperty('--scale-factor', `${viewport.scale}`);
+    container.style.setProperty('--total-scale-factor', `${viewport.scale}`);
+    container.style.setProperty('--scale-round-x', '1px');
+    container.style.setProperty('--scale-round-y', '1px');
+
+    const annotations = await page.getAnnotations({ intent: 'display' });
+    if (cancelled) return;
+
+    if (!annotations || annotations.length === 0) {
+      return;
+    }
+
+    try {
+      type AnnotationLayerConstructor = new (params: unknown) => pdfjsLib.AnnotationLayer;
+      annotationLayerInstance = new (pdfjsLib.AnnotationLayer as unknown as AnnotationLayerConstructor)({
+        div: container,
+        page,
+        viewport,
+        linkService,
+      });
+      await (annotationLayerInstance.render as (params: unknown) => Promise<void>)({
+        annotations,
+        viewport,
+        linkService,
+      });
+    } catch {
+      if (cancelled) return;
+      // Fallback for mock/test environments
+      container.innerHTML = '';
+      for (const annot of annotations) {
+        if (!annot || annot.hidden) continue;
+        const isLink =
+          annot.annotationType === 1 ||
+          annot.subtype === 'Link' ||
+          !!annot.url ||
+          !!annot.dest;
+        if (!isLink || !annot.rect) continue;
+
+        const [x1, y1, x2, y2] = annot.rect;
+        const rect = [
+          Math.min(x1, x2),
+          Math.min(y1, y2),
+          Math.max(x1, x2),
+          Math.max(y1, y2),
+        ];
+
+        const pageView = page.view || [0, 0, viewport.width, viewport.height];
+        const normalizedRect = [
+          rect[0],
+          pageView[3] - rect[3] + pageView[1],
+          rect[2],
+          pageView[3] - rect[1] + pageView[1],
+        ];
+
+        const rawDims = (
+          viewport as unknown as {
+            rawDims?: {
+              pageWidth: number;
+              pageHeight: number;
+              pageX: number;
+              pageY: number;
+            };
+          }
+        ).rawDims;
+        const pageWidth = rawDims?.pageWidth || viewport.width;
+        const pageHeight = rawDims?.pageHeight || viewport.height;
+        const pageX = rawDims?.pageX || 0;
+        const pageY = rawDims?.pageY || 0;
+
+        const left = (100 * (normalizedRect[0] - pageX)) / pageWidth;
+        const top = (100 * (normalizedRect[1] - pageY)) / pageHeight;
+        const width = (100 * (rect[2] - rect[0])) / pageWidth;
+        const height = (100 * (rect[3] - rect[1])) / pageHeight;
+
+        const section = document.createElement('section');
+        section.className = 'linkAnnotation';
+        section.style.left = `${left}%`;
+        section.style.top = `${top}%`;
+        section.style.width = `${width}%`;
+        section.style.height = `${height}%`;
+
+        const link = document.createElement('a');
+        if (annot.url) {
+          linkService.addLinkAttributes(link, annot.url);
+        } else if (annot.dest) {
+          link.href = linkService.getDestinationHash(annot.dest);
+          link.onclick = (e) => {
+            e.preventDefault();
+            void linkService.goToDestination(annot.dest);
+            return false;
+          };
+        } else if (annot.action) {
+          link.href = '#';
+          link.onclick = (e) => {
+            e.preventDefault();
+            linkService.executeNamedAction(annot.action);
+            return false;
+          };
+        }
+        section.appendChild(link);
+        container.appendChild(section);
+      }
+    }
+  })();
+
+  return {
+    promise,
+    cancel() {
+      cancelled = true;
+      try {
+        annotationLayerInstance?.destroy?.();
       } catch {
         // ignore
       }

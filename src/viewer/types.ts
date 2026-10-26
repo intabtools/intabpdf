@@ -1,6 +1,7 @@
 // Shared type definitions for the PDF viewer components, hooks, and search.
 import type { Dispatch, FocusEvent, RefObject, SetStateAction } from 'react';
 import type { PageSize, PdfDocument } from './renderPage';
+import type { PdfLinkService } from './pdfLinks';
 
 export interface SearchMatch {
   id: number;
@@ -18,6 +19,7 @@ export interface VisiblePageProps {
   searchQuery?: string;
   matches?: SearchMatch[];
   currentMatchIndex?: number;
+  linkService?: PdfLinkService;
 }
 
 export interface PageThumbnailProps {

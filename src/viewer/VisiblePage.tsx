@@ -1,7 +1,7 @@
-// Component for rendering a single visible PDF page with canvas, text layer, and search highlights.
+// Component for rendering a single visible PDF page with canvas, text layer, search highlights, and annotation links.
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { drawPageOnCanvas, renderPageTextLayer } from './renderPage';
+import { drawPageOnCanvas, renderPageAnnotationLayer, renderPageTextLayer } from './renderPage';
 import type { VisiblePageProps } from './types';
 
 export default function VisiblePage({
@@ -14,10 +14,12 @@ export default function VisiblePage({
   searchQuery = '',
   matches = [],
   currentMatchIndex = -1,
+  linkService,
 }: VisiblePageProps): ReactNode {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
+  const annotationLayerRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(
     () => pageNumber === 1 || typeof IntersectionObserver === 'undefined'
   );
@@ -101,6 +103,30 @@ export default function VisiblePage({
       job.cancel();
     };
   }, [doc, pageNumber, scale, isVisible]);
+
+  // Annotation layer rendering (PDF links & destinations)
+  useEffect(() => {
+    const annotationLayer = annotationLayerRef.current;
+    if (!isVisible || !annotationLayer || !linkService) return;
+
+    let active = true;
+    const job = renderPageAnnotationLayer(doc, pageNumber, annotationLayer, scale, linkService);
+    job.promise.catch((error: unknown) => {
+      if (!active) return;
+      if (
+        error instanceof Error &&
+        (error.name === 'RenderingCancelledException' || error.name === 'AbortException')
+      ) {
+        return;
+      }
+      console.error(`Failed to render annotations for PDF page ${pageNumber}:`, error);
+    });
+
+    return () => {
+      active = false;
+      job.cancel();
+    };
+  }, [doc, pageNumber, scale, isVisible, linkService]);
 
   // Visible search highlights application with fast active-match toggling
   useEffect(() => {
@@ -224,6 +250,7 @@ export default function VisiblePage({
         <>
           <canvas ref={canvasRef} />
           <div ref={textLayerRef} className="textLayer" />
+          <div ref={annotationLayerRef} className="annotationLayer" />
         </>
       ) : (
         <span className="pg-placeholder">Page {pageNumber}</span>

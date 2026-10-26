@@ -6,14 +6,21 @@ import type { PageSize } from './renderPage';
 const ZOOM_STEPS = [25, 50, 75, 100, 125, 150, 200, 300, 400];
 const DEFAULT_PAGE_SIZE: PageSize = { width: 595, height: 842 };
 
-interface UseViewerZoomOptions {
+export function calculateFitScale(usableWidth: number, pageWidth: number): number {
+  if (usableWidth <= 0 || pageWidth <= 0) return 1;
+  const clampedWidth = Math.max(120, usableWidth);
+  return Math.min(3.0, Math.max(0.15, clampedWidth / pageWidth));
+}
+
+export interface UseViewerZoomOptions {
   pageSizes: PageSize[];
   cvsWidth: number;
   scrollRootRef: RefObject<HTMLElement | null>;
   pagesWrapperRef: RefObject<HTMLDivElement | null>;
+  currentPage?: number;
 }
 
-interface UseViewerZoomResult {
+export interface UseViewerZoomResult {
   zoom: number;
   setZoom: (zoom: number | ((prev: number) => number)) => void;
   isFitToWidth: boolean;
@@ -30,14 +37,15 @@ export function useViewerZoom({
   cvsWidth,
   scrollRootRef,
   pagesWrapperRef,
+  currentPage,
 }: UseViewerZoomOptions): UseViewerZoomResult {
   const [zoom, setZoom] = useState(100);
   const [isFitToWidth, setIsFitToWidth] = useState(true);
 
-  const firstPageWidth = pageSizes[0]?.width || DEFAULT_PAGE_SIZE.width;
-  const availableWidth = Math.max(120, cvsWidth - 36);
-  const fitScale =
-    cvsWidth > 0 ? Math.min(3.0, Math.max(0.15, availableWidth / firstPageWidth)) : 1;
+  const targetPageSize =
+    (currentPage && pageSizes[currentPage - 1]) || pageSizes[0] || DEFAULT_PAGE_SIZE;
+  const targetPageWidth = targetPageSize.width;
+  const fitScale = calculateFitScale(cvsWidth, targetPageWidth);
   const effectiveScale = isFitToWidth ? fitScale : zoom / 100;
 
   const zoomOut = useCallback(() => {

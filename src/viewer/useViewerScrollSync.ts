@@ -58,9 +58,14 @@ export function useViewerScrollSync({
 
     let rafId: number | null = null;
     const measure = () => {
-      const w = root.clientWidth;
-      if (w > 0) {
-        setCvsWidth(w);
+      const currentRoot = scrollRootRef.current;
+      if (!currentRoot) return;
+      const style = window.getComputedStyle(currentRoot);
+      const paddingLeft = parseFloat(style.paddingLeft) || 0;
+      const paddingRight = parseFloat(style.paddingRight) || 0;
+      const usable = Math.max(0, currentRoot.clientWidth - paddingLeft - paddingRight);
+      if (usable > 0) {
+        setCvsWidth(usable);
       }
     };
 
@@ -80,11 +85,13 @@ export function useViewerScrollSync({
 
     observer.observe(root);
     window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
 
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
       observer.disconnect();
       window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
     };
   }, [scrollRootRef]);
 

@@ -5,6 +5,7 @@ import DropZone from '../components/DropZone';
 import type { OpenedFile } from '../platform';
 import VisiblePage from './VisiblePage';
 import type { PageSize, PdfDocument } from './renderPage';
+import type { PdfLinkService } from './pdfLinks';
 import type { SearchMatch } from './types';
 
 const DEFAULT_PAGE_SIZE: PageSize = { width: 595, height: 842 };
@@ -29,6 +30,7 @@ interface ViewerPagesViewProps {
   searchQuery: string;
   matches: SearchMatch[];
   currentMatchIndex: number;
+  linkService?: PdfLinkService;
 }
 
 export default function ViewerPagesView({
@@ -51,6 +53,7 @@ export default function ViewerPagesView({
   searchQuery,
   matches,
   currentMatchIndex,
+  linkService,
 }: ViewerPagesViewProps): ReactNode {
   return (
     <main
@@ -133,6 +136,7 @@ export default function ViewerPagesView({
                 searchQuery={searchQuery}
                 matches={matches}
                 currentMatchIndex={currentMatchIndex}
+                linkService={linkService}
               />
             );
           })}
