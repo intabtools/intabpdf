@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <a href="https://intabpdf.pages.dev"><strong>Explore InTabPDF →</strong></a>
+</p>
+
+<p align="center">
   A community project by <a href="https://github.com/intabtools">intabtools</a>, made by students, for everyone.
 </p>
 
