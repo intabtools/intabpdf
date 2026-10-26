@@ -1,170 +1,172 @@
-# Architecture
+# InTabPDF Architecture
 
-This page explains how we plan to arrange the code. It is a plan to keep things simple as the project grows, not a strict law. If you feel something should change, please open an issue and tell us.
+InTabPDF is a privacy-first, client-only PDF application running across Web browsers, Electron desktop, and Android (via Capacitor).
 
-InTab PDF runs fully on the user's device. There is no server, no database and no login. All the PDF work happens in the browser, or inside the Electron desktop app and the Capacitor Android app (the Android shell is ready, and the first build is next).
+There is zero backend server, zero analytics/telemetry, zero database, and zero network dependency during operation. All PDF document processing, parsing, rendering, and manipulation occur entirely inside the user's device memory.
 
-## What we want from this code
+---
 
-Every rule on this page comes from four goals.
+## 1. Core Architecture Boundaries
 
-| Goal | What it means for us |
-|---|---|
-| Simple | Choose the plain way. No clever tricks and no extra layers. A new student should understand a file in a few minutes. |
-| Modular | One tool lives in one folder. Tools do not depend on each other. Shared things go to `core`, `components` or `hooks`. |
-| Explainable | You can say what a file does, and why it is there, in one or two sentences. Names are clear and comments explain the why. |
-| Maintainable | PRs are small, `core` has tests, and docs are updated along with the code. Anyone in the group can take over any part. |
-
-The project is at a very early stage, so please do not build for the future. Build only what is needed now, and keep it simple. When a real need comes, we will improve it together.
-
-## The big picture
+The application enforces a unidirectional dependency hierarchy across seven decoupled domains:
 
 ```mermaid
 flowchart TD
-    Pages["pages (home, donate, about)"] --> Components["components (shared UI)"]
-    Pages --> Registry["tools/registry"]
-    Tools["tools (one folder per tool)"] --> Components
-    Tools --> Hooks["hooks (shared React hooks)"]
-    Tools --> Platform["platform (open, save, share)"]
-    Tools --> Workers["tool workers"]
-    Workers --> Core["core (PDF logic)"]
-    Viewer["viewer (PDF viewer screen)"] --> Components
-    Viewer --> Platform
+    Config["src/config (Screen & Platform Config)"] --> Shell["src/components/AppShell & WebShell"]
+    Registry["src/tools/registry (Tool Registry)"] --> Pages["src/pages & src/viewer"]
+    Pages --> Modules["src/tools/modules (Lazy Tool Modules)"]
+    Modules --> WorkerService["src/core/worker/service (Worker Dispatcher)"]
+    WorkerService --> WebWorker["src/core/worker/pdfWorker (Web Worker Thread)"]
+    WorkerService -.->|Fallback| Core["src/core (Pure PDF Operations)"]
+    WebWorker --> Core
+    Pages --> Platform["src/platform (Platform Adapters)"]
 ```
 
-The arrows show who can use whom. Code flows in **one direction only**. `core` sits at the bottom and knows nothing about the rest of the app. `pages` are the non-tool screens: they may use `components` and read the tool list, but they never contain PDF logic.
+### Architectural Responsibilities
 
-## How one job flows
+1. **Application Configuration (`src/config/screens.ts`)**
+   - Declares enabled screens per platform (`home`, `viewer`, `tools`, `about`).
+   - The embedded `/viewer` screen is explicitly disabled on `web` (`isScreenEnabled('viewer', 'web') === false`) to eliminate redundant embedded reader overhead, while remaining active on `electron` and `android`.
+   - Defines platform-specific initial destinations (`web: '/'`, `electron: '/'`, `android: '/'`).
+   - Configures default shell visibility (`showAppLayout: true`).
+   - Implements `resolveDestination(path, platform)` to provide deterministic fallbacks (e.g. redirecting `/viewer` to `/` on web).
 
-This is what happens when a user merges two PDFs.
+2. **Screen and Tool Registry (`src/tools/registry.ts`)**
+   - Authoritative registry of all 13 PDF tools across 4 categories (`Create`, `Organize`, `Shrink and secure`, `Sign and convert`).
+   - 6 tools are fully implemented: `merge`, `rotate`, `remove-pages`, `split`, `images-to-pdf`, and `compress`.
+   - Encapsulates tool metadata, icon names, action verbs, input file types, default options, and availability (`'available' | 'coming-soon'`).
+   - Exposes lazy module references (`component?: () => import(...)`) for on-demand loading.
+   - Enforces validation via `validateRegistry()` with runtime assertions for ID uniqueness and availability consistency.
+
+3. **Routing and Dynamic Screen Resolution (`src/App.tsx`, `src/platform/AppRouter.tsx`)**
+   - Selects `BrowserRouter` for standard web environments and `HashRouter` for desktop/mobile packaged apps.
+   - All top-level screens (`HomePage`, `ViewerPage`, `AboutPage`, `ToolPage`) are loaded via `React.lazy()` with `Suspense` fallbacks and error boundary protection.
+   - Unknown routes redirect cleanly to the platform's initial destination.
+
+4. **Platform Shells (`src/components/AppShell.tsx`, `src/components/WebShell.tsx`)**
+   - Renders platform-appropriate chrome (`web` website shell vs. `desktop` / `mobile` app shell).
+   - Injects `data-platform` (`web`, `electron`, `android`) and `data-shell` (`web`, `app`) attributes into `<div id="root">`.
+   - Supports temporary full-screen mode via `showAppLayout === false`, automatically unmounting headers, sidebars, and navigation rails while retaining Escape / Android back button dismissal.
+
+5. **Dynamic Tool Modules (`src/tools/modules/`)**
+   - Independent options panels and action runners for each tool (e.g., `MergeTool.tsx`, `RotateTool.tsx`, `RemovePagesTool.tsx`).
+   - Code-split into isolated chunks; neither the UI nor their PDF dependencies (`pdf-lib`) are bundled into the initial startup payload.
+
+6. **Web Worker Processing Service (`src/core/worker/`)**
+   - Dispatches heavy PDF processing tasks off the main JavaScript UI thread.
+   - Zero-copy data transfer utilizing transferable `ArrayBuffer` objects.
+   - Built-in 60-second execution timeout guard.
+   - Automatic graceful fallback to main-thread execution if Web Workers are unavailable, disabled, or encounter fatal startup errors.
+
+7. **Pure PDF Core (`src/core/`)**
+   - Zero DOM or browser dependencies: accepts typed byte arrays (`Uint8Array`) and returns transformed byte arrays.
+   - 100% testable via unit tests in headless environments without DOM mocking.
+
+8. **Platform Integration Layer (`src/platform/`)**
+   - Standardizes file selection, saving, sharing, and OS-level file opening across Web, Electron IPC, and Capacitor plugins.
+
+---
+
+## 2. On-Demand Dynamic Loading & Code Splitting
+
+Heavy libraries such as `pdf-lib` (~420 KB) and `pdfjs-dist` (~440 KB + 1.2 MB worker) are never loaded during the initial application startup.
+
+### Bundle Structure (Vite Production Build)
+
+| Bundle Chunk | Content | Loaded When |
+|---|---|---|
+| `index-<hash>.js` (~295 KB) | App Shell, React runtime, Router, Navigation icons | Initial page load |
+| `HomePage-<hash>.js` (~4.6 KB) | Tool discovery grid, categories, search | Home route (`/`) |
+| `ViewerPage-<hash>.js` (~443 KB) | PDF.js canvas renderer, zoom, page thumbnails | Viewer route (`/viewer`) |
+| `pdf.worker.min-<hash>.mjs` (~1.2 MB) | PDF.js parsing web worker | Viewer initialization |
+| `ToolPage-<hash>.js` (~7.5 KB) | File staging area, drag-and-drop, common tool cards | Tool route (`/tool/:toolId`) |
+| `MergeTool-<hash>.js` (~1.1 KB) | Merge options & execution handler | Active tool is `merge` |
+| `RotateTool-<hash>.js` (~1.1 KB) | Rotation degree picker & handler | Active tool is `rotate` |
+| `RemovePagesTool-<hash>.js` (~1.8 KB) | Page range selector & validator | Active tool is `remove-pages` |
+| `SplitTool-<hash>.js` (~1.5 KB) | Split mode & range selection | Active tool is `split` |
+| `ImagesToPdfTool-<hash>.js` (~2.5 KB) | Image reorder, preview lightbox, page setup | Active tool is `images-to-pdf` |
+| `CompressTool-<hash>.js` (~2.2 KB) | Target size input & presets | Active tool is `compress` |
+| `core-<hash>.js` (~423 KB) | `pdf-lib` manipulation engine | Any tool executes or loads core |
+| `pdfWorker-<hash>.js` (~426 KB) | Background worker executing operations | Dispatched tool operation |
+
+---
+
+## 3. Web Worker Processing Flow
+
+All document operations follow a non-blocking asynchronous pipeline:
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant P as Tool page
-    participant A as Platform adapter
-    participant W as Web Worker
-    participant C as core
+    participant UI as ToolPage / Module UI
+    participant Svc as pdfProcessingService
+    participant W as pdfWorker (Web Worker)
+    participant Core as Core PDF Logic
 
-    U->>P: Selects files
-    P->>A: pickFiles()
-    A-->>P: File list
-    P->>W: postMessage (file bytes)
-    W->>C: merge(bytes)
-    C-->>W: Result bytes
-    W-->>P: postMessage (result)
-    P->>A: saveFile(result)
-    A-->>U: File saved on device
+    UI->>Svc: execute(operation, payload)
+    alt Worker Supported & Active
+        Svc->>W: postMessage({ id, operation, payload }, [buffers]) (Transferable)
+        Note over Svc,W: Zero-copy memory transfer
+        W->>Core: mergePdfs() / rotatePdfPages() / removePdfPages()
+        Core-->>W: Uint8Array result
+        W-->>Svc: postMessage({ id, ok: true, result }, [result.buffer])
+        Svc-->>UI: Promise resolves with Uint8Array
+    else Worker Fails / Unsupported
+        Svc->>Core: executeOnMainThread(operation, payload)
+        Core-->>Svc: Uint8Array result
+        Svc-->>UI: Promise resolves with Uint8Array
+    end
 ```
 
-The page never does PDF work itself. The worker does it, and the worker only calls `core`.
+### Worker Memory Management & Error Recovery
+- **Defensive Buffer Isolation:** When transferring `ArrayBuffer`s to the worker thread via `postMessage`, the service slices the buffers so only the transferred slice is detached. The caller's original `Uint8Array` in the main thread remains intact and non-neutered, ensuring the user can retry or adjust options, and allowing seamless fallback to main thread.
+- **Runaway Process Termination on Timeout:** If an operation exceeds the 60-second timeout, the request promise is rejected, pending listeners are cleared, and `terminateWorker()` kills the runaway worker thread to prevent CPU starvation and queue blockage.
+- **Worker Initialization & Script Failures:** If `new Worker()` throws or the worker script triggers `worker.onerror`, `service.ts` marks `isWorkerSupported = false`, terminates the failed worker, and routes all current and subsequent requests to `executeOnMainThread`.
+- **Worker Limitations & Transparent State:** Worker execution vs. main-thread fallback is transparent to the UI layer; both present the same `status === 'busy'` / `isProcessing` state. Individual worker operations currently execute to completion without fine-grained progress percentages or per-task cooperative cancel tokens; job cancellation is performed at the worker lifecycle level via `terminateWorker()`.
 
-## The simple rules
+---
 
-These few rules keep the project easy to work on when many people join. Each one has a reason, so they are easy to remember.
+## 4. Platform UI & Scrollbar Strategy
 
-1. **`core` imports nothing from the rest of the app.** This way we can test it easily and reuse it anywhere.
-2. **`core` has no platform checks and no file paths.** Bytes in, bytes out.
-3. **Platform-specific code lives only in `platform/`** and the native shells.
-4. **PDF logic never lives inside a React component.**
-5. **One tool does not import another tool.** If two tools need the same code, move it to `core`, `components` or `hooks`.
-6. **Web uses `BrowserRouter`, packaged apps use `HashRouter`.** Clean URLs are better for web indexing and SEO. Electron and Capacitor load files from the device, and there is no server to rewrite URLs, so they need `HashRouter`. We make this choice in one place, `platform/`, and tools never know which router is used (see [decision 012](decisions.md)).
-7. **No native PDF code in the Electron main process or in Kotlin.** One TypeScript version keeps all platforms the same.
+To provide a native-quality feel across target operating systems, InTabPDF uses platform-conditional styling driven by the `data-platform` root attribute:
 
-Later, when the project is bigger, we may add ESLint rules so that mistakes with rules 1, 2 and 5 are caught automatically. See [Code quality](code-quality.md).
+| Platform | Scrollbar Presentation | Layout Characteristics |
+|---|---|---|
+| **Android / Mobile** (`android`) | Hidden scrollbar tracks (`scrollbar-width: none; ::-webkit-scrollbar { display: none }`). Natural touch fling scrolling. | Full-bleed drawer overlay under status bar (`var(--sat)`), bottom navigation above gesture inset (`var(--sab)`). 2-column touch-friendly tool grid. |
+| **Electron Desktop** (`electron`) | Transient floating scrollbar (6px width, transparent track, thumb visible during scroll/hover). | Persistent desktop sidebar (`width: 232px`), collapsible to 64px (`Ctrl+B`), native title bar integration, responsive 2 to 6 column dashboard grid (`max-width: 1560px`). |
+| **Web Browser** (`web`) | Subtle browser-style scrollbar (8px width, accessible contrast). | Responsive centered container (`max-width: 1120px` to `1520px` on wide screens), top sticky navigation header, breadcrumbs. |
 
-## Web Workers
+---
 
-Heavy work runs in a Web Worker, so the screen does not freeze on big PDFs or slow phones.
+## 5. Security & Privacy Model
 
-- The worker file (`<tool>.worker.ts`) lives **inside its tool folder** (`src/tools/<name>/`). There is no global `src/workers/` folder. It is a thin wrapper: it receives a message, calls the `core` function and sends back the result.
-- The shared message types live in `src/tools/types.ts`, and the shared `useWorker` hook lives in `src/hooks/`.
-- Send `ArrayBuffer`s as **transferable** objects. This avoids copying big files in memory.
-- Try to use the same message shape in every tool, so shared hooks can work with any worker.
+- **Local Execution:** PDFs are loaded into browser memory buffers. No remote API endpoints or analytics trackers exist.
+- **Content Security Policy (CSP):** Enforces `default-src 'self' blob:; object-src 'none'; script-src 'self' 'wasm-unsafe-eval'`.
+- **Zero Third-Party CDNs:** Fonts, icons, and PDF worker scripts are compiled into local production assets.
 
-```ts
-// An idea for the message shape. We will change it when the first tool is built.
-type WorkerRequest<T> = { id: string; payload: T };
+---
 
-type WorkerResponse<R> =
-  | { id: string; ok: true; result: R }
-  | { id: string; ok: false; error: string };
+## 6. Web PDF Viewing Architecture
 
-// For long jobs you can also send: { id: string; progress: number }
-```
+On the web platform (`platform === 'web'`), embedded PDF viewing is replaced with native browser tab viewing via `src/platform/webPdf.ts`:
 
-## The viewer
+- **Native Browser Tab Viewing:** `openPdfInNewTab(bytes, fileName)` creates an `application/pdf` Blob URL appended with `#filename=${encodeURIComponent(fileName)}` and opens it in a new browser tab (`target="_blank"`). This allows users to leverage their browser's native viewer (with built-in printing, zooming, saving, and search) without the overhead of loading PDF.js inside the web app shell.
+- **Blob URL Lifecycle Tracking:** All generated Blob URLs are registered with a timestamp. To prevent memory leaks, URLs are automatically revoked after 10 minutes. In addition, an event listener on `beforeunload` ensures all active tracked Blob URLs are revoked when the tab unloads.
+- **Popup Blocking Graceful Handling:** If `window.open` returns `null` or is blocked by browser security settings, `openPdfInNewTab` returns `false`, enabling callers (such as `ToolPage` and `HomePage`) to show a clear user toast offering an immediate fallback download.
 
-The PDF viewer is a screen, not a tool. It opens one PDF and shows it. It lives in its own folder, `src/viewer/`, and is not in the tool registry (see [decision 014](decisions.md)).
+---
 
-- It draws pages onto a canvas with `pdfjs-dist`. Canvas needs the DOM, so this code cannot be in `core`.
-- Rule 4 still holds: the drawing code lives in plain `.ts` files in `src/viewer/`, not inside the React component.
-- It gets files only through the platform adapter, so it works the same on web, Electron and Capacitor.
-- The PDF.js worker file is bundled with the app. Nothing loads from a CDN.
+## 7. UI Text Selection Policy
 
-## Platform adapter
+To provide a refined application feel and prevent accidental text selection during drag-and-drop, reordering, and button clicks, InTabPDF defines a deliberate selection policy in `src/styles/base.css`:
 
-`platform/` hides the difference between browser, Electron and Capacitor. Tools only talk to this interface and never check which platform they are on.
-
-```ts
-// src/platform/types.ts (an idea, not final)
-export interface PlatformAdapter {
-  pickFiles(opts: { accept: string[]; multiple: boolean }): Promise<File[]>;
-  saveFile(bytes: Uint8Array, suggestedName: string): Promise<void>;
-  share?(bytes: Uint8Array, name: string): Promise<void>;
-  // Called when the operating system opens a PDF with our app (desktop and Android).
-  // Returns a function that stops listening.
-  onFileOpened?(handler: (file: { name: string; bytes: Uint8Array }) => void): () => void;
-}
-```
-
-`platform/index.ts` finds out where the app is running and gives the right version.
-
-## Native shells
-
-The desktop app is a thin Electron shell around the same web build.
-
-- `electron/main.cjs` is the **main process**. It makes the window, handles app start and quit, and reads the PDF files that the operating system gives to the app.
-- `electron/preload.cjs` is the **preload script**. It is the only bridge between the main process and the React code. It gives the screen only the few functions it needs.
-- `src/platform/electron.ts` is the only React-side file that talks to this bridge.
-
-The main process does only window and file work. **No PDF logic lives there.** Tools never talk to Electron directly. They use the platform adapter. See [Platforms](platforms.md) for the full desktop flow.
-
-The Android app is a Capacitor shell around the same web build. `android/` holds only native config and the small code that receives a PDF from Android and passes its bytes to the screen. **No PDF logic lives in Kotlin or Java.** `src/platform/capacitor.ts` is the only React-side file that talks to Capacitor.
-
-## Tool registry
-
-`tools/registry.ts` is the one list of tools. The home grid (`pages/HomePage.tsx`) and the routes in `App.tsx` are both made from it, so adding a new tool never needs a change in the router or the home page.
-
-```mermaid
-flowchart LR
-    T1["tools/merge"] --> R["registry.ts"]
-    T2["tools/split"] --> R
-    T3["tools/compress"] --> R
-    R --> Home["Home grid"]
-    R --> Routes["Routes"]
-```
-
-## Words used in these docs
-
-| Word | Simple meaning |
-|---|---|
-| Web Worker | A background thread in the browser. Heavy work runs here so the screen does not hang. |
-| Bundle | The final JavaScript files that Vite builds for the app. |
-| Lazy loading | Loading a page or library only when the user opens it. We use dynamic `import()` for this. |
-| Adapter | A small layer that gives the same functions on different platforms. `platform/` is our adapter. |
-| Electron | A way to make a desktop app from a web app. It comes with its own Chromium browser, so the app behaves the same on every desktop system. |
-| Capacitor | A way to make an Android app from a web app. It puts our web build inside a WebView. |
-| Intent filter | An Android setting that tells the system which file types an app can open, for example PDF files. |
-| Main process | The Electron part that runs outside the web page. It makes the window and reads files. It lives in `electron/main.cjs`. |
-| Preload script | A small script that gives the web page a safe and limited bridge to the main process. |
-| IPC | Inter-process communication. The way the main process and the web page send messages to each other. |
-| Registry | One list of all tools. The home screen and the routes are made from it. |
-| Transferable | Moving a buffer to a worker without copying it. This saves memory. |
-| CSP | Content-Security-Policy. A browser rule that blocks network requests we did not allow. |
-
-## See also
-
-- [Folder guide](folder-guide.md) for what goes in each folder
-- [Adding a tool](adding-a-tool.md) to build a new tool
-- [Decisions log](decisions.md) for the reasons behind these rules
+- **Chrome and Interactive Elements (`user-select: none`):**
+  - Application headers, navigation bars, tab bars, and drawers.
+  - Sidebar navigation items, command palette triggers, and status bar.
+  - Action buttons, icon buttons, badges, drag handles, and reordering grips.
+  - Drop zones, tool cards, and summary stats.
+- **Selectable Content Elements (`user-select: text`):**
+  - All form controls (`input`, `textarea`, `select`).
+  - Output filename inputs (`.ofn-input`) and tool parameters.
+  - Detailed error messages, crash reports, and technical callouts.
+  - Code blocks (`code`, `pre`) and documentation snippets.
+  - PDF text layer elements (`.textLayer`) within the desktop/Android viewer.

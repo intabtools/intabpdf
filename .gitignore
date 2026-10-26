@@ -12,6 +12,9 @@ dist
 release
 dist-ssr
 *.local
+UI
+artifacts
+scratch
 
 # Editor directories and files
 .vscode/*
@@ -29,3 +32,5 @@ dist-ssr
 .env.*
 !.env.example
 
+/InTabPDF.html
+/InTabPDF_UI_Design_Spec_v2.md

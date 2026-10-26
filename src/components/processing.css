@@ -1,0 +1,109 @@
+/* Full-screen file-processing loader styles adhering to InTabPDF tokens */
+
+.processing-full-loading-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background-color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.processing-loading-view {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px 16px;
+  text-align: center;
+  user-select: none;
+}
+
+.processing-loading-spinner {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.processing-spinner-svg {
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+}
+
+.processing-spinner-track {
+  stroke: var(--border);
+  opacity: 0.55;
+}
+
+.processing-spinner-arc {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 75, 180;
+  stroke-dashoffset: 0;
+  animation: processing-spinner-rotate 1.4s linear infinite, processing-spinner-dash 1.4s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+.processing-spinner-inner {
+  stroke: var(--accent);
+  opacity: 0.7;
+  stroke-linecap: round;
+  stroke-dasharray: 38, 90;
+  stroke-dashoffset: 0;
+  animation: processing-spinner-counter-rotate 1.8s linear infinite;
+  transform-origin: center center;
+}
+
+@keyframes processing-spinner-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes processing-spinner-counter-rotate {
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes processing-spinner-dash {
+  0% {
+    stroke-dasharray: 1, 180;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 75, 180;
+    stroke-dashoffset: -30px;
+  }
+  100% {
+    stroke-dasharray: 75, 180;
+    stroke-dashoffset: -110px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .processing-spinner-arc {
+    animation: processing-spinner-rotate 3.2s linear infinite;
+    stroke-dasharray: 60, 180;
+  }
+  .processing-spinner-inner {
+    animation: none;
+    stroke-dasharray: 30, 90;
+  }
+}
+
+.processing-loading-text {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}

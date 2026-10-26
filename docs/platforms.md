@@ -1,183 +1,218 @@
-# Platforms
+# InTabPDF Platforms & Shells
 
-One codebase, three places to run it. All of them load the **same web build** (the `dist` folder).
+InTabPDF targets three distinct distribution targets from a single TypeScript + React codebase:
+1. **Web App / Website** (Static site, standard browser)
+2. **Desktop App** (Electron packaging for Windows, macOS, Linux)
+3. **Android Mobile App** (Capacitor Android wrapper)
 
-| Platform | Shell | Folder | Status |
-|---|---|---|---|
-| Web | Vite static build | root | Just starting |
-| Desktop | Electron | `electron/` | Foundation added. Windows and Linux packages build. Viewer screen and install testing are still to come |
-| Android | Capacitor | `android/`, `capacitor.config.ts` | Shell and icons ready. First build and release still to do |
+All platforms run the same compiled code from `dist/` with zero remote dependencies.
 
-```mermaid
-flowchart TD
-    Code["src (TypeScript + React)"] --> Build["npm run build"]
-    Build --> Dist["dist"]
-    Dist --> Web["Web hosting"]
-    Dist --> Electron["Electron window"]
-    Dist --> Cap["Capacitor WebView"]
-    Platform["src/platform adapter"] -.-> Web
-    Platform -.-> Electron
-    Platform -.-> Cap
+---
+
+## 1. Platform Detection & Document Attributes
+
+Platform detection is centralized in [src/platform/index.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/index.ts) using `getPlatformType()`:
+
+```typescript
+export type PlatformType = 'web' | 'electron' | 'android';
+
+export function getPlatformType(): PlatformType {
+  // 1. Electron: window.electronAPI injected via preload script
+  if (typeof window !== 'undefined' && 'electronAPI' in window) {
+    return 'electron';
+  }
+  // 2. Capacitor Android: window.Capacitor isNativePlatform() === true
+  if (
+    typeof window !== 'undefined' &&
+    'Capacitor' in window &&
+    (window as any).Capacitor?.isNativePlatform?.()
+  ) {
+    return 'android';
+  }
+  // 3. Fallback: Web browser
+  return 'web';
+}
 ```
 
-## First release: the PDF viewer
+### Document Attributes
 
-Our first release is a simple PDF viewer. A user opens a PDF from the operating system or a file picker, and reads it. There are no editing tools yet. Tools come in later releases.
+[src/components/ShellContainer.tsx](file:///home/ayusman/Desktop/intabpdf/src/components/ShellContainer.tsx) synchronizes attributes on `<div id="root">`:
+- `data-platform`: `"web"` | `"electron"` | `"android"`
+- `data-shell`: `"web"` | `"app"`
 
-Why a viewer first? It uses the whole path (app shell, open a file, show it on screen), so we can test the installers, the file association, signing and the release steps on real devices while tool work continues. See [decision 013](decisions.md).
+This enables CSS selectors like `[data-platform="android"] .sbg` or `[data-shell="app"] .hdr` to apply scoped platform styling without JavaScript render logic.
 
-| Part | Desktop | Android |
-|---|---|---|
-| App shell and icons | Ready | Ready |
-| Build a package | Works (Windows and Linux) | First build still to do |
-| The system hands a PDF to the app | Handoff done (main process to preload) | To do |
-| Viewer screen (shared code in `src/viewer/`) | To do | To do |
-| Tested on real devices | To do | To do |
+---
 
-## Web
+## 2. Platform-Specific Scrollbar Presentation
+
+InTabPDF implements native-feeling scrolling across all platforms via [src/styles/base.css](file:///home/ayusman/Desktop/intabpdf/src/styles/base.css), [src/styles/web.css](file:///home/ayusman/Desktop/intabpdf/src/styles/web.css), and [src/viewer/viewer.css](file:///home/ayusman/Desktop/intabpdf/src/viewer/viewer.css):
+
+### Android / Mobile (`data-platform="android"`)
+- Persistent scrollbars are completely hidden (`scrollbar-width: none; ::-webkit-scrollbar { display: none }`).
+- Natural touch momentum scrolling is preserved across all containers (`-webkit-overflow-scrolling: touch; overflow-y: auto`).
+- Never uses `overflow: hidden` to hide scrollbars when content needs to be reachable.
+
+### Electron Desktop (`data-platform="electron"`)
+- Scrollbars are unobtrusive and transient.
+- Scrollbar tracks are transparent; thumbs are subtle 6px floating pills (`rgba(255, 255, 255, 0.2)` in dark mode, `rgba(0, 0, 0, 0.15)` in light mode) that brighten upon hover or interaction.
+- Mouse-wheel, trackpad, and keyboard accessibility scrolling are preserved.
+
+### Web Browser (`data-platform="web"`)
+- Retains standard, accessible 8px scrollbar tracks with subtle borders and clear contrast so browser users can easily navigate long pages.
+
+---
+
+## 3. Mobile Navigation Drawer Geometry
+
+On mobile (`android`), the navigation drawer follows specific geometry matching reference designs:
+- **Status Bar Separation:** Starts below the status bar using `padding-top: var(--sat)`.
+- **Full-Bleed Overlay:** Overlays the application header, page content, and bottom navigation.
+- **Background Scroll Locking:** While open, `.dr .main` applies `overflow: hidden` to prevent accidental background scrolling.
+- **Independent Scrolling:** The navigation list inside `.dr .sbg` scrolls independently without visible scrollbar tracks.
+- **Dismissal:** Closes on scrim click, destination link click, or Android Back button press.
+
+---
+
+## 4. Fullscreen and Distraction-Free Modes
+
+In the embedded PDF viewer ([src/viewer/ViewerPage.tsx](file:///home/ayusman/Desktop/intabpdf/src/viewer/ViewerPage.tsx)), full-screen reading is separated into two dedicated capabilities:
+
+1. **Window Fullscreen (`Maximize2` / `Minimize2` button, `F` key):**
+   - Invokes standard DOM `document.documentElement.requestFullscreen()` / `exitFullscreen()`.
+   - Expands the window to occupy the entire physical monitor without operating system taskbars.
+2. **Distraction-Free Mode (`Lock` / `LockOpen` button):**
+   - Calls `setShowAppLayout(false)` to cleanly hide the application header, sidebar, bottom navigation, and status bar.
+   - Preserves current scroll position, active page, and zoom factor without layout shifting.
+   - Shows a transient floating exit padlock button (`Exit distraction-free mode`) that appears upon cursor movement and fades after 2.2 seconds.
+   - Dismissible via clicking the padlock button, pressing `Escape`, or the Android Back button.
+
+---
+
+## 5. Platform PDF Viewing Strategies
+
+To best fit the constraints and strengths of each environment, InTabPDF uses tailored viewing mechanisms:
+
+### Web Browser
+- Instead of running a duplicate PDF.js rendering instance within the browser, the web platform routes viewing directly to a new browser tab via `openPdfInNewTab` ([src/platform/webPdf.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/webPdf.ts)).
+- Generates a local Blob URL appended with `#filename=${encodeURIComponent(fileName)}` so the browser's native PDF engine receives the file name.
+- Automatically tracks and revokes Blob URLs after 10 minutes or upon tab `beforeunload` to prevent memory leaks.
+- Handles popup blocking gracefully with toast notifications and direct download fallbacks.
+- The `/viewer` route is disabled on web; navigation to `/viewer` automatically redirects to `/`.
+- Responsive container geometry (`.wp`, `.whi` scaling from 1120px up to 1520px at ≥ 1600px) allowing tool-card catalogs to expand across 3 to 5 columns on wide monitors.
+
+### Electron Desktop & Capacitor Android
+- Retains the full-featured, zero-latency embedded PDF viewer (`/viewer`).
+- Responsive dashboard layout: expands across the full available content area after the sidebar with a comfortable 1560px ceiling on ultra-wide screens, scaling dynamically from 2 columns on mobile to 5 columns at 1650px and 6 columns on Full HD / collapsed sidebar.
+- Direct page-number navigation via an editable badge input (`.vtb-page-badge`), Next/Prev page toolbar buttons, and accessible keyboard navigation (`PageUp`, `PageDown`, `Home`, `End`, `ArrowUp`, `ArrowDown`).
+- Container-scroll target calculation (`scrollTop`) that bypasses compositor smooth-scroll stalls and guarantees instant, deterministic scrolling in nested scroll hierarchies.
+- Centered page-proximity tracking that accurately synchronizes current page number regardless of page aspect ratio or bottom boundary scroll limits.
+- Zoom controls spanning 25% to 400% with accessible zoom badge click-to-fit, dynamic Fit-to-Width, double-click on page canvas to toggle zoom/fit, and keyboard shortcuts (`Ctrl++`, `Ctrl+-`, `Ctrl+0`).
+- Asynchronous fulltext search with match counts (`Searching...`, `X of Y`, `No matches`), Next/Prev navigation, keyboard shortcuts (`Ctrl+F`, `Enter`, `Shift+Enter`, `Escape`), and responsive layout adapted to narrow mobile viewports.
+- Graceful Android fullscreen fallback: when `requestFullscreen()` is unsupported or throws in Capacitor WebView, automatically enters distraction-free reading mode.
+- Explicit `touch-action: pan-x pan-y pinch-zoom` for fluid mobile scrolling and touch manipulation.
+- Quick document close action returning immediately to the empty drop-zone state and thoroughly clearing memory and references.
+- Touch-friendly floating pager and thumbnail drawer on mobile viewports.
+
+---
+
+## 6. File Saving & Sharing Strategies
+
+File saving across platforms is coordinated through `platform.saveFile()` in [src/platform/index.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/index.ts):
+
+### Android Mobile (Capacitor)
+- **Chunked Base64 Encoding:** High-resolution or multi-page PDFs can reach tens of megabytes. To prevent memory bottlenecks and call-stack limits, byte streams are encoded using 32 KB chunked buffers (`uint8ArrayToBase64`).
+- **Direct Documents Persistence:** Files are written directly to `Directory.Documents` via the Capacitor Filesystem plugin.
+- **System Share Sheet Integration:** The file is mirrored to `Directory.Cache`, allowing Android's FileProvider to pass a content URI to `@capacitor/share`. Users can immediately save to Google Drive, send via email, or open in another viewer.
+- **Fail-Safe Fallback:** If native file system or sharing operations encounter restrictions, the adapter automatically falls back to an HTML5 anchor download.
+
+### Web Browser & Electron Desktop
+- Generates an in-memory `Blob` matching the file's MIME type.
+- Creates an invisible DOM `<a>` tag with the `download` attribute set to the sanitized filename.
+- Programmatically triggers the download and schedules `URL.revokeObjectURL()` cleanup after 5 seconds to prevent browser memory leaks.
+
+---
+
+## 7. Build Commands
 
 ```bash
-npm run dev      # dev server
-npm run build    # production build in dist/
-npm run preview  # serve the build locally
+# Web development server
+npm run dev
+
+# Web production build (outputs to dist/)
+npm run build
+
+# Electron desktop build (outputs to dist/ with base: './')
+npm run build:desktop
+
+# Package desktop installer (Linux/Windows)
+npm run dist
+
+# Android native Java compilation
+cd android && ./gradlew compileDebugJavaWithJavac
 ```
 
-The build is plain static files. You can host it anywhere, for example GitHub Pages, Netlify or Cloudflare Pages.
+---
 
-The web build uses `BrowserRouter`, for clean URLs and better indexing. The packaged apps (Electron and Capacitor) use `HashRouter`. They load files from the device and there is no server to rewrite URLs. See [decision 012](decisions.md).
+## 8. Web Deployment & Hosting (Cloudflare Pages)
 
-Two things follow from this:
+The web edition of InTabPDF is deployed as a static client-side application via Cloudflare Pages connected to the GitHub repository.
 
-- **Build mode.** The router and the Vite `base` are chosen at build time. Use `base: "/"` for web (or your sub-path on GitHub Pages) and `base: "./"` for the packaged apps. The desktop scripts (`dist` and `dist:win`) must build in the packaged mode.
-- **Hosting.** With `BrowserRouter`, the host must serve `index.html` for unknown paths. GitHub Pages needs a `404.html` copy of `index.html`. Netlify and Cloudflare Pages need a rewrite rule.
+### Cloudflare Pages Configuration
 
-> Status: not done yet. Until then, the app uses one router everywhere.
+- **Connected Repository:** `https://github.com/intabtools/intabpdf`
+- **Production Branch:** `main` (auto-deploys on push; pull requests receive isolated preview deployments)
+- **Framework Preset:** `None` (or `Vite`)
+- **Build Command:** `npm run build` (`tsc -b && vite build`)
+- **Build Output Directory:** `dist`
+- **Environment Variables:**
+  - `NODE_VERSION`: `20` (Node.js 18+ or 20+ LTS required)
 
-Later we may add a PWA with a service worker, so the web version also works offline. The service worker must save only app files. It must never send user data anywhere.
+### SPA Routing & Redirects
 
-## Desktop (Electron)
+Because InTabPDF uses HTML5 History API (`BrowserRouter`) on the web platform, direct browser visits or crawler requests to deep URLs (e.g. `/tool/merge` or `/about`) must serve `index.html`.
+The static rewrite rule is managed via [public/_redirects](file:///home/ayusman/Desktop/intabpdf/public/_redirects):
 
-We chose Electron over Tauri because it comes with its own Chromium. Every desktop install runs the same engine, so PDF rendering, workers and memory behave the same on all systems. The reasons are in [decision 011](decisions.md).
+```
+/* /index.html 200
+```
 
-### Files
+Vite automatically copies this file to `dist/_redirects` during `npm run build`.
 
-| File | What it does |
+### Deployment URLs & Custom Domains
+
+1. **Free `pages.dev` Subdomain:**
+   Cloudflare Pages automatically assigns `<project-name>.pages.dev` (e.g. `https://intabpdf.pages.dev`).
+2. **Custom Domain:**
+   Custom domains (e.g. `https://intabpdf.com`) can be configured at any time under **Cloudflare Pages Dashboard → Project Settings → Custom Domains**. Cloudflare manages SSL/TLS certificates and global CDN edge routing automatically.
+3. **Production URL & Sitemap Updates:**
+   Once the canonical production domain is assigned:
+   - Update the base URL `<loc>` entries in [public/sitemap.xml](file:///home/ayusman/Desktop/intabpdf/public/sitemap.xml).
+   - Uncomment the `Sitemap:` reference in [public/robots.txt](file:///home/ayusman/Desktop/intabpdf/public/robots.txt).
+   - Add `<link rel="canonical" href="https://<your-domain>/" />` to `index.html`.
+
+### Deployment Verification & Troubleshooting
+
+- **Verification:**
+  1. Navigate to the deployment URL (`https://<project>.pages.dev`).
+  2. Verify that homepage tools, the about page (`/about`), and direct tool links (`/tool/merge`, `/tool/compress`) load with HTTP 200 on hard refresh.
+  3. Verify that `/robots.txt`, `/sitemap.xml`, and `/favicon.svg` are reachable.
+  4. Open the browser DevTools Network tab, upload or process a sample PDF, and confirm **zero outbound network requests** are made with document data.
+- **Troubleshooting Failed Builds:**
+  - *TypeScript Errors (`tsc -b`):* Run `npm run build` locally to identify type mismatch errors before pushing.
+  - *Node Version Warning:* Ensure `NODE_VERSION: 20` is configured in Cloudflare Pages environment variables.
+  - *Missing Assets / 404 on Refresh:* Ensure `public/_redirects` is in place with `/* /index.html 200`.
+
+### Implemented Tools vs. Coming Soon Status
+
+The web production deployment includes 6 fully implemented, client-side tools and 7 tools marked "Coming soon":
+
+| Implemented (Live) | Coming Soon (Guarded & Redirects to Home) |
 |---|---|
-| `electron/main.cjs` | Main process. Makes the window, handles app start, quit and single instance, and reads PDF files |
-| `electron/preload.cjs` | The only bridge between the main process and the React code |
-| `src/platform/electron.ts` | React-side code that talks to the preload bridge. Tools use it only through the platform adapter |
-| `electron/icon.ico`, `electron/icon.png`, `electron/icons/` | App icons (16×16 up to 1024×1024) |
-
-In production, Electron loads the built `dist/` files. In development, it loads the Vite dev server. Please check the scripts in `package.json` for the exact dev command.
-
-### Security settings
-
-Please keep these as they are. If you want to change one, discuss it first.
-
-- Context isolation is on.
-- Node integration in the renderer is off.
-- The renderer is sandboxed and web security is on.
-- Only our own URLs can load, and navigation away from the app is blocked.
-- The preload gives the screen only the few functions it needs, never the whole `ipcRenderer`.
-- No crash reporter and no auto-updater, because they talk to a server.
-
-### Opening a PDF from the operating system
-
-```mermaid
-flowchart LR
-    A["User opens a PDF"] --> B["Main process finds the file path"]
-    B --> C["Wait until the window is ready"]
-    C --> D["Read the file (max 200 MB)"]
-    D --> E["IPC event to the preload"]
-    E --> F["platform/electron.ts"]
-    F --> G["Screen loads the PDF"]
-```
-
-- The path can come from the launch arguments, or from a second launch of the app (Electron's single-instance event).
-- Files bigger than 200 MB are not passed on.
-- The main process only reads the file and passes the bytes. It does not change, copy, upload or keep them.
-- **Not done yet:** the screen that receives the file and shows it. The handoff is ready, but the viewer is not. It is the first thing we build (see [First release](#first-release-the-pdf-viewer)).
-
-### Building packages
-
-```bash
-npm run dist       # Linux: AppImage, DEB, RPM, TAR.GZ
-npm run dist:win   # Windows: NSIS installer (.exe) and ZIP
-```
-
-Both commands run the Vite and TypeScript build first, and then Electron Builder. The output goes to `release/`, which Git ignores. Please never commit generated installers. You can build the Windows packages from Linux.
-
-### What is declared and what is checked
-
-- The `.pdf` file association (Windows) and the `application/pdf` MIME type (Linux) are **declared** in the packaging config. This does not make InTab PDF the default PDF viewer. After installing, check on each system that the association really works.
-- Check that the Linux build and its desktop entry use our icon. An earlier Linux build showed the default Electron icon.
-- A successful build does not prove that the installer works. Please test the installers on real Windows and Linux machines.
-- macOS packaging is not set up yet.
-
-### Desktop rules
-
-- Keep the main process and preload very small: window setup, file opening and saving. **No PDF logic in Electron.**
-- Do not use Node.js APIs in the React code. If the screen needs something from the system, add it in the preload and in `platform/electron.ts`.
-- Do not add Electron plugins or features that talk to a server.
-- Update Electron regularly. It comes with Chromium, so security fixes matter.
-- Use `desktop:` in commit messages.
-
-## Android (Capacitor)
-
-The Android shell is ready: the Capacitor project and the app icons are done. What is left is the first build and release, with the viewer inside.
-
-### Files
-
-| File | What it does |
-|---|---|
-| `android/` | The Capacitor Android project. Native config only, no PDF logic |
-| `capacitor.config.ts` | Capacitor settings: app id, app name and the web build folder (`dist`) |
-| `src/platform/capacitor.ts` | React-side code that talks to Capacitor. Tools and the viewer use it only through the platform adapter (to be added with the viewer) |
-
-- Capacitor puts `dist/` inside a WebView.
-- The Android build uses `HashRouter` and `base: "./"`, like Electron (see [decision 012](decisions.md)).
-- File picking, saving and sharing use Capacitor plugins, called only from `platform/`.
-
-### Building the app
-
-The usual Capacitor steps are below. Please check the scripts in `package.json` for the exact commands.
-
-```bash
-# 1. build the web app in packaged mode (see Web above)
-npx cap sync android    # 2. copy dist/ into the Android project
-npx cap open android    # 3. open Android Studio, then build the APK
-```
-
-### Opening a PDF from the phone
-
-```mermaid
-flowchart LR
-    A["User taps a PDF in a file manager"] --> B["Android opens InTab PDF (intent filter for application/pdf)"]
-    B --> C["Native side gets the file"]
-    C --> D["Read the bytes (size limit)"]
-    D --> E["Pass them to the WebView"]
-    E --> F["platform/capacitor.ts"]
-    F --> G["Viewer shows the PDF"]
-```
-
-- The app must declare that it can open `application/pdf` in the Android manifest.
-- Like on desktop, the native side only reads the file and passes the bytes. It does not change, copy, upload or keep them.
-- **Not done yet:** this whole flow. It is built together with the viewer.
-
-### Security and privacy settings
-
-- No Capacitor plugin that talks to a server (push notifications, analytics, Firebase, crash reporting).
-- Worth checking: can we remove the `INTERNET` permission from the manifest? Test that the app still works, then write the result in the [decisions log](decisions.md).
-- **Never commit the signing key** (keystore) or its passwords. Keep them outside the repo. See the [maintainer guide](maintainer-guide.md).
-- Never commit built APK or AAB files.
-
-### Android rules
-
-- Keep the native side very small: handling the intent, reading the file and passing the bytes. **No PDF logic in Kotlin or Java.**
-- Do not use Capacitor APIs in the React code. If the screen needs something from the system, add it in `platform/capacitor.ts`.
-- Try it on a low-end phone if you can. Big PDFs can use up the WebView memory.
-- Use `android:` in commit messages.
-
-## Simple rule
-
-If code behaves differently on web, desktop and Android, it belongs in `src/platform/`. Everything else should work the same on all three.
+| **Merge** (`/tool/merge`) | **Text to PDF** (`/tool/text-to-pdf`) |
+| **Split** (`/tool/split`) | **Reorder pages** (`/tool/reorder`) |
+| **Compress** (`/tool/compress`) | **Protect** (`/tool/protect`) |
+| **Rotate pages** (`/tool/rotate`) | **Unlock** (`/tool/unlock`) |
+| **Remove pages** (`/tool/remove-pages`) | **Sign** (`/tool/sign`) |
+| **Images to PDF** (`/tool/images-to-pdf`) | **PDF to images** (`/tool/pdf-to-images`) |
+| | **Extract text** (`/tool/extract-text`) |
