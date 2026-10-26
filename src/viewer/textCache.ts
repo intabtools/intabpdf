@@ -76,6 +76,18 @@ export async function extractPageText(
   return built;
 }
 
+export function isPageCached(doc: PdfDocument, pageNumber: number): boolean {
+  return Boolean(documentTextCaches.get(doc)?.has(pageNumber));
+}
+
+export async function extractPagesBatch(
+  doc: PdfDocument,
+  pageNumbers: number[],
+): Promise<CachedPageText[]> {
+  const promises = pageNumbers.map((p) => extractPageText(doc, p));
+  return Promise.all(promises);
+}
+
 export function clearTextCache(doc?: PdfDocument): void {
   if (doc) {
     documentTextCaches.delete(doc);

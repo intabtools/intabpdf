@@ -7,6 +7,11 @@ export interface OpenedFile {
     bytes: Uint8Array;
 }
 
+export interface SaveFileResult {
+    saved: boolean;
+    fileName?: string;
+}
+
 export interface PlatformAdapter {
     hasPendingFile?(): boolean;
     clearPendingFile?(): void;
@@ -14,5 +19,5 @@ export interface PlatformAdapter {
     onFileOpened(handler: (file: OpenedFile) => void): () => void;
     onFileOpenStart?(handler: (fileName: string) => void): () => void;
     onFileOpenError?(handler: (error: string) => void): () => void;
-    saveFile?(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<void>;
+    saveFile?(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<SaveFileResult | void>;
 }

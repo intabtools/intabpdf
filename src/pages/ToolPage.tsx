@@ -187,13 +187,17 @@ export default function ToolPage(): ReactNode {
   const handleDownload = async () => {
     if (!outputBytes) return;
     try {
-      await platform.saveFile?.(
+      const res = await platform.saveFile?.(
         outputBytes,
         finalFileName,
         isZipOutput ? 'application/zip' : 'application/pdf'
       );
+      if (res && res.saved === false) {
+        return;
+      }
+      const savedName = (res && res.fileName) || finalFileName;
       setIsSaved(true);
-      showToast(`Saved ${finalFileName}`);
+      showToast(`Saved ${savedName}`);
     } catch (err) {
       console.error('Failed to save file:', err);
       showToast('Failed to save file');

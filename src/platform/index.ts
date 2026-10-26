@@ -1,9 +1,10 @@
 // Platform adapter for picking PDFs and listening for OS file-open events across Web, Electron, and Android.
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Filesystem } from '@capacitor/filesystem';
 import './electron';
-import type { OpenedFile, PlatformAdapter, PlatformType } from './types';
+import type { OpenedFile, PlatformAdapter, PlatformType, SaveFileResult } from './types';
+import { saveFileAndroid } from './androidSave';
 
 function pickPdfFromInput(onStart?: (fileName: string) => void): Promise<OpenedFile | null> {
     return new Promise((resolve) => {
@@ -334,54 +335,17 @@ export const platform: PlatformAdapter = {
         };
     },
 
-    async saveFile(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<void> {
+    async saveFile(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<SaveFileResult | void> {
         const isZip = fileName.toLowerCase().endsWith('.zip');
         const type = mimeType || (isZip ? 'application/zip' : 'application/pdf');
 
-        // 1. Native Capacitor Android/iOS runtime
-        if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+        // 1. Native Capacitor Android runtime
+        if (typeof window !== 'undefined' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
             try {
-                const base64Data = uint8ArrayToBase64(bytes);
-
-                // Attempt to write permanently to user Documents
-                let documentsSaved = false;
-                try {
-                    await Filesystem.writeFile({
-                        path: fileName,
-                        data: base64Data,
-                        directory: Directory.Documents,
-                        recursive: true,
-                    });
-                    documentsSaved = true;
-                } catch (docErr) {
-                    console.warn('Could not write directly to Documents directory:', docErr);
-                }
-
-                // Also write to Cache so native share/view providers have immediate access
-                const writeResult = await Filesystem.writeFile({
-                    path: fileName,
-                    data: base64Data,
-                    directory: Directory.Cache,
-                    recursive: true,
-                });
-
-                // Present the native Android Share sheet
-                const { Share } = await import('@capacitor/share');
-                const canShare = await Share.canShare().then((r) => r.value).catch(() => false);
-                if (canShare) {
-                    await Share.share({
-                        title: fileName,
-                        url: writeResult.uri,
-                        dialogTitle: `Save or Share ${fileName}`,
-                    });
-                    return;
-                }
-
-                if (documentsSaved) {
-                    return;
-                }
+                return await saveFileAndroid(bytes, fileName);
             } catch (nativeErr) {
-                console.warn('Native Capacitor save/share failed, falling back to browser download:', nativeErr);
+                console.warn('Native Capacitor Android save failed:', nativeErr);
+                throw nativeErr;
             }
         }
 
@@ -397,10 +361,11 @@ export const platform: PlatformAdapter = {
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
+        return { saved: true, fileName };
     },
 };
 
-export type { OpenedFile, PlatformType } from './types';
+export type { OpenedFile, PlatformType, SaveFileResult } from './types';
 export { openPdfInNewTab, revokeAllTrackedBlobUrls, getTrackedBlobUrlCount } from './webPdf';
 
 export function openExternalUrl(url: string): void {

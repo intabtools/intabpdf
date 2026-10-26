@@ -35,10 +35,11 @@ describe('platform adapter', () => {
     expect(largeB64.length).toBeGreaterThan(0);
   });
 
-  it('handles platform.saveFile gracefully in document environment', async () => {
+  it('handles platform.saveFile gracefully in web/electron document environment', async () => {
     const sample = new Uint8Array([37, 80, 68, 70]); // %PDF
     expect(platform.saveFile).toBeDefined();
-    await expect(platform.saveFile!(sample, 'test-doc.pdf', 'application/pdf')).resolves.not.toThrow();
+    const result = await platform.saveFile!(sample, 'test-doc.pdf', 'application/pdf');
+    expect(result).toEqual({ saved: true, fileName: 'test-doc.pdf' });
   });
 
   describe('external launch events and Android NativeIntent integration', () => {

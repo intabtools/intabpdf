@@ -44,15 +44,16 @@ export default function ViewerSearchBar({
         onKeyDown={onKeyDown}
         aria-label="Search document text"
       />
-      {isSearching ? (
+      {isSearching && matches.length === 0 ? (
         <span className="search-count">Searching...</span>
-      ) : searchQuery.trim() && matches.length === 0 ? (
+      ) : searchQuery.trim() && matches.length === 0 && !isSearching ? (
         <span className="search-count no-match" role="status">
           No matches
         </span>
       ) : matches.length > 0 ? (
         <span className="search-count">
           {currentMatchIndex + 1} of {matches.length}
+          {isSearching ? '…' : ''}
         </span>
       ) : null}
       <button

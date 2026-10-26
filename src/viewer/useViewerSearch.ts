@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react';
 import type { PdfDocument } from './renderPage';
 import type { SearchMatch } from './types';
-import { extractPageText } from './textCache';
+import { extractPagesBatch } from './textCache';
 
 interface UseViewerSearchOptions {
   pdfDoc: PdfDocument | null;
@@ -37,7 +37,8 @@ export function useViewerSearch({
   const [isSearching, setIsSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Text search asynchronously across loaded document pages with cached text and event-loop yielding
+  // Text search asynchronously across loaded document pages with batched concurrent extraction,
+  // progressive match streaming, and responsive event-loop yielding
   useEffect(() => {
     const q = searchQuery.trim().toLowerCase();
     let active = true;
@@ -56,44 +57,75 @@ export function useViewerSearch({
       try {
         const foundMatches: SearchMatch[] = [];
         let matchId = 0;
-        let lastYield = performance.now();
+        let initialMatchPublished = false;
+        let lastPublishTime = performance.now();
+        const BATCH_SIZE = 6;
 
-        for (let p = 1; p <= pdfDoc.numPages; p++) {
+        for (let batchStart = 1; batchStart <= pdfDoc.numPages; batchStart += BATCH_SIZE) {
           if (!active) return;
 
-          // Yield to event loop periodically to keep UI responsive on large documents
-          if (p % 25 === 0 || performance.now() - lastYield > 20) {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-            if (!active) return;
-            lastYield = performance.now();
+          const batchPages: number[] = [];
+          for (
+            let p = batchStart;
+            p < batchStart + BATCH_SIZE && p <= pdfDoc.numPages;
+            p++
+          ) {
+            batchPages.push(p);
           }
 
-          const pageText = await extractPageText(pdfDoc, p);
+          const pageTexts = await extractPagesBatch(pdfDoc, batchPages);
           if (!active) return;
 
-          // Fast rejection: skip pages that do not contain the query string
-          if (!pageText.fullLowerText.includes(q)) continue;
+          let batchFoundMatches = false;
 
-          let matchOnPage = 0;
-          for (const item of pageText.lowerItems) {
-            let pos = 0;
-            while ((pos = item.indexOf(q, pos)) !== -1) {
-              foundMatches.push({
-                id: matchId++,
-                pageNumber: p,
-                matchIndexOnPage: matchOnPage++,
-              });
-              pos += q.length;
+          for (const pageText of pageTexts) {
+            // Fast rejection: skip pages that do not contain the query string
+            if (!pageText.fullLowerText.includes(q)) continue;
+
+            let matchOnPage = 0;
+            for (const item of pageText.lowerItems) {
+              let pos = 0;
+              while ((pos = item.indexOf(q, pos)) !== -1) {
+                foundMatches.push({
+                  id: matchId++,
+                  pageNumber: pageText.pageNumber,
+                  matchIndexOnPage: matchOnPage++,
+                });
+                pos += q.length;
+                batchFoundMatches = true;
+              }
             }
+          }
+
+          // Progressive streaming: publish early matches as soon as found
+          if (batchFoundMatches && active) {
+            if (!initialMatchPublished && foundMatches.length > 0) {
+              initialMatchPublished = true;
+              setMatches([...foundMatches]);
+              setCurrentMatchIndex(0);
+              jumpToPage(foundMatches[0].pageNumber);
+              lastPublishTime = performance.now();
+            } else if (performance.now() - lastPublishTime > 150) {
+              setMatches([...foundMatches]);
+              lastPublishTime = performance.now();
+            }
+          }
+
+          // Yield to event loop between batches so Android WebView remains fluid at 60 FPS
+          if (batchStart + BATCH_SIZE <= pdfDoc.numPages) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            if (!active) return;
           }
         }
 
         if (!active) return;
         setMatches(foundMatches);
-        setCurrentMatchIndex(foundMatches.length > 0 ? 0 : -1);
+        setCurrentMatchIndex((prev) =>
+          prev >= 0 ? prev : foundMatches.length > 0 ? 0 : -1
+        );
         setIsSearching(false);
 
-        if (foundMatches.length > 0) {
+        if (!initialMatchPublished && foundMatches.length > 0) {
           jumpToPage(foundMatches[0].pageNumber);
         }
       } catch (err) {

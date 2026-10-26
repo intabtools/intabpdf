@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import ShellContainer from './components/ShellContainer';
 import { ToastProvider } from './components/ToastContext';
 import { ProcessingProvider } from './components/ProcessingContext';
+import { FileConflictProvider } from './components/FileConflictDialog';
 import { ViewerProvider } from './viewer/ViewerContext';
 import { getInitialDestination, isScreenEnabled, resolveDestination } from './config/screens';
 import { getPlatformType } from './platform';
@@ -96,7 +97,8 @@ export default function App(): ReactNode {
   return (
     <ToastProvider>
       <ProcessingProvider>
-        <ViewerProvider>
+        <FileConflictProvider>
+          <ViewerProvider>
           <ShellContainer>
             <ScreenErrorBoundary>
               <Suspense fallback={<PageSuspenseFallback />}>
@@ -149,7 +151,8 @@ export default function App(): ReactNode {
             </ScreenErrorBoundary>
           </ShellContainer>
         </ViewerProvider>
-      </ProcessingProvider>
-    </ToastProvider>
-  );
+      </FileConflictProvider>
+    </ProcessingProvider>
+  </ToastProvider>
+);
 }

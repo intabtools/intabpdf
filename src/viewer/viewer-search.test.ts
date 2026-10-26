@@ -3,7 +3,9 @@ import {
   buildPageTextCache,
   clearTextCache,
   extractPageText,
+  extractPagesBatch,
   getCachedPageText,
+  isPageCached,
   setCachedPageText,
 } from './textCache';
 import type { PdfDocument } from './renderPage';
@@ -302,6 +304,33 @@ describe('Viewer document text search logic', () => {
       // Explicit clearTextCache releases cached entries
       clearTextCache(mockDoc);
       expect(getCachedPageText(mockDoc, 1)).toBeUndefined();
+    });
+
+    it('extracts multiple pages concurrently with extractPagesBatch and verifies isPageCached', async () => {
+      const mockDoc = {
+        getPage: async (p: number) => ({
+          getTextContent: async () => ({
+            items: [{ str: `Content of page ${p}` }],
+          }),
+        }),
+      } as unknown as PdfDocument;
+
+      expect(isPageCached(mockDoc, 1)).toBe(false);
+      expect(isPageCached(mockDoc, 2)).toBe(false);
+      expect(isPageCached(mockDoc, 3)).toBe(false);
+
+      const batchResults = await extractPagesBatch(mockDoc, [1, 2, 3]);
+      expect(batchResults.length).toBe(3);
+      expect(batchResults[0].items).toEqual(['Content of page 1']);
+      expect(batchResults[1].items).toEqual(['Content of page 2']);
+      expect(batchResults[2].items).toEqual(['Content of page 3']);
+
+      expect(isPageCached(mockDoc, 1)).toBe(true);
+      expect(isPageCached(mockDoc, 2)).toBe(true);
+      expect(isPageCached(mockDoc, 3)).toBe(true);
+
+      clearTextCache(mockDoc);
+      expect(isPageCached(mockDoc, 1)).toBe(false);
     });
 
     it('benchmarks sub-millisecond search over 200 simulated cached pages', () => {

@@ -124,6 +124,10 @@ export default function VisiblePage({
       return;
     }
 
+    if (spans.length === 0) {
+      return;
+    }
+
     // Fast-path: if the highlights for this query and text layer are already rendered,
     // only update the active-match class without destroying or re-creating DOM nodes
     if (
