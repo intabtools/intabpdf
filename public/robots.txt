@@ -5,4 +5,4 @@ User-agent: *
 Allow: /
 
 # Note: Once the production domain is confirmed, uncomment and configure the absolute sitemap URL:
-# Sitemap: https://<production-domain>/sitemap.xml
+Sitemap: https://intabpdf.pages.dev/sitemap.xml
