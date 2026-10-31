@@ -59,3 +59,28 @@ if (typeof M.sumPrecise !== 'function') {
     return sum;
   };
 }
+
+const MapProto = Map.prototype as unknown as {
+  getOrInsertComputed?: <K, V>(key: K, callback: (key: K) => V) => V;
+};
+
+if (typeof MapProto.getOrInsertComputed !== 'function') {
+  MapProto.getOrInsertComputed = function <K, V>(this: Map<K, V>, key: K, callback: (key: K) => V): V {
+    if (this.has(key)) {
+      return this.get(key)!;
+    }
+    const val = callback(key);
+    this.set(key, val);
+    return val;
+  };
+}
+
+const ABProto = ArrayBuffer.prototype as unknown as {
+  transferToFixedLength?: () => ArrayBuffer;
+};
+
+if (typeof ABProto.transferToFixedLength !== 'function') {
+  ABProto.transferToFixedLength = function (this: ArrayBuffer) {
+    return this.slice(0);
+  };
+}

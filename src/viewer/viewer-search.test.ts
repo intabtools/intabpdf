@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildPageSequence } from './useViewerSearch';
 import {
   buildPageTextCache,
   clearTextCache,
@@ -468,6 +469,103 @@ describe('Viewer document text search logic', () => {
       expect(marks[1].classList.contains('active-match')).toBe(true);
       expect(marks[1].scrollIntoViewCount).toBe(1);
       expect(marks[2].classList.contains('active-match')).toBe(false);
+    });
+  });
+
+  describe('Reading-Context-Aware Search Initiation & Match Selection', () => {
+    it('builds page scan sequence starting at the current reading page with wrap-around', () => {
+      // 10 pages, reading page 1 -> natural [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      expect(buildPageSequence(10, 1)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+      // 10 pages, reading page 5 -> starts at 5, continues to 10, then wraps to [1, 2, 3, 4]
+      expect(buildPageSequence(10, 5)).toEqual([5, 6, 7, 8, 9, 10, 1, 2, 3, 4]);
+
+      // 10 pages, reading page 10 -> starts at 10, then wraps to [1..9]
+      expect(buildPageSequence(10, 10)).toEqual([10, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+      // Clamps out-of-range bounds
+      expect(buildPageSequence(5, 0)).toEqual([1, 2, 3, 4, 5]);
+      expect(buildPageSequence(5, 99)).toEqual([5, 1, 2, 3, 4]);
+      expect(buildPageSequence(0, 1)).toEqual([]);
+    });
+
+    it('selects active match on the current page when matches exist on the current page', () => {
+      const readingPage = 3;
+      const sortedMatches = [
+        { id: 0, pageNumber: 1, matchIndexOnPage: 0 },
+        { id: 1, pageNumber: 2, matchIndexOnPage: 0 },
+        { id: 2, pageNumber: 3, matchIndexOnPage: 0 }, // match on current page
+        { id: 3, pageNumber: 3, matchIndexOnPage: 1 }, // second match on current page
+        { id: 4, pageNumber: 5, matchIndexOnPage: 0 },
+      ];
+
+      const targetIdx = sortedMatches.findIndex((m) => m.pageNumber >= readingPage);
+      const activeIdx = targetIdx !== -1 ? targetIdx : 0;
+
+      // Active match must be index 2 (first match on page 3)
+      expect(activeIdx).toBe(2);
+      expect(sortedMatches[activeIdx].pageNumber).toBe(readingPage);
+      // Total match count remains intact
+      expect(sortedMatches.length).toBe(5);
+    });
+
+    it('selects first downstream match when current page has no matches', () => {
+      const readingPage = 2;
+      const sortedMatches = [
+        { id: 0, pageNumber: 1, matchIndexOnPage: 0 },
+        { id: 1, pageNumber: 4, matchIndexOnPage: 0 }, // downstream
+        { id: 2, pageNumber: 6, matchIndexOnPage: 0 },
+      ];
+
+      const targetIdx = sortedMatches.findIndex((m) => m.pageNumber >= readingPage);
+      const activeIdx = targetIdx !== -1 ? targetIdx : 0;
+
+      expect(activeIdx).toBe(1);
+      expect(sortedMatches[activeIdx].pageNumber).toBe(4);
+    });
+
+    it('wraps around to the first document match when no matches exist downstream of current page', () => {
+      const readingPage = 8;
+      const sortedMatches = [
+        { id: 0, pageNumber: 2, matchIndexOnPage: 0 },
+        { id: 1, pageNumber: 3, matchIndexOnPage: 0 },
+        { id: 2, pageNumber: 5, matchIndexOnPage: 0 },
+      ];
+
+      const targetIdx = sortedMatches.findIndex((m) => m.pageNumber >= readingPage);
+      const activeIdx = targetIdx !== -1 ? targetIdx : 0;
+
+      // Wraps around to page 2 (index 0)
+      expect(targetIdx).toBe(-1);
+      expect(activeIdx).toBe(0);
+      expect(sortedMatches[activeIdx].pageNumber).toBe(2);
+    });
+
+    it('preserves sequential forward and backward cycling across the entire document from reading page match', () => {
+      const sortedMatches = [
+        { id: 0, pageNumber: 1, matchIndexOnPage: 0 },
+        { id: 1, pageNumber: 2, matchIndexOnPage: 0 },
+        { id: 2, pageNumber: 5, matchIndexOnPage: 0 },
+        { id: 3, pageNumber: 7, matchIndexOnPage: 0 },
+      ];
+
+      // User reading page 5 -> initial active match is index 2
+      let currentIndex = sortedMatches.findIndex((m) => m.pageNumber >= 5);
+      expect(currentIndex).toBe(2);
+
+      // Cycle forward
+      currentIndex = (currentIndex + 1) % sortedMatches.length;
+      expect(currentIndex).toBe(3); // page 7
+      currentIndex = (currentIndex + 1) % sortedMatches.length;
+      expect(currentIndex).toBe(0); // wrapped around to page 1
+      currentIndex = (currentIndex + 1) % sortedMatches.length;
+      expect(currentIndex).toBe(1); // page 2
+
+      // Cycle backward
+      currentIndex = (currentIndex - 1 + sortedMatches.length) % sortedMatches.length;
+      expect(currentIndex).toBe(0); // page 1
+      currentIndex = (currentIndex - 1 + sortedMatches.length) % sortedMatches.length;
+      expect(currentIndex).toBe(3); // wrapped back to page 7
     });
   });
 });

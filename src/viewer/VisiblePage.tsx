@@ -248,7 +248,10 @@ export default function VisiblePage({
     >
       {isVisible ? (
         <>
-          <canvas ref={canvasRef} />
+          <canvas
+            ref={canvasRef}
+            style={{ width: `${width}px`, height: `${height}px` }}
+          />
           <div ref={textLayerRef} className="textLayer" />
           <div ref={annotationLayerRef} className="annotationLayer" />
         </>
