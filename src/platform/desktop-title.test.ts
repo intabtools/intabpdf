@@ -45,11 +45,11 @@ describe('Desktop Branding and Window Title Specification', () => {
   });
 
   it('ensures no other application components or hooks overwrite document.title', () => {
-    // Verify that across src/, only main.tsx sets document.title
+    // Verify that across src/, only main.tsx sets document.title (excluding tests)
     const srcDir = resolve(rootDir, 'src');
     const grepResult = execSync(`git grep -n "document\\.title" "${srcDir}"`, { encoding: 'utf8' }).trim();
-    const lines = grepResult.split('\n');
-    expect(lines.length).toBe(1);
-    expect(lines[0]).toContain('src/main.tsx');
+    const nonTestLines = grepResult.split('\n').filter((line) => !line.includes('.test.'));
+    expect(nonTestLines.length).toBe(1);
+    expect(nonTestLines[0]).toContain('src/main.tsx');
   });
 });
