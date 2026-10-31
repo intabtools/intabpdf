@@ -39,6 +39,7 @@ function pickPdfFromInput(onStart?: (fileName: string) => void): Promise<OpenedF
                 finish({ name: file.name, bytes: new Uint8Array(buffer) });
             } catch (err) {
                 console.error('Failed to read file:', err);
+                dispatchFileError('Could not read that file. Please try selecting it again.');
                 finish(null);
             }
         };
@@ -158,8 +159,44 @@ const fileListeners = new Set<(file: OpenedFile) => void>();
 const fileStartListeners = new Set<(fileName: string) => void>();
 const fileErrorListeners = new Set<(error: string) => void>();
 const bufferedFiles: OpenedFile[] = [];
+const bufferedStarts: string[] = [];
+const bufferedErrors: string[] = [];
+
+let electronOpenUnsub: (() => void) | null = null;
+let electronStartUnsub: (() => void) | null = null;
+let electronErrorUnsub: (() => void) | null = null;
+
+function ensureElectronBridge() {
+    if (typeof window === 'undefined' || !window.intab) return;
+
+    if (!electronStartUnsub && window.intab.onOpenPdfStart) {
+        electronStartUnsub = window.intab.onOpenPdfStart(({ name }) => {
+            dispatchFileStart(name);
+        });
+    }
+
+    if (!electronErrorUnsub && window.intab.onOpenPdfError) {
+        electronErrorUnsub = window.intab.onOpenPdfError(({ error }) => {
+            dispatchFileError(error);
+        });
+    }
+
+    if (!electronOpenUnsub && window.intab.onOpenPdf) {
+        electronOpenUnsub = window.intab.onOpenPdf((file) => {
+            const bytes =
+                file.bytes instanceof Uint8Array
+                    ? file.bytes
+                    : new Uint8Array(file.bytes);
+            dispatchFile({ name: file.name, bytes });
+        });
+    }
+}
 
 function dispatchFileStart(fileName: string) {
+    if (fileStartListeners.size === 0) {
+        bufferedStarts.push(fileName);
+        return;
+    }
     for (const listener of fileStartListeners) {
         try {
             listener(fileName);
@@ -170,6 +207,10 @@ function dispatchFileStart(fileName: string) {
 }
 
 function dispatchFileError(error: string) {
+    if (fileErrorListeners.size === 0) {
+        bufferedErrors.push(error);
+        return;
+    }
     for (const listener of fileErrorListeners) {
         try {
             listener(error);
@@ -179,7 +220,18 @@ function dispatchFileError(error: string) {
     }
 }
 
+let lastDispatchedName: string | null = null;
+let lastDispatchedTime = 0;
+
 function dispatchFile(file: OpenedFile) {
+    const now = Date.now();
+    // Guard against identical file event dispatched within 500ms
+    if (lastDispatchedName === file.name && (now - lastDispatchedTime) < 500) {
+        return;
+    }
+    lastDispatchedName = file.name;
+    lastDispatchedTime = now;
+
     if (fileListeners.size === 0) {
         bufferedFiles.push(file);
         return;
@@ -284,29 +336,53 @@ export const platform: PlatformAdapter = {
         pendingLaunchFileConsumed = false;
         lastConsumedUri = null;
         lastConsumedTime = 0;
+        lastDispatchedName = null;
+        lastDispatchedTime = 0;
+        bufferedFiles.length = 0;
+        bufferedStarts.length = 0;
+        bufferedErrors.length = 0;
         if (typeof window !== 'undefined') {
             window.NativeIntent?.clearPendingPdf?.();
+            window.intab?.clearPendingPdf?.();
         }
     },
 
     pickPdfFile: pickPdfFromInput,
 
     onFileOpenStart(handler) {
+        ensureElectronBridge();
         fileStartListeners.add(handler);
+        while (bufferedStarts.length > 0) {
+            const next = bufferedStarts.shift()!;
+            handler(next);
+        }
         return () => {
             fileStartListeners.delete(handler);
+            if (fileStartListeners.size === 0 && electronStartUnsub) {
+                electronStartUnsub();
+                electronStartUnsub = null;
+            }
         };
     },
 
     onFileOpenError(handler) {
+        ensureElectronBridge();
         fileErrorListeners.add(handler);
+        while (bufferedErrors.length > 0) {
+            const next = bufferedErrors.shift()!;
+            handler(next);
+        }
         return () => {
             fileErrorListeners.delete(handler);
+            if (fileErrorListeners.size === 0 && electronErrorUnsub) {
+                electronErrorUnsub();
+                electronErrorUnsub = null;
+            }
         };
     },
 
     onFileOpened(handler) {
-        // Register listener
+        ensureElectronBridge();
         fileListeners.add(handler);
 
         // Deliver buffered files
@@ -315,22 +391,11 @@ export const platform: PlatformAdapter = {
             handler(next);
         }
 
-        // Also connect Electron listener if present
-        let electronUnsub: (() => void) | undefined;
-        if (typeof window !== 'undefined' && window.intab?.onOpenPdf) {
-            electronUnsub = window.intab.onOpenPdf((file) => {
-                const bytes =
-                    file.bytes instanceof Uint8Array
-                        ? file.bytes
-                        : new Uint8Array(file.bytes);
-                dispatchFile({ name: file.name, bytes });
-            });
-        }
-
         return () => {
             fileListeners.delete(handler);
-            if (electronUnsub) {
-                electronUnsub();
+            if (fileListeners.size === 0 && electronOpenUnsub) {
+                electronOpenUnsub();
+                electronOpenUnsub = null;
             }
         };
     },

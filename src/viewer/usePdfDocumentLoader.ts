@@ -268,8 +268,9 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         }
         passwordCallbackRef.current = null;
       }
+      setContextLoading(false);
     };
-  }, []);
+  }, [setContextLoading]);
 
   useEffect(() => {
     return () => {

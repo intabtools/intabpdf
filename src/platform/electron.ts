@@ -5,7 +5,10 @@ declare global {
     interface Window {
         intab?: {
             hasPendingPdf?(): boolean;
+            clearPendingPdf?(): void;
             onOpenPdf(callback: (file: OpenedFile) => void): () => void;
+            onOpenPdfError?(callback: (errorData: { name: string; error: string }) => void): () => void;
+            onOpenPdfStart?(callback: (startData: { name: string }) => void): () => void;
             openExternalUrl?(url: string): void;
         };
         NativeIntent?: {

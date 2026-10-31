@@ -17,16 +17,6 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
     }
   }, [initialHasPending, navigate]);
 
-  // Guard against hanging on cold-start intent if OS file reading encounters an unrecoverable failure
-  useEffect(() => {
-    if (initialHasPending && !currentFile) {
-      const timer = setTimeout(() => {
-        setIsLoading(false);
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [initialHasPending, currentFile]);
-
   // Listen to platform file open events (e.g. Electron file associations, Android intent, drag onto dock)
   useEffect(() => {
     const unsubStart = platform.onFileOpenStart?.(() => {
