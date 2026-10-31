@@ -193,7 +193,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     autoHideMenuBar: true,
-    title: 'InTab PDF',
+    title: 'InTabPDF',
     icon: path.join(__dirname, 'icon.png'),
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -207,6 +207,10 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.removeMenu();
+  win.setTitle('InTabPDF');
+  win.on('page-title-updated', (event) => {
+    event.preventDefault();
+  });
   const wc = win.webContents;
   // Reset readiness only when the top-level page reloads or navigates away.
   // Do NOT listen to 'did-start-loading' because it fires for sub-resources and lazy chunks.

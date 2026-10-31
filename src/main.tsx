@@ -7,9 +7,13 @@ import App from './App';
 import AppRouter from './platform/AppRouter';
 import { getPlatformType } from './platform';
 
-// Set initial platform attribute on html element
+// Set initial platform attribute on html element and title for desktop
 if (typeof document !== 'undefined') {
-  document.documentElement.dataset.platform = getPlatformType();
+  const platformType = getPlatformType();
+  document.documentElement.dataset.platform = platformType;
+  if (platformType === 'electron') {
+    document.title = 'InTabPDF';
+  }
 }
 
 const rootElement = document.getElementById('root');
