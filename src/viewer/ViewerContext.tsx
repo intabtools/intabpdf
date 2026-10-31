@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPlatformType, platform, type OpenedFile } from '../platform';
@@ -9,10 +9,18 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
   const [initialHasPending] = useState(() => platform.hasPendingFile?.() ?? false);
   const [isLoading, setIsLoading] = useState(initialHasPending);
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
 
-  // On cold start with pending file, immediately navigate to viewer
   useEffect(() => {
-    if (initialHasPending && getPlatformType() !== 'web') {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
+  const coldStartHandledRef = useRef(false);
+
+  // On cold start with pending file, immediately navigate to viewer exactly once
+  useEffect(() => {
+    if (initialHasPending && !coldStartHandledRef.current && getPlatformType() !== 'web') {
+      coldStartHandledRef.current = true;
       navigate('/viewer');
     }
   }, [initialHasPending, navigate]);
@@ -22,20 +30,20 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
     const unsubStart = platform.onFileOpenStart?.(() => {
       setIsLoading(true);
       if (getPlatformType() !== 'web') {
-        navigate('/viewer');
+        navigateRef.current('/viewer');
       }
     });
     const unsubOpened = platform.onFileOpened((file) => {
       setIsLoading(true);
       setCurrentFile(file);
       if (getPlatformType() !== 'web') {
-        navigate('/viewer');
+        navigateRef.current('/viewer');
       }
     });
     const unsubError = platform.onFileOpenError?.(() => {
       setIsLoading(false);
       if (getPlatformType() !== 'web') {
-        navigate('/viewer');
+        navigateRef.current('/viewer');
       }
     });
     return () => {
@@ -43,7 +51,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       unsubOpened();
       unsubError?.();
     };
-  }, [navigate]);
+  }, []);
 
   const loadFile = useCallback(
     (file: OpenedFile) => {

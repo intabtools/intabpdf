@@ -269,8 +269,11 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         passwordCallbackRef.current = null;
       }
       setContextLoading(false);
+      setCurrentFile(null);
+      lastOpenedFileRef.current = null;
+      platform.clearPendingFile?.();
     };
-  }, [setContextLoading]);
+  }, [setContextLoading, setCurrentFile]);
 
   useEffect(() => {
     return () => {
