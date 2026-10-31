@@ -47,13 +47,21 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     openPdfPicker,
     isLoading: contextLoading,
     setIsLoading: setContextLoading,
+    pdfDoc: contextPdfDoc = null,
+    fileName: contextFileName = '',
+    pageSizes: contextPageSizes = [],
+    currentPage: contextCurrentPage = 1,
+    saveViewerDocument,
+    clearDocumentSession,
   } = useViewer();
 
-  const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(null);
-  const [fileName, setFileName] = useState('');
-  const [pageSizes, setPageSizes] = useState<PageSize[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [internalLoading, setInternalLoading] = useState(() => Boolean(currentFile && !pdfDoc));
+  const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(() => contextPdfDoc);
+  const [fileName, setFileName] = useState(() => contextFileName || (currentFile ? currentFile.name : ''));
+  const [pageSizes, setPageSizes] = useState<PageSize[]>(() => contextPageSizes);
+  const [currentPage, setCurrentPage] = useState(() => contextCurrentPage || 1);
+  const [internalLoading, setInternalLoading] = useState(
+    () => Boolean(currentFile && !contextPdfDoc)
+  );
   const [error, setError] = useState<string | null>(null);
   const [passwordPrompt, setPasswordPrompt] = useState<PasswordPromptState | null>(null);
 
@@ -71,7 +79,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
   const isLoading = contextLoading || internalLoading;
 
   const loadRequestRef = useRef(0);
-  const lastOpenedFileRef = useRef<OpenedFile | null>(null);
+  const lastOpenedFileRef = useRef<OpenedFile | null>(contextPdfDoc ? currentFile : null);
 
   const submitPassword = useCallback((password: string) => {
     if (!passwordCallbackRef.current) return;
@@ -98,10 +106,11 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     setPdfDoc(null);
     setFileName('');
     setPageSizes([]);
+    void clearDocumentSession?.();
     setCurrentFile(null);
     lastOpenedFileRef.current = null;
     platform.clearPendingFile?.();
-  }, [setCurrentFile, setLoading]);
+  }, [clearDocumentSession, setCurrentFile, setLoading]);
 
   const openDocument = useCallback(
     async (file: OpenedFile) => {
@@ -173,9 +182,11 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
           return;
         }
 
+        const initialSizes = Array.from({ length: doc.numPages }, () => firstSize);
         setPdfDoc(doc);
         adopted = true;
-        setPageSizes(Array.from({ length: doc.numPages }, () => firstSize));
+        setPageSizes(initialSizes);
+        saveViewerDocument?.(doc, file, initialSizes);
 
         const activeDoc = doc;
         void Promise.all(
@@ -187,7 +198,10 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
             }
           }),
         ).then((sizes) => {
-          if (requestId === loadRequestRef.current) setPageSizes(sizes);
+          if (requestId === loadRequestRef.current) {
+            setPageSizes(sizes);
+            saveViewerDocument?.(activeDoc, file, sizes);
+          }
         });
       } catch (loadError) {
         if (doc && !adopted) {
@@ -199,6 +213,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
           setPasswordPrompt(null);
           setPdfDoc(null);
           setPageSizes([]);
+          void clearDocumentSession?.();
 
           const isCancelled =
             loadError instanceof Error &&
@@ -234,7 +249,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         }
       }
     },
-    [setLoading]
+    [clearDocumentSession, saveViewerDocument, setLoading]
   );
 
   useEffect(() => {
@@ -268,16 +283,9 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         }
         passwordCallbackRef.current = null;
       }
+      setContextLoading(false);
     };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (pdfDoc) {
-        void destroyPdf(pdfDoc).catch(() => undefined);
-      }
-    };
-  }, [pdfDoc]);
+  }, [setContextLoading]);
 
   const handleOpenClick = async () => {
     const file = await openPdfPicker(() => {
@@ -349,7 +357,9 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
       passwordCallbackRef.current = null;
     }
     setPasswordPrompt(null);
-    if (pdfDoc) {
+    if (clearDocumentSession) {
+      await clearDocumentSession();
+    } else if (pdfDoc) {
       await destroyPdf(pdfDoc).catch(() => undefined);
     }
     setPdfDoc(null);
@@ -361,7 +371,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     setCurrentFile(null);
     lastOpenedFileRef.current = null;
     platform.clearPendingFile?.();
-  }, [pdfDoc, setCurrentFile, setLoading]);
+  }, [clearDocumentSession, pdfDoc, setCurrentFile, setLoading]);
 
   return {
     pdfDoc,

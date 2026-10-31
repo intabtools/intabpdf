@@ -1,5 +1,9 @@
+import { createRequire } from 'module';
 import { describe, expect, it, vi } from 'vitest';
 import { getPlatformType, handleLaunchUri, platform, uint8ArrayToBase64 } from './index';
+
+const require = createRequire(import.meta.url);
+const { resolvePdfArg, findPdf } = require('../../electron/args.cjs');
 
 describe('platform adapter', () => {
   it('exposes pickPdfFile, onFileOpened, and saveFile', () => {
@@ -172,6 +176,157 @@ describe('platform adapter', () => {
       platform.clearPendingFile?.();
       unsubError?.();
       delete win.NativeIntent;
+    });
+  });
+
+  describe('Electron IPC and window.intab integration', () => {
+    interface TestDesktopWindow {
+      intab?: {
+        isPackaged?: boolean;
+        hasPendingPdf?: () => boolean;
+        clearPendingPdf?: () => void;
+        onOpenPdf?: (callback: (file: { name: string; bytes: Uint8Array | number[] }) => void) => () => void;
+        onOpenPdfStart?: (callback: (data: { name: string }) => void) => () => void;
+        onOpenPdfError?: (callback: (data: { error: string }) => void) => () => void;
+        openExternalUrl?: (url: string) => void;
+      };
+    }
+
+    const getTestWindow = (): TestDesktopWindow => {
+      const g = globalThis as unknown as { window?: TestDesktopWindow };
+      if (!g.window) {
+        g.window = {};
+      }
+      return g.window;
+    };
+
+    it('detects pending file from window.intab and allows consuming exactly once', () => {
+      let pendingState = true;
+      let clearCalled = false;
+      const win = getTestWindow();
+      win.intab = {
+        hasPendingPdf: () => pendingState,
+        clearPendingPdf: () => {
+          clearCalled = true;
+          pendingState = false;
+        },
+      };
+
+      expect(platform.hasPendingFile?.()).toBe(true);
+      // Consumed flag prevents repeated positive return
+      expect(platform.hasPendingFile?.()).toBe(false);
+
+      // Clearing resets internal state and calls bridge
+      platform.clearPendingFile?.();
+      expect(clearCalled).toBe(true);
+
+      pendingState = true;
+      expect(platform.hasPendingFile?.()).toBe(true);
+
+      platform.clearPendingFile?.();
+      delete win.intab;
+    });
+
+    it('relays open-pdf-start, open-pdf-error, and open-pdf events from Electron bridge', () => {
+      let startCb: ((data: { name: string }) => void) | null = null;
+      let errorCb: ((data: { error: string }) => void) | null = null;
+      let openCb: ((data: { name: string; bytes: number[] }) => void) | null = null;
+
+      const win = getTestWindow();
+      win.intab = {
+        onOpenPdfStart: (cb) => {
+          startCb = cb;
+          return () => {
+            startCb = null;
+          };
+        },
+        onOpenPdfError: (cb) => {
+          errorCb = cb;
+          return () => {
+            errorCb = null;
+          };
+        },
+        onOpenPdf: (cb) => {
+          openCb = cb;
+          return () => {
+            openCb = null;
+          };
+        },
+      };
+
+      const starts: string[] = [];
+      const errors: string[] = [];
+      const opened: string[] = [];
+
+      const unsubStart = platform.onFileOpenStart?.((name) => starts.push(name));
+      const unsubError = platform.onFileOpenError?.((err) => errors.push(err));
+      const unsubOpen = platform.onFileOpened((file) => {
+        expect(file.bytes).toBeInstanceOf(Uint8Array);
+        opened.push(file.name);
+      });
+
+      expect(startCb).toBeDefined();
+      expect(errorCb).toBeDefined();
+      expect(openCb).toBeDefined();
+
+      if (startCb) {
+        (startCb as (data: { name: string }) => void)({ name: 'contract.pdf' });
+      }
+      expect(starts).toEqual(['contract.pdf']);
+
+      if (errorCb) {
+        (errorCb as (data: { error: string }) => void)({ error: 'File read permission denied' });
+      }
+      expect(errors).toEqual(['File read permission denied']);
+
+      if (openCb) {
+        (openCb as (data: { name: string; bytes: number[] }) => void)({ name: 'report.pdf', bytes: [37, 80, 68, 70] });
+      }
+      expect(opened).toEqual(['report.pdf']);
+
+      // Deduplication: sending identical file immediately should be filtered out
+      if (openCb) {
+        (openCb as (data: { name: string; bytes: number[] }) => void)({ name: 'report.pdf', bytes: [37, 80, 68, 70] });
+      }
+      expect(opened).toEqual(['report.pdf']);
+
+      // Cleanup
+      unsubStart?.();
+      unsubError?.();
+      unsubOpen();
+      platform.clearPendingFile?.();
+      delete win.intab;
+    });
+  });
+
+  describe('Electron CLI and URI argument resolution', () => {
+    it('resolves standard PDF paths', () => {
+      const resolved = resolvePdfArg('test.pdf');
+      expect(resolved).toBeTruthy();
+      expect(resolved?.endsWith('test.pdf')).toBe(true);
+    });
+
+    it('resolves file:// URLs including percent-encoded spaces', () => {
+      const fileUrl = 'file:///home/user/my%20presentation%20v2.pdf';
+      const resolved = resolvePdfArg(fileUrl);
+      expect(resolved).toBe('/home/user/my presentation v2.pdf');
+    });
+
+    it('ignores CLI flags and non-PDF files', () => {
+      expect(resolvePdfArg('--enable-features=UseOzonePlatform')).toBeNull();
+      expect(resolvePdfArg('--dev')).toBeNull();
+      expect(resolvePdfArg('/path/to/image.png')).toBeNull();
+      expect(resolvePdfArg('')).toBeNull();
+      expect(resolvePdfArg(null as unknown as string)).toBeNull();
+    });
+
+    it('finds PDF in argv skipping executable path at index 0', () => {
+      const argv = ['/usr/bin/intabpdf', '--no-sandbox', 'file:///data/annual-report.pdf'];
+      const pdf = findPdf(argv);
+      expect(pdf).toBe('/data/annual-report.pdf');
+
+      const argvNone = ['/usr/bin/intabpdf', '--dev', '--inspect'];
+      expect(findPdf(argvNone)).toBeNull();
     });
   });
 });

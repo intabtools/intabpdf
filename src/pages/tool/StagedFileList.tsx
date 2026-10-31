@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import type { DragEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode, TouchEvent } from 'react';
 import { ChevronDown, ChevronUp, FileText, GripVertical, X } from 'lucide-react';
-import { formatBytes } from '../../core';
+import { formatBytes } from '../../core/formatBytes';
 import type { StagedFile } from '../../tools/types';
 
 function ThumbnailPreview({ file }: { file: StagedFile }): ReactNode {

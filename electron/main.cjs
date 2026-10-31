@@ -18,21 +18,15 @@ let win = null;
 let rendererReady = false;
 let drainingQueue = false;
 const pendingFiles = [];
+const { resolvePdfArg, findPdf } = require('./args.cjs');
 
-// argv[0] is the executable itself, so skip it.
-const findPdf = (argv) =>
-  argv
-    .slice(1)
-    .find(
-      (arg) =>
-        typeof arg === 'string' &&
-        !arg.startsWith('--') &&
-        arg.toLowerCase().endsWith('.pdf'),
-    ) || null;
 // Queue an incoming PDF until the frontend is ready.
 function queuePdf(filePath) {
   if (!filePath) return;
-  pendingFiles.push(path.resolve(filePath));
+  const resolved = resolvePdfArg(filePath) || path.resolve(filePath);
+  if (!pendingFiles.includes(resolved)) {
+    pendingFiles.push(resolved);
+  }
   flushPendingFiles().catch((error) => {
     console.error('Failed to process pending PDFs:', error);
   });
@@ -52,7 +46,10 @@ async function flushPendingFiles() {
       !win.isDestroyed()
     ) {
       const filePath = pendingFiles[0];
+      const fileName = path.basename(filePath);
       try {
+        win.webContents.send('open-pdf-start', { name: fileName });
+
         const stats = await fs.promises.stat(filePath);
 
         if (!stats.isFile()) {
@@ -72,12 +69,42 @@ async function flushPendingFiles() {
         }
         pendingFiles.shift();
         win.webContents.send('open-pdf', {
-          name: path.basename(filePath),
+          name: fileName,
           bytes,
         });
       } catch (error) {
         pendingFiles.shift();
         console.error(`Could not open PDF: ${filePath}`, error);
+        if (win && !win.isDestroyed()) {
+          let userError =
+            'Could not open this PDF. Check whether the file is damaged, unsupported, or accessible.';
+          if (error && error.code === 'ENOENT') {
+            userError =
+              'Could not find this PDF file. It may have been moved, renamed, or deleted.';
+          } else if (error && error.code === 'EACCES') {
+            userError =
+              'Permission denied while trying to access this PDF file.';
+          } else if (
+            error &&
+            error.message &&
+            error.message.includes('File too large')
+          ) {
+            userError = `This PDF exceeds the maximum file size limit (${Math.round(
+              MAX_PDF_BYTES / (1024 * 1024),
+            )} MB).`;
+          } else if (
+            error &&
+            error.message &&
+            error.message.includes('Not a regular file')
+          ) {
+            userError =
+              'The selected path is a folder or special file, not a standard PDF document.';
+          }
+          win.webContents.send('open-pdf-error', {
+            name: fileName,
+            error: userError,
+          });
+        }
       }
     }
   } finally {
@@ -166,7 +193,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     autoHideMenuBar: true,
-    title: 'InTab PDF',
+    title: 'InTabPDF',
     icon: path.join(__dirname, 'icon.png'),
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -180,10 +207,17 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   win.removeMenu();
+  win.setTitle('InTabPDF');
+  win.on('page-title-updated', (event) => {
+    event.preventDefault();
+  });
   const wc = win.webContents;
-  // Reset readiness if the frontend reloads.
-  wc.on('did-start-loading', () => {
-    rendererReady = false;
+  // Reset readiness only when the top-level page reloads or navigates away.
+  // Do NOT listen to 'did-start-loading' because it fires for sub-resources and lazy chunks.
+  wc.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
+    if (isMainFrame && !isInPlace) {
+      rendererReady = false;
+    }
   });
   // If the renderer crashes, reset readiness and reload so queued files
   // can be delivered again.
@@ -232,7 +266,9 @@ if (!gotLock) {
 } else {
   // Capture a PDF passed when the app is launched.
   const initialPdf = findPdf(process.argv);
-  if (initialPdf) pendingFiles.push(path.resolve(initialPdf));
+  if (initialPdf && !pendingFiles.includes(initialPdf)) {
+    pendingFiles.push(initialPdf);
+  }
   app.on('second-instance', (_event, argv) => {
     const file = findPdf(argv);
     if (file) queuePdf(file);
@@ -252,6 +288,11 @@ if (!gotLock) {
       return;
     }
     event.returnValue = pendingFiles.length > 0;
+  });
+  ipcMain.on('clear-pending-file', (event) => {
+    if (!win || win.isDestroyed()) return;
+    if (event.sender !== win.webContents) return;
+    pendingFiles.length = 0;
   });
 
   // Safely open the canonical repository externally via IPC from our trusted main frame.

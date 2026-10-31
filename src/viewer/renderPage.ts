@@ -73,6 +73,9 @@ export async function getPageSize(
   return { width: viewport.width, height: viewport.height };
 }
 
+export const MAX_CANVAS_DIMENSION = 4096;
+export const MAX_CANVAS_PIXELS = 16777216; // 16 megapixels
+
 export function drawPageOnCanvas(
   doc: PdfDocument,
   pageNumber: number,
@@ -88,18 +91,96 @@ export function drawPageOnCanvas(
 
     const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
     const displayViewport = page.getViewport({ scale });
-    const renderViewport = page.getViewport({ scale: scale * devicePixelRatio });
 
-    canvas.width = Math.max(1, Math.floor(renderViewport.width));
-    canvas.height = Math.max(1, Math.floor(renderViewport.height));
-    canvas.style.width = `${Math.floor(displayViewport.width)}px`;
-    canvas.style.height = `${Math.floor(displayViewport.height)}px`;
+    let renderScale = scale * devicePixelRatio;
+    const testViewport = page.getViewport({ scale: renderScale });
+    const unconstrainedWidth = testViewport.width;
+    const unconstrainedHeight = testViewport.height;
 
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Canvas 2D context unavailable');
+    if (
+      unconstrainedWidth > MAX_CANVAS_DIMENSION ||
+      unconstrainedHeight > MAX_CANVAS_DIMENSION ||
+      unconstrainedWidth * unconstrainedHeight > MAX_CANVAS_PIXELS
+    ) {
+      const dimFactor = Math.min(
+        MAX_CANVAS_DIMENSION / unconstrainedWidth,
+        MAX_CANVAS_DIMENSION / unconstrainedHeight,
+      );
+      const pixelFactor = Math.sqrt(MAX_CANVAS_PIXELS / (unconstrainedWidth * unconstrainedHeight));
+      renderScale *= Math.min(dimFactor, pixelFactor, 1);
+    }
 
-    renderTask = page.render({ canvas, canvasContext: context, viewport: renderViewport });
-    await renderTask.promise;
+    const renderViewport = page.getViewport({ scale: renderScale });
+    const targetWidth = Math.max(1, Math.floor(renderViewport.width));
+    const targetHeight = Math.max(1, Math.floor(renderViewport.height));
+    const dispWidth = `${Math.floor(displayViewport.width)}px`;
+    const dispHeight = `${Math.floor(displayViewport.height)}px`;
+
+    // Immediately update CSS display dimensions on the target canvas so existing rendered content
+    // visually scales up or down immediately without white flash or blank frames during re-rasterization.
+    canvas.style.width = dispWidth;
+    canvas.style.height = dispHeight;
+
+    // Use offscreen staging canvas so rendering occurs in the background without wiping
+    // the currently visible canvas bitmap before the new rasterization finishes.
+    const stagingCanvas = document.createElement('canvas');
+    stagingCanvas.width = targetWidth;
+    stagingCanvas.height = targetHeight;
+
+    const stagingContext = stagingCanvas.getContext('2d');
+    if (!stagingContext) throw new Error('Canvas 2D context unavailable');
+
+    try {
+      renderTask = page.render({
+        canvas: stagingCanvas,
+        canvasContext: stagingContext,
+        viewport: renderViewport,
+      });
+      await renderTask.promise;
+    } catch (renderError) {
+      if (cancelled) return;
+      if (
+        renderError instanceof Error &&
+        (renderError.name === 'RenderingCancelledException' ||
+          renderError.name === 'AbortException')
+      ) {
+        throw renderError;
+      }
+
+      // Memory limit recovery: if rendering at higher scale/DPR fails, fallback to 1x scale
+      console.warn(
+        `High-resolution render failed for page ${pageNumber}, retrying at 1x DPR:`,
+        renderError,
+      );
+      const fallbackViewport = page.getViewport({ scale });
+      stagingCanvas.width = Math.max(1, Math.floor(fallbackViewport.width));
+      stagingCanvas.height = Math.max(1, Math.floor(fallbackViewport.height));
+      renderTask = page.render({
+        canvas: stagingCanvas,
+        canvasContext: stagingContext,
+        viewport: fallbackViewport,
+      });
+      await renderTask.promise;
+    }
+
+    if (cancelled) return;
+
+    // In a single synchronous turn, update destination canvas dimensions and blit the newly
+    // completed raster image. Because width assignment and drawImage occur in the same JS tick,
+    // the browser never paints a blank white frame.
+    canvas.width = stagingCanvas.width;
+    canvas.height = stagingCanvas.height;
+    canvas.style.width = dispWidth;
+    canvas.style.height = dispHeight;
+
+    const destContext = canvas.getContext('2d');
+    if (destContext && typeof destContext.drawImage === 'function') {
+      destContext.drawImage(stagingCanvas, 0, 0);
+    }
+
+    // Immediately release staging canvas buffer memory
+    stagingCanvas.width = 0;
+    stagingCanvas.height = 0;
   })();
 
   return {

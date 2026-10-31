@@ -5,12 +5,13 @@ import type { PdfDocument } from './renderPage';
 import type { SearchMatch } from './types';
 import { extractPagesBatch } from './textCache';
 
-interface UseViewerSearchOptions {
+export interface UseViewerSearchOptions {
   pdfDoc: PdfDocument | null;
   jumpToPage: (page: number) => void;
+  currentPage?: number;
 }
 
-interface UseViewerSearchResult {
+export interface UseViewerSearchResult {
   isSearchOpen: boolean;
   setIsSearchOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   searchQuery: string;
@@ -26,9 +27,27 @@ interface UseViewerSearchResult {
   handleSearchInputKeyDown: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
 }
 
+/**
+ * Builds an array of page numbers starting from startPage up to numPages,
+ * wrapping around from 1 to startPage - 1.
+ */
+export function buildPageSequence(numPages: number, startPage: number): number[] {
+  if (numPages <= 0) return [];
+  const pages: number[] = [];
+  const clampedStart = Math.max(1, Math.min(numPages, startPage));
+  for (let p = clampedStart; p <= numPages; p++) {
+    pages.push(p);
+  }
+  for (let p = 1; p < clampedStart; p++) {
+    pages.push(p);
+  }
+  return pages;
+}
+
 export function useViewerSearch({
   pdfDoc,
   jumpToPage,
+  currentPage,
 }: UseViewerSearchOptions): UseViewerSearchResult {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,11 +56,19 @@ export function useViewerSearch({
   const [isSearching, setIsSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Text search asynchronously across loaded document pages with batched concurrent extraction,
+  const currentPageRef = useRef(currentPage ?? 1);
+  useEffect(() => {
+    currentPageRef.current = currentPage ?? 1;
+  }, [currentPage]);
+
+  const userNavigatedRef = useRef(false);
+
+  // Text search asynchronously across loaded document pages with batched extraction starting from current reading page,
   // progressive match streaming, and responsive event-loop yielding
   useEffect(() => {
     const q = searchQuery.trim().toLowerCase();
     let active = true;
+    userNavigatedRef.current = false;
 
     const timer = setTimeout(async () => {
       if (!q || !pdfDoc) {
@@ -53,26 +80,20 @@ export function useViewerSearch({
         return;
       }
 
+      const readingPage = currentPageRef.current || 1;
       setIsSearching(true);
       try {
         const foundMatches: SearchMatch[] = [];
-        let matchId = 0;
         let initialMatchPublished = false;
         let lastPublishTime = performance.now();
         const BATCH_SIZE = 6;
 
-        for (let batchStart = 1; batchStart <= pdfDoc.numPages; batchStart += BATCH_SIZE) {
+        const pageSequence = buildPageSequence(pdfDoc.numPages, readingPage);
+
+        for (let batchIdx = 0; batchIdx < pageSequence.length; batchIdx += BATCH_SIZE) {
           if (!active) return;
 
-          const batchPages: number[] = [];
-          for (
-            let p = batchStart;
-            p < batchStart + BATCH_SIZE && p <= pdfDoc.numPages;
-            p++
-          ) {
-            batchPages.push(p);
-          }
-
+          const batchPages = pageSequence.slice(batchIdx, batchIdx + BATCH_SIZE);
           const pageTexts = await extractPagesBatch(pdfDoc, batchPages);
           if (!active) return;
 
@@ -87,7 +108,7 @@ export function useViewerSearch({
               let pos = 0;
               while ((pos = item.indexOf(q, pos)) !== -1) {
                 foundMatches.push({
-                  id: matchId++,
+                  id: 0, // Assigned after sorting
                   pageNumber: pageText.pageNumber,
                   matchIndexOnPage: matchOnPage++,
                 });
@@ -97,36 +118,68 @@ export function useViewerSearch({
             }
           }
 
-          // Progressive streaming: publish early matches as soon as found
+          // Sort matches in natural document order (page 1..N) to preserve total document count and sequential navigation
           if (batchFoundMatches && active) {
+            foundMatches.sort((a, b) => {
+              if (a.pageNumber !== b.pageNumber) return a.pageNumber - b.pageNumber;
+              return a.matchIndexOnPage - b.matchIndexOnPage;
+            });
+            foundMatches.forEach((m, idx) => {
+              m.id = idx;
+            });
+
+            const targetIdx = foundMatches.findIndex((m) => m.pageNumber >= readingPage);
+            const activeIdx = targetIdx !== -1 ? targetIdx : 0;
+
             if (!initialMatchPublished && foundMatches.length > 0) {
               initialMatchPublished = true;
               setMatches([...foundMatches]);
-              setCurrentMatchIndex(0);
-              jumpToPage(foundMatches[0].pageNumber);
+              setCurrentMatchIndex(activeIdx);
+              jumpToPage(foundMatches[activeIdx].pageNumber);
               lastPublishTime = performance.now();
             } else if (performance.now() - lastPublishTime > 150) {
               setMatches([...foundMatches]);
+              setCurrentMatchIndex((prev) => {
+                if (userNavigatedRef.current && prev >= 0 && prev < foundMatches.length) {
+                  return prev;
+                }
+                return activeIdx;
+              });
               lastPublishTime = performance.now();
             }
           }
 
           // Yield to event loop between batches so Android WebView remains fluid at 60 FPS
-          if (batchStart + BATCH_SIZE <= pdfDoc.numPages) {
+          if (batchIdx + BATCH_SIZE < pageSequence.length) {
             await new Promise((resolve) => setTimeout(resolve, 0));
             if (!active) return;
           }
         }
 
         if (!active) return;
+
+        foundMatches.sort((a, b) => {
+          if (a.pageNumber !== b.pageNumber) return a.pageNumber - b.pageNumber;
+          return a.matchIndexOnPage - b.matchIndexOnPage;
+        });
+        foundMatches.forEach((m, idx) => {
+          m.id = idx;
+        });
+
+        const finalTargetIdx = foundMatches.findIndex((m) => m.pageNumber >= readingPage);
+        const finalActiveIdx = finalTargetIdx !== -1 ? finalTargetIdx : 0;
+
         setMatches(foundMatches);
-        setCurrentMatchIndex((prev) =>
-          prev >= 0 ? prev : foundMatches.length > 0 ? 0 : -1
-        );
+        setCurrentMatchIndex((prev) => {
+          if (userNavigatedRef.current && prev >= 0 && prev < foundMatches.length) {
+            return prev;
+          }
+          return foundMatches.length > 0 ? finalActiveIdx : -1;
+        });
         setIsSearching(false);
 
         if (!initialMatchPublished && foundMatches.length > 0) {
-          jumpToPage(foundMatches[0].pageNumber);
+          jumpToPage(foundMatches[finalActiveIdx].pageNumber);
         }
       } catch (err) {
         if (!active) return;
@@ -144,6 +197,7 @@ export function useViewerSearch({
 
   const goToNextMatch = () => {
     if (matches.length === 0) return;
+    userNavigatedRef.current = true;
     const nextIdx = (currentMatchIndex + 1) % matches.length;
     setCurrentMatchIndex(nextIdx);
     jumpToPage(matches[nextIdx].pageNumber);
@@ -151,6 +205,7 @@ export function useViewerSearch({
 
   const goToPrevMatch = () => {
     if (matches.length === 0) return;
+    userNavigatedRef.current = true;
     const prevIdx = (currentMatchIndex - 1 + matches.length) % matches.length;
     setCurrentMatchIndex(prevIdx);
     jumpToPage(matches[prevIdx].pageNumber);

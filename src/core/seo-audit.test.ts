@@ -18,7 +18,7 @@ describe('SEO, Discoverability, and Web Metadata Audit', () => {
     // Title & Charset & Viewport
     expect(html).toContain('<meta charset="UTF-8" />');
     expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0" />');
-    expect(html).toContain('<title>InTabPDF — Privacy-First PDF Tools That Never Leave Your Device</title>');
+    expect(html).toContain('<title>InTabPDF : Privacy-First PDF Tools That Never Leave Your Device</title>');
 
     // Meta Description & Keywords
     expect(html).toContain('name="description"');
@@ -44,7 +44,7 @@ describe('SEO, Discoverability, and Web Metadata Audit', () => {
 
     // Noscript fallback for non-JS crawlers
     expect(html).toContain('<noscript>');
-    expect(html).toContain('InTabPDF — Privacy-First PDF Tools');
+    expect(html).toContain('InTabPDF : Privacy-First PDF Tools');
     expect(html).toContain('JavaScript is required to run the local PDF tools.');
   });
 

@@ -12,6 +12,7 @@ import ViewerThumbnails from './ViewerThumbnails';
 import ViewerPagesView from './ViewerPagesView';
 import PasswordDialog from '../components/PasswordDialog';
 import { createPdfLinkService } from './pdfLinks';
+import { useViewer } from '../hooks/useViewer';
 import { useViewerFullscreen } from './useViewerFullscreen';
 import { useViewerZoom } from './useViewerZoom';
 import { useViewerSearch } from './useViewerSearch';
@@ -49,6 +50,20 @@ export default function ViewerPage(): ReactNode {
     handleDrop,
     resetDocumentState,
   } = usePdfDocumentLoader();
+
+  const {
+    zoom: savedZoom = 100,
+    isFitToWidth: savedIsFitToWidth = true,
+    updateReadingState,
+  } = useViewer();
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPage(page);
+      updateReadingState?.({ currentPage: page });
+    },
+    [setCurrentPage, updateReadingState]
+  );
 
   const numPages = pdfDoc?.numPages ?? 0;
 
@@ -90,8 +105,9 @@ export default function ViewerPage(): ReactNode {
     handlePageJumpSubmit,
   } = useViewerScrollSync({
     pdfDoc,
+    pageSizes,
     currentPage,
-    setCurrentPage,
+    setCurrentPage: handlePageChange,
     numPages,
     isFullscreen,
     showThumbnails,
@@ -118,10 +134,14 @@ export default function ViewerPage(): ReactNode {
     toggleFitOrZoom,
   } = useViewerZoom({
     pageSizes,
-    currentPage,
     cvsWidth,
     scrollRootRef,
     pagesWrapperRef,
+    initialZoom: savedZoom,
+    initialIsFitToWidth: savedIsFitToWidth,
+    onZoomChange: (newZoom, newFit) => {
+      updateReadingState?.({ zoom: newZoom, isFitToWidth: newFit });
+    },
   });
 
   const {
@@ -141,6 +161,7 @@ export default function ViewerPage(): ReactNode {
   } = useViewerSearch({
     pdfDoc,
     jumpToPage,
+    currentPage,
   });
 
   const handleOpenPalette = () => {

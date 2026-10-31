@@ -2,7 +2,7 @@
 import type { ReactNode } from 'react';
 import { Download, Eye, RefreshCw, XCircle } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
-import { formatBytes } from '../../core';
+import { formatBytes } from '../../core/formatBytes';
 import type { PlatformType } from '../../platform';
 import type { StagedFile, ToolDefinition } from '../../tools/types';
 

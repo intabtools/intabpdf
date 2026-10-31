@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public class MainActivity extends BridgeActivity {
+    static volatile boolean isProcessInitialized = false;
     private static volatile boolean hasPdfLaunchIntent = false;
     private static volatile String pendingPdfUri = null;
     private static volatile String pendingPdfName = null;
@@ -21,8 +22,24 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (!isProcessInitialized) {
+            isProcessInitialized = true;
+            cleanStaleExternalLaunchPdf(getCacheDir());
+        }
         handleIntent(getIntent());
         setupNativeBridge();
+    }
+
+    static void cleanStaleExternalLaunchPdf(File cacheDir) {
+        try {
+            if (cacheDir != null) {
+                File staleFile = new File(cacheDir, "external_launch.pdf");
+                if (staleFile.exists() && staleFile.isFile()) {
+                    staleFile.delete();
+                }
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
