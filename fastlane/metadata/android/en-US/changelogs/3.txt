@@ -1,0 +1,2 @@
+• Removed the unused Google Services Gradle plugin and buildscript classpath from the Android project.
+• Updated the app release version to 1.1.2.

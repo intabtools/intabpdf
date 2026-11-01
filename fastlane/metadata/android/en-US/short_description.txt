@@ -1,0 +1,1 @@
+Offline PDF reader and tools to merge, split, rotate, compress and convert PDFs
