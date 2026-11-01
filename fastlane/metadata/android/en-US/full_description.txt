@@ -1,0 +1,28 @@
+InTab PDF is a simple app for reading and managing PDF files on your Android device.
+
+All PDF processing happens on your device. Your documents are not uploaded to any server. You can use the app offline without an internet connection.
+
+What you can do with InTab PDF:
+
+• PDF Reader: Open and read PDF files with text search, zoom controls and page thumbnails. Use distraction-free mode for comfortable reading.
+
+• Merge PDF: Combine multiple PDF documents into one file and arrange them in your preferred order.
+
+• Rotate PDF: Rotate all pages or selected pages in 90-degree steps.
+
+• Remove Pages: Delete unwanted pages or page ranges.
+
+• Split PDF: Extract selected page ranges or split a document into smaller files.
+
+• Images to PDF: Convert JPG, PNG and WebP images into PDF. Arrange images and choose A4 or fit-to-page sizing.
+
+• Compress PDF: Reduce PDF file size using a target size or compression presets.
+
+• More tools are coming soon.
+
+Privacy:
+
+• No account or login required.
+• No ads, analytics, telemetry or tracking.
+• No backend server or cloud uploads.
+• Your files stay on your device unless you choose to save or share them.
