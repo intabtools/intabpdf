@@ -39,12 +39,18 @@ html, body {
   font-size: 14px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 #root {
   height: 100%;
   display: flex;
   flex-direction: column;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 button {
@@ -75,7 +81,11 @@ button:disabled {
    Deliberate UI Selection Policy
    ========================================================================== */
 
-/* Non-selectable application UI: headings, cards, navigation, controls, badges, toolbars */
+/* Non-selectable application UI: headings, cards, navigation, controls, badges, toolbars, footer */
+html,
+body,
+#root,
+.app,
 .hdr,
 .wh,
 .sb,
@@ -106,7 +116,10 @@ button:disabled {
 .tci,
 .dz,
 .cd,
+.card,
+.card.opts,
 .card.opts .sw,
+.tp,
 button,
 .ib,
 .cta,
@@ -130,9 +143,12 @@ button,
 .staged-item-controls,
 .vfs-pill,
 .vfs-btn,
-.viewer-floating-pill {
-  user-select: none;
+.viewer-floating-pill,
+dialog,
+.mo {
   -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 /* Explicit exceptions: areas where text selection must remain naturally available */
@@ -144,22 +160,12 @@ textarea,
 .output-filename-group input,
 .viewer-search-bar input,
 .selectable,
-.output-info,
-.summary-text,
-.doc-text,
-.error-details,
-.err,
-pre,
-code,
+.selectable-text,
 .vwr .textLayer,
-.textLayer,
-.textLayer span,
-.card.busy,
-.card.busy .lede,
-.card.opts .summary,
-.card.opts .summary b {
-  user-select: text;
+.vwr .textLayer * {
   -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* App container and layout structure */
@@ -1505,9 +1511,19 @@ details p {
   margin: 12px 4px 6px;
 }
 
-/* Status Bar (Desktop - Removed to recover vertical space) */
+/* Status Bar (Desktop) */
 .stb {
-  display: none !important;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  height: 26px;
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex: none;
 }
 
 .stb .sp {
@@ -1521,6 +1537,10 @@ details p {
   border-radius: 50%;
   background: var(--success);
   margin-right: 7px;
+}
+
+html[data-platform="android"] .stb {
+  display: none !important;
 }
 
 /* Command Palette Modal (Ctrl+K) */
@@ -2079,6 +2099,9 @@ details p {
   .main {
     padding: 8px 32px 32px;
   }
+  .stb {
+    display: flex;
+  }
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
@@ -2237,6 +2260,9 @@ details p {
   }
   .main {
     padding: 8px 32px 32px;
+  }
+  .stb {
+    display: flex;
   }
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
