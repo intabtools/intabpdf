@@ -12,6 +12,7 @@ export interface ViewerContextType {
 
   // Preserved viewer document & reading session state across navigation
   pdfDoc?: PdfDocument | null;
+  activeDocFile?: OpenedFile | null;
   fileName?: string;
   pageSizes?: PageSize[];
   currentPage?: number;
