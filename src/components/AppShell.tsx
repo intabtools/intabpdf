@@ -13,6 +13,8 @@ import BottomNav from './BottomNav';
 import CommandPalette from './CommandPalette';
 import NavigationRail from './NavigationRail';
 import Sidebar from './Sidebar';
+import StatusBar from './StatusBar';
+import { getPlatformType } from '../platform';
 
 interface AppShellProps {
   children: ReactNode;
@@ -24,6 +26,7 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
   const location = useLocation();
   const navigate = useNavigate();
   const { setShowAppLayout } = useShell();
+  const isAndroid = getPlatformType() === 'android';
 
   // Dark mode state with persistence in localStorage (permitted by privacy rules)
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -230,6 +233,9 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
       </div>
 
       {showAppLayout && !isFullScreenOverlay && <BottomNav />}
+      {showAppLayout && !isFullScreenOverlay && !isAndroid && (
+        <StatusBar onSwitchToWeb={onSwitchToWeb} />
+      )}
 
       <CommandPalette
         isOpen={isPaletteOpen}
