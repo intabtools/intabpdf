@@ -98,8 +98,11 @@ export default function ToolPage(): ReactNode {
     if (tool?.id === 'compress' && stagedFiles.length > 1) {
       return '.zip';
     }
+    if (tool?.id === 'pdf-to-images' && typeof extraState.outputExtension === 'string') {
+      return extraState.outputExtension;
+    }
     return tool ? getOutputExtension(tool.id, tool.outputName) : '.pdf';
-  }, [tool, stagedFiles.length]);
+  }, [tool, stagedFiles.length, extraState.outputExtension]);
 
   const acceptTypes = useMemo(() => {
     if (tool?.fileType === 'img') return 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
@@ -185,7 +188,14 @@ export default function ToolPage(): ReactNode {
       setStatus('done');
     } catch (err) {
       console.error('PDF tool processing failed:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Processing failed');
+      const isCancelled =
+        err instanceof Error &&
+        (err.name === 'AbortError' ||
+          err.name === 'RenderingCancelledException' ||
+          err.message.toLowerCase().includes('cancel'));
+      if (!isCancelled) {
+        setErrorMessage(err instanceof Error ? err.message : 'Processing failed');
+      }
       setStatus('idle');
     }
   };
@@ -197,6 +207,10 @@ export default function ToolPage(): ReactNode {
         ? 'application/zip'
         : outputExtension === '.txt'
         ? 'text/plain;charset=utf-8'
+        : outputExtension === '.png'
+        ? 'image/png'
+        : outputExtension === '.jpg' || outputExtension === '.jpeg'
+        ? 'image/jpeg'
         : 'application/pdf';
 
       const res = await platform.saveFile?.(

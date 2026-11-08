@@ -107,3 +107,32 @@
   color: var(--text);
   letter-spacing: -0.01em;
 }
+
+.processing-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 24px;
+  margin-top: 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.processing-cancel-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--text-muted);
+}
+
+.processing-cancel-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  color: var(--text-muted);
+}

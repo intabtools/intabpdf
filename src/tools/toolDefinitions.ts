@@ -215,7 +215,8 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Convert',
     noun: 'file',
     outputName: 'pages.zip',
-    availability: 'coming-soon',
+    availability: 'available',
+    component: () => import('./modules/PdfToImagesTool'),
     options: [
       { id: 'hi-res', label: 'High resolution', description: 'Larger images', defaultValue: false },
       { id: 'png', label: 'Use PNG', description: 'Instead of JPG', defaultValue: false },

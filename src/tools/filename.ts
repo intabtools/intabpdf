@@ -39,6 +39,9 @@ export function getDefaultOutputBaseName(
     case 'images-to-pdf':
       return 'images-to-pdf';
 
+    case 'pdf-to-images':
+      return firstFile ? `${firstFile}-images` : 'pdf-images';
+
     default:
       return firstFile ? `${toolId}-${firstFile}` : `${toolId}-document`;
   }
@@ -47,12 +50,17 @@ export function getDefaultOutputBaseName(
 /**
  * Returns the expected output extension (e.g. '.pdf', '.zip', or '.txt') for a given tool.
  */
-export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.zip' | '.txt' {
+export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.zip' | '.txt' | string {
   if (toolId === 'split' || outputName.toLowerCase().endsWith('.zip')) {
     return '.zip';
   }
   if (toolId === 'extract-text' || outputName.toLowerCase().endsWith('.txt')) {
     return '.txt';
+  }
+  if (toolId === 'pdf-to-images') {
+    if (outputName.toLowerCase().endsWith('.png')) return '.png';
+    if (outputName.toLowerCase().endsWith('.jpg') || outputName.toLowerCase().endsWith('.jpeg')) return '.jpg';
+    return '.zip';
   }
   return '.pdf';
 }
@@ -72,13 +80,13 @@ export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.
 export function sanitizeOutputFileName(
   input: string,
   fallbackBaseName: string,
-  extension: '.pdf' | '.zip' | '.txt' = '.pdf'
+  extension: '.pdf' | '.zip' | '.txt' | string = '.pdf'
 ): string {
   let base = (input || '').trim();
 
   // Strip duplicate extension if user typed it
   base = base.replace(new RegExp(`\\${extension}$`, 'i'), '');
-  base = base.replace(/\.(pdf|zip|txt)$/i, '');
+  base = base.replace(/\.(pdf|zip|txt|png|jpe?g)$/i, '');
 
   // Replace illegal filesystem characters: / \ : * ? " < > | and control characters (0x00-0x1F)
   // eslint-disable-next-line no-control-regex

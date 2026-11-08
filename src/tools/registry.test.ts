@@ -92,15 +92,17 @@ describe('tools/registry', () => {
       'extract-text',
       'images-to-pdf',
       'merge',
+      'pdf-to-images',
       'remove-pages',
       'rotate',
       'split',
     ]);
 
     const comingSoon = getComingSoonTools();
-    expect(comingSoon.length).toBe(6);
+    expect(comingSoon.length).toBe(5);
 
     expect(isToolImplemented('images-to-pdf')).toBe(true);
+    expect(isToolImplemented('pdf-to-images')).toBe(true);
     expect(isToolImplemented('merge')).toBe(true);
     expect(isToolImplemented('rotate')).toBe(true);
     expect(isToolImplemented('remove-pages')).toBe(true);

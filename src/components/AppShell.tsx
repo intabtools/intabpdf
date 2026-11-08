@@ -192,7 +192,10 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
     >
       {isViewerLoading && <PdfLoadingScreen message="Opening PDF…" />}
       {!isViewerLoading && isProcessingActive && (
-        <ProcessingLoadingScreen message={processing?.message || 'Processing PDF…'} />
+        <ProcessingLoadingScreen
+          message={processing?.message || 'Processing PDF…'}
+          onCancel={processing?.cancelHandler ?? undefined}
+        />
       )}
 
       {showAppLayout && !isFullScreenOverlay && (

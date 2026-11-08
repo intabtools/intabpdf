@@ -70,6 +70,7 @@ describe('SEO, Discoverability, and Web Metadata Audit', () => {
     expect(jsonLd.featureList).toContain('Remove Pages');
     expect(jsonLd.featureList).toContain('Images to PDF');
     expect(jsonLd.featureList).toContain('Extract Text');
+    expect(jsonLd.featureList).toContain('PDF to Images');
 
     // Ensure no unsupported aggregate ratings or invented metrics
     expect(jsonLd.aggregateRating).toBeUndefined();

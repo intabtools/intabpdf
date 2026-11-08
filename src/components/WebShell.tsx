@@ -89,7 +89,10 @@ export default function WebShell({
     >
       {isViewerLoading && <PdfLoadingScreen message="Opening PDF…" />}
       {!isViewerLoading && isProcessingActive && (
-        <ProcessingLoadingScreen message={processing?.message || 'Processing PDF…'} />
+        <ProcessingLoadingScreen
+          message={processing?.message || 'Processing PDF…'}
+          onCancel={processing?.cancelHandler ?? undefined}
+        />
       )}
 
       <div

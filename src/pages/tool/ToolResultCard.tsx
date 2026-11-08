@@ -297,7 +297,9 @@ export default function ToolResultCard({
         </div>
       ) : (
         <div className="meta">
-          {isTextOutput && wordCount === 0
+          {tool.id === 'pdf-to-images' && extraState.imageCount
+            ? `${extraState.imageCount} ${extraState.imageCount === 1 ? 'page' : 'pages'} converted to ${extraState.imageFormat || 'images'} • ${formatBytes(outputBytes.byteLength)}`
+            : isTextOutput && wordCount === 0
             ? '0 words extracted • 0 B'
             : `Ready to save • ${formatBytes(outputBytes.byteLength)}`}
         </div>
@@ -447,11 +449,15 @@ export default function ToolResultCard({
               ? 'Save ZIP'
               : isTextOutput
               ? 'Save TXT'
+              : outputExtension === '.png'
+              ? 'Save PNG'
+              : outputExtension === '.jpg' || outputExtension === '.jpeg'
+              ? 'Save JPEG'
               : 'Save PDF'}
           </span>
         </button>
 
-        {!isZipOutput && !isTextOutput && (
+        {!isZipOutput && !isTextOutput && outputExtension !== '.png' && outputExtension !== '.jpg' && outputExtension !== '.jpeg' && (
           <button
             type="button"
             className="cta"
