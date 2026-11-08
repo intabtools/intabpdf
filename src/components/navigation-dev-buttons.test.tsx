@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import WebShell from './WebShell';
+import AppHeader from './AppHeader';
 import StatusBar from './StatusBar';
 import { ToastProvider } from './ToastContext';
 
@@ -63,6 +64,42 @@ describe('Navigation Dev Buttons ("App view" and "Desktop view")', () => {
 
     (import.meta.env as { DEV: boolean }).DEV = false;
     const prodHtml = renderToString(<StatusBar onSwitchToWeb={() => {}} />);
+    expect(prodHtml).not.toContain('Website view');
+    expect(prodHtml).not.toContain('Switch to Website view');
+  });
+
+  it('renders AppHeader switcher button in development mode and hides it in production', () => {
+    (import.meta.env as { DEV: boolean }).DEV = true;
+    const devHtml = renderToString(
+      <MemoryRouter>
+        <AppHeader
+          onToggleSidebar={() => {}}
+          onOpenPalette={() => {}}
+          isDark={false}
+          onToggleTheme={() => {}}
+          isSidebarCollapsed={false}
+          isDrawerOpen={false}
+          onSwitchToWeb={() => {}}
+        />
+      </MemoryRouter>
+    );
+    expect(devHtml).toContain('Website view');
+    expect(devHtml).toContain('title="Switch to Website view"');
+
+    (import.meta.env as { DEV: boolean }).DEV = false;
+    const prodHtml = renderToString(
+      <MemoryRouter>
+        <AppHeader
+          onToggleSidebar={() => {}}
+          onOpenPalette={() => {}}
+          isDark={false}
+          onToggleTheme={() => {}}
+          isSidebarCollapsed={false}
+          isDrawerOpen={false}
+          onSwitchToWeb={() => {}}
+        />
+      </MemoryRouter>
+    );
     expect(prodHtml).not.toContain('Website view');
     expect(prodHtml).not.toContain('Switch to Website view');
   });

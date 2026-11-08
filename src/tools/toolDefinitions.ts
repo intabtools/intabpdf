@@ -97,7 +97,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: 'rotate',
     name: 'Rotate pages',
-    description: 'Turn all pages the right way up',
+    description: 'Turn pages the right way up',
     category: 'Organize',
     icon: 'rotate',
     fileType: 'pdf',
@@ -110,7 +110,13 @@ export const TOOLS: ToolDefinition[] = [
       {
         id: 'cw',
         label: 'Turn clockwise',
-        description: 'Off turns anticlockwise (rotates all pages in the document)',
+        description: 'Off turns anticlockwise',
+        defaultValue: true,
+      },
+      {
+        id: 'all-pages',
+        label: 'Rotate every page',
+        description: 'Off lets you pick pages',
         defaultValue: true,
       },
     ],
@@ -225,7 +231,8 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Extract text from',
     noun: 'file',
     outputName: 'text.txt',
-    availability: 'coming-soon',
+    availability: 'available',
+    component: () => import('./modules/ExtractTextTool'),
     options: [
       { id: 'line-breaks', label: 'Keep line breaks', description: 'Off joins lines into paragraphs', defaultValue: true },
     ],

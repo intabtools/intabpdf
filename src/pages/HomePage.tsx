@@ -171,11 +171,13 @@ export default function HomePage(): ReactNode {
   }
 
   // App Shell Layout (Desktop Electron, Android, Tablet)
+  const isMobilePlatform = getPlatformType() === 'android';
+
   return (
     <div className="cnt">
       <DropZone
         title="Open PDF files"
-        subtitle="Choose files or drop them here."
+        subtitle={isMobilePlatform ? 'Tap to select files from device' : 'Choose files or drop them here.'}
         ctaText="Choose files"
         accept="application/pdf,.pdf"
         multiple={false}

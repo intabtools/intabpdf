@@ -11,6 +11,7 @@ import type { PageRange, SplitOptions } from '../split';
 import type { ImagesToPdfOptions, InputImage } from '../images-to-pdf';
 import type { RotateOptions } from '../rotate';
 import type { CompressOptions } from '../compress';
+import type { MergeOptions } from '../merge';
 
 interface WorkerMessageData {
   id: string;
@@ -18,7 +19,8 @@ interface WorkerMessageData {
   payload: {
     buffers?: Uint8Array[];
     buffer?: Uint8Array;
-    options?: RotateOptions | ImagesToPdfOptions | CompressOptions;
+    options?: MergeOptions | RotateOptions | ImagesToPdfOptions | CompressOptions;
+    mergeOptions?: MergeOptions;
     pageIndices?: number[];
     ranges?: PageRange[];
     splitOptions?: SplitOptions;
@@ -39,7 +41,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessageData>) => {
         if (!payload.buffers || payload.buffers.length === 0) {
           throw new Error('Merge operation requires at least one PDF buffer.');
         }
-        result = await mergePdfs(payload.buffers);
+        const mergeOptions = (payload.options || payload.mergeOptions) as MergeOptions | undefined;
+        result = await mergePdfs(payload.buffers, mergeOptions);
         break;
       }
       case 'rotate': {

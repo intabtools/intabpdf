@@ -1,8 +1,9 @@
 // Tool module for compressing PDF documents to target file sizes or quality presets.
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileDown, Gauge, Info, Sparkles, Target, Zap } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import { ProcessingContext } from '../../components/processingContextDef';
 import type { ToolComponentProps } from '../types';
 import { analyzePdfDocument, pdfProcessingService } from '../../core';
 import type { CompressionPreset } from '../../core';
@@ -13,6 +14,7 @@ import {
   type TargetPreset,
 } from './compress/compressConfig';
 import TargetSizeSection from './compress/TargetSizeSection';
+import { executeBatchCompression } from './compress/batchCompress';
 
 export default function CompressTool({
   tool,
@@ -27,6 +29,7 @@ export default function CompressTool({
   defaultBaseName,
   outputExtension,
 }: ToolComponentProps): ReactNode {
+  const processing = useContext(ProcessingContext);
   const file = stagedFiles[0];
 
   // Primary mode: 'recommended' | 'smaller' | 'high-quality' | 'target'
@@ -35,21 +38,21 @@ export default function CompressTool({
 
   useEffect(() => {
     let cancelled = false;
-    if (file?.bytes) {
-      analyzePdfDocument(file.bytes)
-        .then((analysis) => {
-          if (!cancelled) setHasSignatures(analysis.hasSignatures);
-        })
-        .catch(() => {
-          if (!cancelled) setHasSignatures(false);
+    if (stagedFiles.length > 0) {
+      Promise.all(stagedFiles.map((f) => analyzePdfDocument(f.bytes).catch(() => null)))
+        .then((analyses) => {
+          if (!cancelled) {
+            const anySignatures = analyses.some((a) => a?.hasSignatures);
+            setHasSignatures(anySignatures);
+          }
         });
     }
     return () => {
       cancelled = true;
     };
-  }, [file]);
+  }, [stagedFiles]);
 
-  const showSignatureWarning = Boolean(file) && hasSignatures;
+  const showSignatureWarning = stagedFiles.length > 0 && hasSignatures;
 
   // Target size inputs
   const [targetValue, setTargetValue] = useState<string>(() => {
@@ -105,7 +108,7 @@ export default function CompressTool({
   };
 
   const handleRun = async () => {
-    if (!file || isProcessing) return;
+    if (stagedFiles.length === 0 || isProcessing) return;
 
     if (mode === 'target' && (!targetBytes || targetBytes <= 0)) {
       return;
@@ -130,25 +133,50 @@ export default function CompressTool({
           ? undefined
           : (activePresetCard.corePreset as CompressionPreset);
 
-      return await pdfProcessingService.execute('compress', {
-        buffer: file.bytes,
-        options: {
-          targetBytes: mode === 'target' ? (targetBytes ?? undefined) : undefined,
-          preset: corePreset,
+      if (stagedFiles.length === 1) {
+        return await pdfProcessingService.execute('compress', {
+          buffer: stagedFiles[0].bytes,
+          options: {
+            targetBytes: mode === 'target' ? (targetBytes ?? undefined) : undefined,
+            preset: corePreset,
+            downsampleImages: optionsState['downsample'] ?? true,
+            stripMetadata: optionsState['strip-meta'] ?? true,
+          },
+        });
+      }
+
+      return await executeBatchCompression(
+        stagedFiles,
+        {
+          mode,
+          targetBytes: targetBytes ?? undefined,
+          corePreset,
           downsampleImages: optionsState['downsample'] ?? true,
           stripMetadata: optionsState['strip-meta'] ?? true,
         },
-      });
+        {
+          updateMessage: processing?.updateMessage,
+          onExtraStateChange,
+        }
+      );
     });
   };
 
   // Determine active strategy action label
   const actionLabel = isProcessing
     ? mode === 'target'
-      ? `Compressing to ${targetLabel}...`
+      ? stagedFiles.length > 1
+        ? `Compressing ${stagedFiles.length} files to ${targetLabel}...`
+        : `Compressing to ${targetLabel}...`
+      : stagedFiles.length > 1
+      ? `Compressing ${stagedFiles.length} PDFs (${activePresetCard.name})...`
       : `Compressing PDF (${activePresetCard.name})...`
     : mode === 'target'
-    ? `Compress to Target Size (${targetLabel || 'Custom'})`
+    ? stagedFiles.length > 1
+      ? `Compress ${stagedFiles.length} files to Target Size (${targetLabel || 'Custom'})`
+      : `Compress to Target Size (${targetLabel || 'Custom'})`
+    : stagedFiles.length > 1
+    ? `Compress ${stagedFiles.length} files (${activePresetCard.name})`
     : `Compress PDF (${activePresetCard.name})`;
 
   return (
@@ -162,7 +190,7 @@ export default function CompressTool({
         }}
       >
         <b>{tool.name} options</b>
-        {file && (
+        {stagedFiles.length > 0 && (
           <span
             style={{
               fontSize: '12px',
@@ -173,7 +201,11 @@ export default function CompressTool({
               border: '1px solid var(--border)',
             }}
           >
-            Original: {formatBytes(file.size)}
+            {stagedFiles.length === 1
+              ? `Original: ${formatBytes(stagedFiles[0].size)}`
+              : `${stagedFiles.length} files • Total: ${formatBytes(
+                  stagedFiles.reduce((acc, f) => acc + f.size, 0)
+                )}`}
           </span>
         )}
       </div>
@@ -518,7 +550,7 @@ export default function CompressTool({
         className="cta"
         onClick={handleRun}
         disabled={
-          isProcessing || !file || (mode === 'target' && (!targetBytes || targetBytes <= 0))
+          isProcessing || stagedFiles.length === 0 || (mode === 'target' && (!targetBytes || targetBytes <= 0))
         }
         style={{
           marginTop: '12px',

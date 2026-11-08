@@ -103,20 +103,22 @@ export default function StagedFileList({
             onDragEnd={onDragEnd}
             className={`card fi ${draggedIndex === index ? 'dragging' : ''} ${dragOverClass}`}
           >
-            <span
-              className="gr"
-              tabIndex={0}
-              role="button"
-              aria-label={`Reorder ${file.name}. Press Alt+Up or Alt+Down to move.`}
-              title="Drag to reorder (Alt+Up / Alt+Down)"
-              onTouchStart={(e) => onTouchStartGrip(e, index)}
-              onTouchMove={onTouchMoveGrip}
-              onTouchEnd={onTouchEndGrip}
-              onTouchCancel={onTouchEndGrip}
-              onKeyDown={(e) => onGripKeyDown(e, index)}
-            >
-              <GripVertical size={16} />
-            </span>
+            {stagedFiles.length > 1 && (
+              <span
+                className="gr"
+                tabIndex={0}
+                role="button"
+                aria-label={`Reorder ${file.name}. Press Alt+Up or Alt+Down to move.`}
+                title="Drag to reorder (Alt+Up / Alt+Down)"
+                onTouchStart={(e) => onTouchStartGrip(e, index)}
+                onTouchMove={onTouchMoveGrip}
+                onTouchEnd={onTouchEndGrip}
+                onTouchCancel={onTouchEndGrip}
+                onKeyDown={(e) => onGripKeyDown(e, index)}
+              >
+                <GripVertical size={16} />
+              </span>
+            )}
 
             <span className="pgw">
               <button

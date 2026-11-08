@@ -1505,19 +1505,9 @@ details p {
   margin: 12px 4px 6px;
 }
 
-/* Status Bar (Desktop) */
+/* Status Bar (Desktop - Removed to recover vertical space) */
 .stb {
-  display: none;
-  align-items: center;
-  gap: 12px;
-  height: 26px;
-  padding: 0 14px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  flex: none;
+  display: none !important;
 }
 
 .stb .sp {
@@ -1650,7 +1640,7 @@ details p {
   .main {
     background: var(--background);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    padding: 14px 16px 28px;
+    padding: 14px 16px calc(36px + env(safe-area-inset-bottom, 0px));
   }
   .main.flush {
     border-radius: 0;
@@ -1692,13 +1682,29 @@ details p {
   .done {
     padding: 20px 14px;
   }
+  .tool-result-actions {
+    grid-template-columns: 1fr !important;
+  }
   .fi {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 8px 8px;
+    gap: 6px;
+  }
+  .fi .ib.sm {
+    width: 34px;
+    height: 34px;
   }
   .cta {
     font-size: 13.5px;
     padding: 11px 12px;
+  }
+  .mo {
+    padding: 16px 12px calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .dlg {
+    max-height: calc(100vh - 100px);
+  }
+  .pin kbd {
+    display: none;
   }
 }
 
@@ -1722,7 +1728,7 @@ details p {
   .main {
     background: var(--background);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    padding: 14px 16px 28px;
+    padding: 14px 16px calc(36px + env(safe-area-inset-bottom, 0px));
   }
   .main.flush {
     border-radius: 0;
@@ -1764,13 +1770,29 @@ details p {
   .done {
     padding: 20px 14px;
   }
+  .tool-result-actions {
+    grid-template-columns: 1fr !important;
+  }
   .fi {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 8px 8px;
+    gap: 6px;
+  }
+  .fi .ib.sm {
+    width: 34px;
+    height: 34px;
   }
   .cta {
     font-size: 13.5px;
     padding: 11px 12px;
+  }
+  .mo {
+    padding: 16px 12px calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .dlg {
+    max-height: calc(100vh - 100px);
+  }
+  .pin kbd {
+    display: none;
   }
 }
 
@@ -2057,9 +2079,6 @@ details p {
   .main {
     padding: 8px 32px 32px;
   }
-  .stb {
-    display: flex;
-  }
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
@@ -2218,9 +2237,6 @@ details p {
   }
   .main {
     padding: 8px 32px 32px;
-  }
-  .stb {
-    display: flex;
   }
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

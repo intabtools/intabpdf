@@ -475,7 +475,7 @@ export function getPlatformType(): PlatformType {
     // 3. Electron desktop runtime
     if (
         window.intab !== undefined ||
-        navigator.userAgent.includes('Electron') ||
+        (typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')) ||
         import.meta.env.MODE === 'desktop'
     ) {
         return 'electron';

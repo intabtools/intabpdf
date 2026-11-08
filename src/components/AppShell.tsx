@@ -13,7 +13,6 @@ import BottomNav from './BottomNav';
 import CommandPalette from './CommandPalette';
 import NavigationRail from './NavigationRail';
 import Sidebar from './Sidebar';
-import StatusBar from './StatusBar';
 
 interface AppShellProps {
   children: ReactNode;
@@ -205,6 +204,7 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
           subTitle={subTitle}
           isSidebarCollapsed={isSidebarCollapsed}
           isDrawerOpen={isDrawerOpen}
+          onSwitchToWeb={onSwitchToWeb}
         />
       )}
 
@@ -227,7 +227,6 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
       </div>
 
       {showAppLayout && !isFullScreenOverlay && <BottomNav />}
-      {showAppLayout && !isFullScreenOverlay && <StatusBar onSwitchToWeb={onSwitchToWeb} />}
 
       <CommandPalette
         isOpen={isPaletteOpen}

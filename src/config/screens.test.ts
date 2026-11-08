@@ -52,15 +52,15 @@ describe('config/screens', () => {
     expect(resolveDestination('/tool/compress', 'web')).toBe('/tool/compress');
   });
 
-  it('safely falls back for unknown destinations, unlisted tools, and disabled/coming-soon tools', () => {
+  it('safely falls back for unknown destinations and unlisted tools while permitting direct navigation to registered coming-soon tools', () => {
     expect(resolveDestination('/unknown-route', 'web')).toBe('/');
     expect(resolveDestination('/tool/non-existent-tool-xyz', 'web')).toBe('/');
     expect(resolveDestination('/tool/fake', 'android')).toBe('/');
     // Available tools resolve to their route
     expect(resolveDestination('/tool/split', 'electron')).toBe('/tool/split');
-    // Coming soon tools cannot be opened through direct navigation
-    expect(resolveDestination('/tool/protect', 'web')).toBe('/');
-    expect(resolveDestination('/tool/unlock', 'android')).toBe('/');
+    // Coming soon tools resolve so ToolPage can render ToolMissingState placeholder
+    expect(resolveDestination('/tool/protect', 'web')).toBe('/tool/protect');
+    expect(resolveDestination('/tool/unlock', 'android')).toBe('/tool/unlock');
   });
 
   it('supports configuring independent initial destinations per platform and safely falls back if initial destination is invalid', () => {

@@ -24,12 +24,12 @@ import ToolStatusCards from './tool/ToolStatusCards';
 import ToolWebLayout from './tool/ToolWebLayout';
 import { useFileReorder } from './tool/useFileReorder';
 
-function getOperationMessage(toolId: string): string {
+function getOperationMessage(toolId: string, count = 1): string {
   switch (toolId) {
     case 'images-to-pdf':
       return 'Creating PDF…';
     case 'compress':
-      return 'Compressing PDF…';
+      return count > 1 ? `Compressing ${count} PDFs…` : 'Compressing PDF…';
     case 'merge':
       return 'Merging PDFs…';
     case 'split':
@@ -38,6 +38,8 @@ function getOperationMessage(toolId: string): string {
       return 'Rotating pages…';
     case 'remove-pages':
       return 'Removing pages…';
+    case 'extract-text':
+      return 'Extracting text…';
     default:
       return 'Processing PDF…';
   }
@@ -85,15 +87,19 @@ export default function ToolPage(): ReactNode {
     handleGripKeyDown,
   } = useFileReorder({ stagedFiles, setStagedFiles });
 
-  const defaultBaseName = useMemo(
-    () => (tool ? getDefaultOutputBaseName(tool.id, stagedFiles) : 'document'),
-    [tool, stagedFiles]
-  );
+  const defaultBaseName = useMemo(() => {
+    if (tool?.id === 'compress' && stagedFiles.length > 1) {
+      return 'compressed-documents';
+    }
+    return tool ? getDefaultOutputBaseName(tool.id, stagedFiles) : 'document';
+  }, [tool, stagedFiles]);
 
-  const outputExtension = useMemo(
-    () => (tool ? getOutputExtension(tool.id, tool.outputName) : '.pdf'),
-    [tool]
-  );
+  const outputExtension = useMemo(() => {
+    if (tool?.id === 'compress' && stagedFiles.length > 1) {
+      return '.zip';
+    }
+    return tool ? getOutputExtension(tool.id, tool.outputName) : '.pdf';
+  }, [tool, stagedFiles.length]);
 
   const acceptTypes = useMemo(() => {
     if (tool?.fileType === 'img') return 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
@@ -171,7 +177,7 @@ export default function ToolPage(): ReactNode {
     setErrorMessage(null);
     setIsSaved(false);
 
-    const message = tool ? getOperationMessage(tool.id) : 'Processing PDF…';
+    const message = tool ? getOperationMessage(tool.id, stagedFiles.length) : 'Processing PDF…';
 
     try {
       const result = await runWithProcessing(message, runner);
@@ -187,10 +193,16 @@ export default function ToolPage(): ReactNode {
   const handleDownload = async () => {
     if (!outputBytes) return;
     try {
+      const mimeType = isZipOutput
+        ? 'application/zip'
+        : outputExtension === '.txt'
+        ? 'text/plain;charset=utf-8'
+        : 'application/pdf';
+
       const res = await platform.saveFile?.(
         outputBytes,
         finalFileName,
-        isZipOutput ? 'application/zip' : 'application/pdf'
+        mimeType
       );
       if (res && res.saved === false) {
         return;
@@ -277,7 +289,7 @@ export default function ToolPage(): ReactNode {
         <DropZone
           title={tool.name}
           subtitle={tool.description}
-          multiple={tool.id === 'merge' || tool.id === 'images-to-pdf'}
+          multiple={tool.id === 'merge' || tool.id === 'images-to-pdf' || tool.id === 'compress'}
           accept={acceptTypes}
           onFilesSelectedStart={handleFilesSelectedStart}
           onFilesSelected={handleFilesAdded}

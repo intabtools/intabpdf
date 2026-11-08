@@ -11,6 +11,7 @@ import type { PageRange, SplitOptions } from '../split';
 import type { ImagesToPdfOptions, InputImage } from '../images-to-pdf';
 import type { RotateOptions } from '../rotate';
 import type { CompressOptions } from '../compress';
+import type { MergeOptions } from '../merge';
 
 export type PdfOperation =
   | 'merge'
@@ -21,7 +22,7 @@ export type PdfOperation =
   | 'compress';
 
 export interface OperationPayloads {
-  merge: { buffers: Uint8Array[] };
+  merge: { buffers: Uint8Array[]; options?: MergeOptions };
   rotate: { buffer: Uint8Array; options?: RotateOptions };
   'remove-pages': { buffer: Uint8Array; pageIndices: number[] };
   split: { buffer: Uint8Array; ranges: PageRange[]; splitOptions?: SplitOptions };
@@ -106,7 +107,7 @@ class PdfProcessingService {
     switch (operation) {
       case 'merge': {
         const p = payload as OperationPayloads['merge'];
-        return await mergePdfs(p.buffers);
+        return await mergePdfs(p.buffers, p.options);
       }
       case 'rotate': {
         const p = payload as OperationPayloads['rotate'];

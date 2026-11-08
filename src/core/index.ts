@@ -1,9 +1,13 @@
 // Central export hub for all pure PDF core operations and worker services.
 export { formatBytes } from './formatBytes';
 export { mergePdfs } from './merge';
+export type { MergeOptions } from './merge';
 
-export { rotatePdfPages } from './rotate';
-export type { RotateOptions } from './rotate';
+export { extractTextFromPdf, formatPageTextContent } from './extract-text';
+export type { ExtractTextOptions, ExtractTextResult } from './extract-text';
+
+export { rotatePdfPages, parseRotatePageInput } from './rotate';
+export type { RotateOptions, ParsedRotatePagesResult } from './rotate';
 
 export { removePdfPages, parseRemovePageInput } from './remove-pages';
 export type { RemovePagesOptions, ParsedRemovePagesResult } from './remove-pages';
@@ -62,4 +66,3 @@ export type {
 
 export { pdfProcessingService } from './worker/service';
 export type { PdfOperation, OperationPayloads } from './worker/service';
-

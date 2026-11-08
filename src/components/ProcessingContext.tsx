@@ -23,6 +23,10 @@ export function ProcessingProvider({ children }: { children: ReactNode }) {
     setIsProcessing(false);
   }, []);
 
+  const updateMessage = useCallback((msg: string) => {
+    setMessage(msg);
+  }, []);
+
   const runWithProcessing = useCallback(
     async <T,>(msg: string, task: () => Promise<T>): Promise<T> => {
       const reqId = startProcessing(msg);
@@ -43,9 +47,10 @@ export function ProcessingProvider({ children }: { children: ReactNode }) {
       message,
       startProcessing,
       stopProcessing,
+      updateMessage,
       runWithProcessing,
     }),
-    [isProcessing, message, startProcessing, stopProcessing, runWithProcessing]
+    [isProcessing, message, startProcessing, stopProcessing, updateMessage, runWithProcessing]
   );
 
   return (

@@ -1,6 +1,7 @@
 // Result card displayed when a PDF tool completes execution, with stats, download, and viewing options.
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Download, Eye, RefreshCw, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Download, Eye, Info, RefreshCw, XCircle } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import { formatBytes } from '../../core/formatBytes';
 import type { PlatformType } from '../../platform';
@@ -41,7 +42,21 @@ export default function ToolResultCard({
   onStartOver,
   onClearFiles,
 }: ToolResultCardProps): ReactNode {
-  const originalBytesCount = stagedFiles[0]?.size ?? 0;
+  const batchStats = extraState.batchStats as
+    | {
+        total: number;
+        successCount: number;
+        failureCount: number;
+        failures: { fileName: string; reason: string }[];
+      }
+    | undefined;
+
+  const originalBytesCount =
+    typeof extraState.successfulOriginalBytes === 'number' && extraState.successfulOriginalBytes > 0
+      ? extraState.successfulOriginalBytes
+      : stagedFiles.length > 1
+      ? stagedFiles.reduce((acc, f) => acc + f.size, 0)
+      : (stagedFiles[0]?.size ?? 0);
   const newBytesCount = outputBytes.byteLength;
   const savedBytesCount = originalBytesCount - newBytesCount;
   const isReduced = savedBytesCount > 0;
@@ -66,9 +81,43 @@ export default function ToolResultCard({
   const presetName =
     typeof extraState.presetName === 'string' ? extraState.presetName : undefined;
 
+  const [isCopied, setIsCopied] = useState(false);
+
+  const isTextOutput = outputExtension === '.txt' || tool.id === 'extract-text';
+  const textPreview = useMemo(() => {
+    if (!isTextOutput || !outputBytes) return '';
+    try {
+      return new TextDecoder().decode(outputBytes);
+    } catch {
+      return '';
+    }
+  }, [isTextOutput, outputBytes]);
+
+  const textTrimmed = textPreview.trim();
+  const wordCount = useMemo(() => {
+    return textTrimmed ? textTrimmed.split(/\s+/).filter(Boolean).length : 0;
+  }, [textTrimmed]);
+
+  const handleCopyText = async () => {
+    if (!textPreview || wordCount === 0) return;
+    try {
+      await navigator.clipboard.writeText(textPreview);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      // Fallback if clipboard API is not available
+    }
+  };
+
   let cardTitle = `${tool.name} complete!`;
-  if (tool.id === 'compress') {
-    if (hasTarget) {
+  if (isTextOutput && wordCount === 0) {
+    cardTitle = 'No text extracted';
+  } else if (tool.id === 'compress') {
+    if (batchStats && batchStats.failureCount > 0) {
+      cardTitle = `Compressed ${batchStats.successCount} of ${batchStats.total} files`;
+    } else if (stagedFiles.length > 1) {
+      cardTitle = `Compressed ${stagedFiles.length} files!`;
+    } else if (hasTarget) {
       cardTitle = targetAchieved ? 'Target size achieved!' : 'Target not reached';
     } else {
       cardTitle = isReduced ? 'Compression complete!' : 'Document already optimized';
@@ -83,6 +132,49 @@ export default function ToolResultCard({
       aria-live="polite"
     >
       <b>{cardTitle}</b>
+
+      {batchStats && batchStats.failureCount > 0 && (
+        <div
+          role="alert"
+          style={{
+            marginTop: '8px',
+            marginBottom: '4px',
+            padding: '10px 12px',
+            borderRadius: 'var(--radius-sm)',
+            background: 'rgba(216, 59, 1, 0.08)',
+            border: '1px solid rgba(216, 59, 1, 0.3)',
+            color: 'var(--text)',
+            fontSize: '13px',
+            lineHeight: 1.5,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 600,
+              color: 'var(--accent, #d83b01)',
+              marginBottom: '4px',
+            }}
+          >
+            <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+            <span>
+              {batchStats.failureCount} of {batchStats.total} files could not be compressed
+            </span>
+          </div>
+          <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+            {batchStats.successCount} file{batchStats.successCount === 1 ? '' : 's'} successfully compressed and included in the ZIP. Failed files were excluded:
+          </p>
+          <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px' }}>
+            {batchStats.failures.map((f, idx) => (
+              <li key={idx} style={{ marginBottom: '2px' }}>
+                <strong>{f.fileName}</strong>: {f.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {tool.id === 'compress' ? (
         <div
@@ -205,7 +297,109 @@ export default function ToolResultCard({
         </div>
       ) : (
         <div className="meta">
-          Ready to save • {formatBytes(outputBytes.byteLength)}
+          {isTextOutput && wordCount === 0
+            ? '0 words extracted • 0 B'
+            : `Ready to save • ${formatBytes(outputBytes.byteLength)}`}
+        </div>
+      )}
+
+      {isTextOutput && (
+        <div style={{ marginTop: '12px', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+          {wordCount === 0 && (
+            <div
+              role="status"
+              style={{
+                marginBottom: '10px',
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                background: extraState.hasImages
+                  ? 'rgba(216, 59, 1, 0.08)'
+                  : 'var(--surface-2)',
+                border: extraState.hasImages
+                  ? '1px solid rgba(216, 59, 1, 0.3)'
+                  : '1px solid var(--border)',
+                color: 'var(--text)',
+                fontSize: '13px',
+                lineHeight: 1.5,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 600,
+                  color: extraState.hasImages ? 'var(--accent, #d83b01)' : 'var(--text)',
+                  marginBottom: '4px',
+                }}
+              >
+                <Info size={15} style={{ flexShrink: 0 }} />
+                <span>
+                  {extraState.hasImages
+                    ? 'Image-based PDF (OCR required)'
+                    : 'No text found in document'}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                {extraState.hasImages
+                  ? 'This PDF appears to contain scanned images rather than selectable text. Optical Character Recognition (OCR) is required to extract text from image-based PDFs, which is not currently supported in InTabPDF.'
+                  : 'This document does not contain any selectable text characters or font streams (e.g. blank pages or vector-only artwork).'}
+              </p>
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '6px',
+              gap: '8px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              {wordCount} {wordCount === 1 ? 'word' : 'words'} • {textPreview.length} characters
+            </span>
+            <button
+              type="button"
+              className="sb sm"
+              onClick={() => void handleCopyText()}
+              disabled={!textPreview || wordCount === 0}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                fontSize: '12px',
+                borderRadius: 'var(--radius-sm)',
+              }}
+            >
+              {isCopied ? <Check size={13} color="var(--accent)" /> : <Copy size={13} />}
+              <span>{isCopied ? 'Copied!' : 'Copy text'}</span>
+            </button>
+          </div>
+          <textarea
+            readOnly
+            value={textPreview}
+            placeholder="(No text found in document)"
+            aria-label="Extracted text preview"
+            style={{
+              width: '100%',
+              minHeight: '130px',
+              maxHeight: '260px',
+              padding: '8px 10px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface-2)',
+              color: 'var(--text)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              lineHeight: '1.45',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+          />
         </div>
       )}
 
@@ -223,6 +417,7 @@ export default function ToolResultCard({
 
       {/* Action Buttons */}
       <div
+        className="tool-result-actions"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))',
@@ -232,14 +427,31 @@ export default function ToolResultCard({
           minWidth: 0,
         }}
       >
-        <button type="button" className="cta" onClick={onDownload} style={{ minHeight: '44px' }}>
+        <button
+          type="button"
+          className="cta"
+          onClick={onDownload}
+          disabled={isTextOutput && wordCount === 0}
+          style={{
+            minHeight: '44px',
+            ...(isTextOutput && wordCount === 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
+          }}
+        >
           <Download size={16} style={{ flexShrink: 0 }} />
           <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.25 }}>
-            {isSaved ? 'Download again' : isZipOutput ? 'Save ZIP' : 'Save PDF'}
+            {isTextOutput && wordCount === 0
+              ? 'No text to save'
+              : isSaved
+              ? 'Download again'
+              : isZipOutput
+              ? 'Save ZIP'
+              : isTextOutput
+              ? 'Save TXT'
+              : 'Save PDF'}
           </span>
         </button>
 
-        {!isZipOutput && (
+        {!isZipOutput && !isTextOutput && (
           <button
             type="button"
             className="cta"
