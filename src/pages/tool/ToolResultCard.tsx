@@ -83,7 +83,7 @@ export default function ToolResultCard({
 
   const [isCopied, setIsCopied] = useState(false);
 
-  const isTextOutput = outputExtension === '.txt' || tool.id === 'extract-text';
+  const isTextOutput = !isZipOutput && (outputExtension === '.txt' || tool.id === 'extract-text');
   const textPreview = useMemo(() => {
     if (!isTextOutput || !outputBytes) return '';
     try {
@@ -110,18 +110,25 @@ export default function ToolResultCard({
   };
 
   let cardTitle = `${tool.name} complete!`;
-  if (isTextOutput && wordCount === 0) {
+  if (isTextOutput && wordCount === 0 && (!batchStats || batchStats.total <= 1)) {
     cardTitle = 'No text extracted';
   } else if (tool.id === 'compress') {
     if (batchStats && batchStats.failureCount > 0) {
       cardTitle = `Compressed ${batchStats.successCount} of ${batchStats.total} files`;
-    } else if (stagedFiles.length > 1) {
-      cardTitle = `Compressed ${stagedFiles.length} files!`;
+    } else if (stagedFiles.length > 1 || (batchStats && batchStats.total > 1)) {
+      const count = batchStats?.total ?? stagedFiles.length;
+      cardTitle = `Compressed ${count} files!`;
     } else if (hasTarget) {
       cardTitle = targetAchieved ? 'Target size achieved!' : 'Target not reached';
     } else {
       cardTitle = isReduced ? 'Compression complete!' : 'Document already optimized';
     }
+  } else if (batchStats && batchStats.failureCount > 0) {
+    cardTitle = `${tool.name}: ${batchStats.successCount} of ${batchStats.total} files processed`;
+  } else if (batchStats && batchStats.total > 1) {
+    cardTitle = `${tool.name}: ${batchStats.total} files processed!`;
+  } else if (stagedFiles.length > 1 && isZipOutput) {
+    cardTitle = `${tool.name}: ${stagedFiles.length} files processed!`;
   }
 
   return (
@@ -160,11 +167,11 @@ export default function ToolResultCard({
           >
             <AlertTriangle size={15} style={{ flexShrink: 0 }} />
             <span>
-              {batchStats.failureCount} of {batchStats.total} files could not be compressed
+              {`${batchStats.failureCount} of ${batchStats.total} files could not be ${tool.id === 'compress' ? 'compressed' : 'processed'}`}
             </span>
           </div>
           <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-            {batchStats.successCount} file{batchStats.successCount === 1 ? '' : 's'} successfully compressed and included in the ZIP. Failed files were excluded:
+            {`${batchStats.successCount} file${batchStats.successCount === 1 ? '' : 's'} successfully ${tool.id === 'compress' ? 'compressed' : 'processed'} and included in the ZIP. Failed files were excluded:`}
           </p>
           <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px' }}>
             {batchStats.failures.map((f, idx) => (
@@ -301,6 +308,10 @@ export default function ToolResultCard({
             ? `${extraState.imageCount} ${extraState.imageCount === 1 ? 'page' : 'pages'} converted to ${extraState.imageFormat || 'images'} • ${formatBytes(outputBytes.byteLength)}`
             : isTextOutput && wordCount === 0
             ? '0 words extracted • 0 B'
+            : isTextOutput
+            ? `${wordCount} ${wordCount === 1 ? 'word' : 'words'} extracted • ${formatBytes(outputBytes.byteLength)}`
+            : isZipOutput && stagedFiles.length > 1
+            ? `${batchStats?.successCount ?? stagedFiles.length} files packaged in ZIP • ${formatBytes(outputBytes.byteLength)}`
             : `Ready to save • ${formatBytes(outputBytes.byteLength)}`}
         </div>
       )}

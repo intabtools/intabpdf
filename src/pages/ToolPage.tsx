@@ -35,11 +35,13 @@ function getOperationMessage(toolId: string, count = 1): string {
     case 'split':
       return 'Splitting PDF…';
     case 'rotate':
-      return 'Rotating pages…';
+      return count > 1 ? `Rotating ${count} PDFs…` : 'Rotating pages…';
     case 'remove-pages':
       return 'Removing pages…';
     case 'extract-text':
-      return 'Extracting text…';
+      return count > 1 ? `Extracting text from ${count} PDFs…` : 'Extracting text…';
+    case 'pdf-to-images':
+      return count > 1 ? `Converting ${count} PDFs to images…` : 'Converting to images…';
     default:
       return 'Processing PDF…';
   }
@@ -56,6 +58,7 @@ export default function ToolPage(): ReactNode {
 
   const tool = getToolById(toolId || '');
   const isImplemented = tool ? isToolImplemented(tool.id) : false;
+  const isSingleFileTool = tool?.id === 'remove-pages' || tool?.id === 'split';
 
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [optionsState, setOptionsState] = useState<Record<string, boolean>>(() => {
@@ -88,20 +91,14 @@ export default function ToolPage(): ReactNode {
   } = useFileReorder({ stagedFiles, setStagedFiles });
 
   const defaultBaseName = useMemo(() => {
-    if (tool?.id === 'compress' && stagedFiles.length > 1) {
-      return 'compressed-documents';
-    }
     return tool ? getDefaultOutputBaseName(tool.id, stagedFiles) : 'document';
   }, [tool, stagedFiles]);
 
   const outputExtension = useMemo(() => {
-    if (tool?.id === 'compress' && stagedFiles.length > 1) {
-      return '.zip';
-    }
-    if (tool?.id === 'pdf-to-images' && typeof extraState.outputExtension === 'string') {
+    if (typeof extraState.outputExtension === 'string') {
       return extraState.outputExtension;
     }
-    return tool ? getOutputExtension(tool.id, tool.outputName) : '.pdf';
+    return tool ? getOutputExtension(tool.id, tool.outputName, stagedFiles.length) : '.pdf';
   }, [tool, stagedFiles.length, extraState.outputExtension]);
 
   const acceptTypes = useMemo(() => {
@@ -153,13 +150,17 @@ export default function ToolPage(): ReactNode {
 
   const handleFilesAdded = (files: OpenedFile[]) => {
     handleFilesSelectedEnd();
+    if (isSingleFileTool && files.length > 1) {
+      showToast(`${tool?.name || 'This tool'} accepts only one PDF at a time. Please select a single file.`);
+      return;
+    }
     const newItems: StagedFile[] = files.map((f, i) => ({
       id: `${f.name}-${Date.now()}-${i}`,
       name: f.name,
       size: f.bytes.byteLength,
       bytes: f.bytes,
     }));
-    setStagedFiles((prev) => [...prev, ...newItems]);
+    setStagedFiles((prev) => (isSingleFileTool ? newItems : [...prev, ...newItems]));
     setStatus('idle');
     setOutputBytes(null);
     setErrorMessage(null);
@@ -303,10 +304,13 @@ export default function ToolPage(): ReactNode {
         <DropZone
           title={tool.name}
           subtitle={tool.description}
-          multiple={tool.id === 'merge' || tool.id === 'images-to-pdf' || tool.id === 'compress'}
+          multiple={!isSingleFileTool}
           accept={acceptTypes}
           onFilesSelectedStart={handleFilesSelectedStart}
           onFilesSelected={handleFilesAdded}
+          onMultipleRejected={() => {
+            showToast(`${tool.name} accepts only one PDF at a time. Please select a single file.`);
+          }}
         />
       )}
 
@@ -332,16 +336,18 @@ export default function ToolPage(): ReactNode {
               onRemoveFile={handleRemoveFile}
             />
 
-            <DropZone
-              title="Add more files"
-              subtitle="Choose additional files"
-              ctaText="Add"
-              multiple={true}
-              accept={acceptTypes}
-              onFilesSelectedStart={handleFilesSelectedStart}
-              onFilesSelected={handleFilesAdded}
-              className="add"
-            />
+            {!isSingleFileTool && (
+              <DropZone
+                title="Add more files"
+                subtitle="Choose additional files"
+                ctaText="Add"
+                multiple={true}
+                accept={acceptTypes}
+                onFilesSelectedStart={handleFilesSelectedStart}
+                onFilesSelected={handleFilesAdded}
+                className="add"
+              />
+            )}
           </div>
 
           <Suspense fallback={<div className="card opts"><div className="spin" /></div>}>

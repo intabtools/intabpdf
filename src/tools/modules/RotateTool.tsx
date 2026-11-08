@@ -1,10 +1,13 @@
 // Tool module for rotating PDF pages in 90-degree increments.
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Info, RotateCw } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import { ProcessingContext } from '../../components/processingContextDef';
 import type { ToolComponentProps } from '../types';
 import { getPdfPageCount, parseRotatePageInput, pdfProcessingService } from '../../core';
+import { executeBatchOperation } from '../batchOperation';
+import { getCleanBaseName } from '../filename';
 
 export default function RotateTool({
   tool,
@@ -13,16 +16,19 @@ export default function RotateTool({
   onOptionsChange,
   onExecute,
   isProcessing,
+  onExtraStateChange,
   outputBaseName,
   onOutputBaseNameChange,
   defaultBaseName,
   outputExtension,
 }: ToolComponentProps): ReactNode {
+  const processing = useContext(ProcessingContext);
   const [pagesInput, setPagesInput] = useState('');
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
 
   const file = stagedFiles[0];
+  const isMultiFile = stagedFiles.length > 1;
 
   useEffect(() => {
     let active = true;
@@ -67,37 +73,118 @@ export default function RotateTool({
     (Boolean(validation) && !validation?.error && (validation?.indices.length ?? 0) > 0);
 
   const canExecute =
-    Boolean(file) &&
-    !pageError &&
+    stagedFiles.length > 0 &&
+    (isMultiFile || !pageError) &&
     !isProcessing &&
     isSelectionValid;
 
   const handleRun = async () => {
-    if (!canExecute || !file) return;
+    if (!canExecute || stagedFiles.length === 0) return;
 
-    await onExecute(async () => {
-      const pageIndices = !allPages && validation ? validation.indices : undefined;
-      return await pdfProcessingService.execute('rotate', {
-        buffer: file.bytes,
-        options: {
-          clockwise: isCw,
-          allPages,
-          pageIndices,
-        },
+    const abortController = isMultiFile ? new AbortController() : null;
+    if (abortController) {
+      processing?.setCancelHandler?.(() => {
+        abortController.abort();
       });
-    });
+    }
+
+    try {
+      await onExecute(async () => {
+        if (stagedFiles.length === 1) {
+          const pageIndices = !allPages && validation ? validation.indices : undefined;
+          return await pdfProcessingService.execute('rotate', {
+            buffer: stagedFiles[0].bytes,
+            options: {
+              clockwise: isCw,
+              allPages,
+              pageIndices,
+            },
+          });
+        }
+
+        return await executeBatchOperation({
+          actionVerb: 'Rotating',
+          stagedFiles,
+          updateMessage: processing?.updateMessage,
+          onExtraStateChange,
+          signal: abortController?.signal,
+          processFile: async (curFile) => {
+            let pageIndices: number[] | undefined;
+            if (!allPages) {
+              const docPageCount = await getPdfPageCount(curFile.bytes);
+              const parsed = parseRotatePageInput(pagesInput, docPageCount);
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+              pageIndices = parsed.indices;
+            }
+
+            const rotatedBytes = await pdfProcessingService.execute('rotate', {
+              buffer: curFile.bytes,
+              options: {
+                clockwise: isCw,
+                allPages,
+                pageIndices,
+              },
+            });
+
+            const cleanBase = getCleanBaseName(curFile.name) || 'document';
+            return {
+              name: `rotated-${cleanBase}.pdf`,
+              bytes: rotatedBytes,
+            };
+          },
+        });
+      });
+    } finally {
+      if (isMultiFile) {
+        processing?.setCancelHandler?.(null);
+      }
+    }
   };
 
   const ctaLabel = isProcessing
-    ? 'Rotating...'
-    : allPages
-      ? 'Rotate all pages'
-      : validation && validation.indices.length > 0
-        ? `Rotate ${validation.indices.length} ${validation.indices.length === 1 ? 'page' : 'pages'}`
-        : 'Rotate selected pages';
+    ? stagedFiles.length > 1
+      ? `Rotating ${stagedFiles.length} files...`
+      : 'Rotating...'
+    : stagedFiles.length > 1
+      ? allPages
+        ? `Rotate all pages (${stagedFiles.length} files)`
+        : validation && validation.indices.length > 0
+          ? `Rotate ${validation.indices.length} ${validation.indices.length === 1 ? 'page' : 'pages'} (${stagedFiles.length} files)`
+          : `Rotate selected pages (${stagedFiles.length} files)`
+      : allPages
+        ? 'Rotate all pages'
+        : validation && validation.indices.length > 0
+          ? `Rotate ${validation.indices.length} ${validation.indices.length === 1 ? 'page' : 'pages'}`
+          : 'Rotate selected pages';
 
   return (
     <div className="card opts">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '8px',
+        }}
+      >
+        <b>{tool.name} options</b>
+        {stagedFiles.length > 1 && (
+          <span
+            style={{
+              fontSize: '12px',
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {`${stagedFiles.length} files selected`}
+          </span>
+        )}
+      </div>
       {tool.options.map((opt) => {
         const checked = optionsState[opt.id] ?? opt.defaultValue;
         return (

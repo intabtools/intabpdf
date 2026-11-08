@@ -9,6 +9,8 @@ import { getPdfPageCount } from '../../core';
 import type { ToolComponentProps } from '../types';
 import { parseImagePageSelection } from './pdfToImages/pageSelection';
 import { renderPdfToImages } from './pdfToImages/renderer';
+import { executeBatchOperation } from '../batchOperation';
+import { getCleanBaseName } from '../filename';
 import {
   JPEG_QUALITY_PRESETS,
   LARGE_BATCH_THRESHOLD_3X,
@@ -28,6 +30,7 @@ export default function PdfToImagesTool({
   defaultBaseName,
 }: ToolComponentProps): ReactNode {
   const file = stagedFiles[0];
+  const isMultiFile = stagedFiles.length > 1;
   const { showToast } = useToast();
   const processing = useContext(ProcessingContext);
 
@@ -82,10 +85,10 @@ export default function PdfToImagesTool({
   }, [pageSelectionMode, rangeInput, effectivePageCount]);
 
   const selectedPagesCount = selectionValidation.pages.length;
-  const isSinglePage = selectedPagesCount === 1;
+  const isSinglePage = !isMultiFile && selectedPagesCount === 1;
 
   // Expected output extension for the current configuration
-  const currentOutputExt = isSinglePage ? (format === 'jpeg' ? '.jpg' : '.png') : '.zip';
+  const currentOutputExt = isMultiFile ? '.zip' : (isSinglePage ? (format === 'jpeg' ? '.jpg' : '.png') : '.zip');
 
   // Synchronize extension with parent ToolPage
   useEffect(() => {
@@ -93,7 +96,8 @@ export default function PdfToImagesTool({
   }, [currentOutputExt, onExtraStateChange]);
 
   const handleRun = async () => {
-    if (!file || isProcessing || effectivePageCount === null) return;
+    if (stagedFiles.length === 0 || isProcessing) return;
+    if (!isMultiFile && (!file || effectivePageCount === null)) return;
     if (pageSelectionMode === 'range' && (selectionValidation.error || selectedPagesCount === 0)) {
       return;
     }
@@ -107,26 +111,81 @@ export default function PdfToImagesTool({
 
     try {
       await onExecute(async () => {
-        const result = await renderPdfToImages(file.bytes, {
-          format,
-          scale,
-          jpegQuality,
-          pages: selectionValidation.pages,
+        if (!isMultiFile) {
+          const result = await renderPdfToImages(file.bytes, {
+            format,
+            scale,
+            jpegQuality,
+            pages: selectionValidation.pages,
+            signal: abortController.signal,
+            onProgress: (progress) => {
+              processing?.updateMessage?.(
+                `Converting page ${progress.current} of ${progress.total} (${progress.percent}%)…`
+              );
+            },
+          });
+
+          onExtraStateChange?.('outputExtension', result.outputExtension);
+          onExtraStateChange?.('imageCount', result.pageCount);
+          onExtraStateChange?.('imageFormat', format.toUpperCase());
+          onExtraStateChange?.('scale', scale);
+          onExtraStateChange?.('isZip', result.isZip);
+
+          return result.outputBytes;
+        }
+
+        let totalImageCount = 0;
+
+        const zipBytes = await executeBatchOperation({
+          actionVerb: 'Converting',
+          stagedFiles,
+          updateMessage: processing?.updateMessage,
+          onExtraStateChange,
           signal: abortController.signal,
-          onProgress: (progress) => {
-            processing?.updateMessage?.(
-              `Converting page ${progress.current} of ${progress.total} (${progress.percent}%)…`
-            );
+          processFile: async (curFile, fileIndex) => {
+            const curDocPageCount = await getPdfPageCount(curFile.bytes);
+            let targetPages: number[];
+
+            if (pageSelectionMode === 'all') {
+              targetPages = Array.from({ length: curDocPageCount }, (_, i) => i + 1);
+            } else {
+              const parsed = parseImagePageSelection(rangeInput, curDocPageCount);
+              if (parsed.error || parsed.pages.length === 0) {
+                throw new Error(parsed.error || 'No matching pages for range selection');
+              }
+              targetPages = parsed.pages;
+            }
+
+            const result = await renderPdfToImages(curFile.bytes, {
+              format,
+              scale,
+              jpegQuality,
+              pages: targetPages,
+              signal: abortController.signal,
+              onProgress: (progress) => {
+                processing?.updateMessage?.(
+                  `[${fileIndex + 1}/${stagedFiles.length}] Converting page ${progress.current} of ${progress.total} (${progress.percent}%)…`
+                );
+              },
+            });
+
+            totalImageCount += result.pageCount;
+            const cleanBase = getCleanBaseName(curFile.name) || 'document';
+
+            return result.images.map((img) => ({
+              name: `${cleanBase}-${img.fileName}`,
+              bytes: img.bytes,
+            }));
           },
         });
 
-        onExtraStateChange?.('outputExtension', result.outputExtension);
-        onExtraStateChange?.('imageCount', result.pageCount);
+        onExtraStateChange?.('outputExtension', '.zip');
+        onExtraStateChange?.('imageCount', totalImageCount);
         onExtraStateChange?.('imageFormat', format.toUpperCase());
         onExtraStateChange?.('scale', scale);
-        onExtraStateChange?.('isZip', result.isZip);
+        onExtraStateChange?.('isZip', true);
 
-        return result.outputBytes;
+        return zipBytes;
       });
     } catch (err: unknown) {
       if (
@@ -153,7 +212,20 @@ export default function PdfToImagesTool({
     <div className="card opts">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <b>{tool.name} options</b>
-        {effectivePageCount !== null && (
+        {isMultiFile ? (
+          <span
+            style={{
+              fontSize: '12px',
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {`${stagedFiles.length} files selected`}
+          </span>
+        ) : effectivePageCount !== null ? (
           <span
             style={{
               fontSize: '12px',
@@ -166,7 +238,7 @@ export default function PdfToImagesTool({
           >
             {effectivePageCount} {effectivePageCount === 1 ? 'page' : 'pages'} in document
           </span>
-        )}
+        ) : null}
       </div>
 
       {effectivePageError && (
@@ -422,7 +494,7 @@ export default function PdfToImagesTool({
         type="button"
         className="cta"
         onClick={handleRun}
-        disabled={isProcessing || !file || effectivePageCount === null || isInvalid}
+        disabled={isProcessing || stagedFiles.length === 0 || (!isMultiFile && effectivePageCount === null) || isInvalid}
         style={{
           marginTop: '12px',
           width: '100%',
@@ -432,7 +504,11 @@ export default function PdfToImagesTool({
         <FileImage size={16} />
         <span>
           {isProcessing
-            ? 'Converting…'
+            ? isMultiFile
+              ? `Converting ${stagedFiles.length} files…`
+              : 'Converting…'
+            : isMultiFile
+            ? `Convert ${stagedFiles.length} files to ${format.toUpperCase()}`
             : isSinglePage
             ? `Convert 1 page to ${format.toUpperCase()}`
             : `Convert ${selectedPagesCount || effectivePageCount || ''} pages to ${format.toUpperCase()}`}

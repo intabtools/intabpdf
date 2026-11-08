@@ -127,39 +127,54 @@ export default function CompressTool({
         : activePresetCard.strategySummary
     );
 
-    await onExecute(async () => {
-      const corePreset: CompressionPreset | undefined =
-        mode === 'target'
-          ? undefined
-          : (activePresetCard.corePreset as CompressionPreset);
+    const isMultiFile = stagedFiles.length > 1;
+    const abortController = isMultiFile ? new AbortController() : null;
+    if (abortController) {
+      processing?.setCancelHandler?.(() => {
+        abortController.abort();
+      });
+    }
 
-      if (stagedFiles.length === 1) {
-        return await pdfProcessingService.execute('compress', {
-          buffer: stagedFiles[0].bytes,
-          options: {
-            targetBytes: mode === 'target' ? (targetBytes ?? undefined) : undefined,
-            preset: corePreset,
+    try {
+      await onExecute(async () => {
+        const corePreset: CompressionPreset | undefined =
+          mode === 'target'
+            ? undefined
+            : (activePresetCard.corePreset as CompressionPreset);
+
+        if (stagedFiles.length === 1) {
+          return await pdfProcessingService.execute('compress', {
+            buffer: stagedFiles[0].bytes,
+            options: {
+              targetBytes: mode === 'target' ? (targetBytes ?? undefined) : undefined,
+              preset: corePreset,
+              downsampleImages: optionsState['downsample'] ?? true,
+              stripMetadata: optionsState['strip-meta'] ?? true,
+            },
+          });
+        }
+
+        return await executeBatchCompression(
+          stagedFiles,
+          {
+            mode,
+            targetBytes: targetBytes ?? undefined,
+            corePreset,
             downsampleImages: optionsState['downsample'] ?? true,
             stripMetadata: optionsState['strip-meta'] ?? true,
           },
-        });
+          {
+            updateMessage: processing?.updateMessage,
+            onExtraStateChange,
+            signal: abortController?.signal,
+          }
+        );
+      });
+    } finally {
+      if (isMultiFile) {
+        processing?.setCancelHandler?.(null);
       }
-
-      return await executeBatchCompression(
-        stagedFiles,
-        {
-          mode,
-          targetBytes: targetBytes ?? undefined,
-          corePreset,
-          downsampleImages: optionsState['downsample'] ?? true,
-          stripMetadata: optionsState['strip-meta'] ?? true,
-        },
-        {
-          updateMessage: processing?.updateMessage,
-          onExtraStateChange,
-        }
-      );
-    });
+    }
   };
 
   // Determine active strategy action label

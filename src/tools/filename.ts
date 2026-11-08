@@ -19,6 +19,7 @@ export function getDefaultOutputBaseName(
 
   switch (toolId) {
     case 'rotate':
+      if (stagedFiles.length > 1) return 'rotated-documents';
       return firstFile ? `rotated-${firstFile}` : 'rotated-document';
 
     case 'remove-pages':
@@ -28,18 +29,21 @@ export function getDefaultOutputBaseName(
       return firstFile ? `split-${firstFile}` : 'split-document';
 
     case 'compress':
+      if (stagedFiles.length > 1) return 'compressed-documents';
       return firstFile ? `compressed-${firstFile}` : 'compressed-document';
 
     case 'merge':
       return firstFile ? `merged-${firstFile}` : 'merged-document';
 
     case 'extract-text':
+      if (stagedFiles.length > 1) return 'extracted-texts';
       return firstFile ? `extracted-${firstFile}` : 'extracted-text';
 
     case 'images-to-pdf':
       return 'images-to-pdf';
 
     case 'pdf-to-images':
+      if (stagedFiles.length > 1) return 'pdf-images';
       return firstFile ? `${firstFile}-images` : 'pdf-images';
 
     default:
@@ -50,7 +54,17 @@ export function getDefaultOutputBaseName(
 /**
  * Returns the expected output extension (e.g. '.pdf', '.zip', or '.txt') for a given tool.
  */
-export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.zip' | '.txt' | string {
+export function getOutputExtension(
+  toolId: string,
+  outputName = '',
+  stagedCount = 1
+): '.pdf' | '.zip' | '.txt' | string {
+  if (
+    stagedCount > 1 &&
+    (toolId === 'rotate' || toolId === 'extract-text' || toolId === 'compress' || toolId === 'pdf-to-images')
+  ) {
+    return '.zip';
+  }
   if (toolId === 'split' || outputName.toLowerCase().endsWith('.zip')) {
     return '.zip';
   }

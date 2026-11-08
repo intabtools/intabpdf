@@ -32,7 +32,6 @@ export type { ZipEntry } from './zip';
 export {
   imagesToPdf,
   detectImageFormat,
-  convertWebpToPng,
 } from './images-to-pdf';
 export type {
   InputImage,

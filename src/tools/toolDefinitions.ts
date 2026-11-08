@@ -23,7 +23,6 @@ export const TOOLS: ToolDefinition[] = [
     availability: 'available',
     component: () => import('./modules/ImagesToPdfTool'),
     options: [
-      { id: 'fit', label: 'Fit photos to page', description: 'Scale each photo to the page', defaultValue: true },
       { id: 'shrink', label: 'Shrink large photos', description: 'Smaller file, same look', defaultValue: false },
     ],
   },
@@ -76,7 +75,6 @@ export const TOOLS: ToolDefinition[] = [
     component: () => import('./modules/SplitTool'),
     options: [
       { id: 'one-per-page', label: 'One file per page', description: 'Otherwise you pick the ranges', defaultValue: false },
-      { id: 'bookmarks', label: 'Keep bookmarks', description: 'Carry them into each part', defaultValue: true },
     ],
   },
   {
@@ -217,10 +215,7 @@ export const TOOLS: ToolDefinition[] = [
     outputName: 'pages.zip',
     availability: 'available',
     component: () => import('./modules/PdfToImagesTool'),
-    options: [
-      { id: 'hi-res', label: 'High resolution', description: 'Larger images', defaultValue: false },
-      { id: 'png', label: 'Use PNG', description: 'Instead of JPG', defaultValue: false },
-    ],
+    options: [],
   },
   {
     id: 'extract-text',

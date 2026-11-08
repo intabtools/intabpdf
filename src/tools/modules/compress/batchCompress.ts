@@ -16,6 +16,7 @@ export interface BatchCompressionOptions {
 export interface BatchCompressionCallbacks {
   updateMessage?: (message: string) => void;
   onExtraStateChange?: (key: string, value: unknown) => void;
+  signal?: AbortSignal;
 }
 
 export async function executeBatchCompression(
@@ -23,18 +24,34 @@ export async function executeBatchCompression(
   options: BatchCompressionOptions,
   callbacks?: BatchCompressionCallbacks
 ): Promise<Uint8Array> {
+  if (stagedFiles.length === 0) {
+    throw new Error('No files staged for processing.');
+  }
+
+  if (callbacks?.signal?.aborted) {
+    throw new DOMException('Operation cancelled', 'AbortError');
+  }
+
   const zipEntries: ZipEntry[] = [];
   const usedNames = new Set<string>();
   const failures: { fileName: string; reason: string }[] = [];
   let successfulOriginalBytes = 0;
 
   for (let i = 0; i < stagedFiles.length; i++) {
+    if (callbacks?.signal?.aborted) {
+      throw new DOMException('Operation cancelled', 'AbortError');
+    }
+
     const curFile = stagedFiles[i];
     callbacks?.updateMessage?.(
       `Compressing file ${i + 1} of ${stagedFiles.length}…`
     );
-    // Micro-pause to allow UI loader re-render and paint
+    // Micro-pause to allow UI loader re-render, paint, and cancel click
     await new Promise((resolve) => setTimeout(resolve, 10));
+
+    if (callbacks?.signal?.aborted) {
+      throw new DOMException('Operation cancelled', 'AbortError');
+    }
 
     try {
       const compressedBytes = await pdfProcessingService.execute('compress', {
@@ -46,6 +63,10 @@ export async function executeBatchCompression(
           stripMetadata: options.stripMetadata ?? true,
         },
       });
+
+      if (callbacks?.signal?.aborted) {
+        throw new DOMException('Operation cancelled', 'AbortError');
+      }
 
       const rawBase = getCleanBaseName(curFile.name) || `document-${i + 1}`;
       let entryName = `compressed-${rawBase}.pdf`;
@@ -62,6 +83,13 @@ export async function executeBatchCompression(
       });
       successfulOriginalBytes += curFile.size;
     } catch (err) {
+      if (
+        callbacks?.signal?.aborted ||
+        (err instanceof Error &&
+          (err.name === 'AbortError' || err.message.toLowerCase().includes('cancel')))
+      ) {
+        throw err;
+      }
       const reason =
         err instanceof Error && err.message
           ? err.message
@@ -71,6 +99,10 @@ export async function executeBatchCompression(
         reason,
       });
     }
+  }
+
+  if (callbacks?.signal?.aborted) {
+    throw new DOMException('Operation cancelled', 'AbortError');
   }
 
   if (zipEntries.length === 0) {
