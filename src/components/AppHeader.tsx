@@ -12,6 +12,7 @@ interface AppHeaderProps {
   subTitle?: string;
   isSidebarCollapsed: boolean;
   isDrawerOpen: boolean;
+  onSwitchToWeb?: () => void;
 }
 
 export default function AppHeader({
@@ -22,6 +23,7 @@ export default function AppHeader({
   subTitle,
   isSidebarCollapsed,
   isDrawerOpen,
+  onSwitchToWeb,
 }: AppHeaderProps): ReactNode {
   const location = useLocation();
   const navigate = useNavigate();
@@ -100,6 +102,25 @@ export default function AppHeader({
       >
         <Search size={22} strokeWidth={1.8} />
       </button>
+
+      {Boolean(import.meta.env.DEV) && onSwitchToWeb && (
+        <button
+          type="button"
+          onClick={onSwitchToWeb}
+          style={{
+            opacity: 0.85,
+            color: 'var(--accent)',
+            cursor: 'pointer',
+            fontSize: '12px',
+            background: 'none',
+            border: 0,
+            padding: '4px 8px',
+          }}
+          title="Switch to Website view"
+        >
+          Website view
+        </button>
+      )}
 
       <button
         type="button"

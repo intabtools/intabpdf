@@ -5,7 +5,11 @@ import { getPlatformType, platform, type OpenedFile } from '../platform';
 import type { PageSize, PdfDocument } from './renderPage';
 import { ViewerContext } from './viewerContextDef';
 
+const destroyingDocs = new WeakSet<object>();
+
 async function safelyDestroyPdf(doc: PdfDocument): Promise<void> {
+  if (!doc || destroyingDocs.has(doc)) return;
+  destroyingDocs.add(doc);
   try {
     const { destroyPdf } = await import('./renderPage');
     await destroyPdf(doc).catch(() => undefined);
@@ -23,6 +27,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
 
   // Preserved viewer document & reading session state across navigation
   const [activePdfDoc, setActivePdfDoc] = useState<PdfDocument | null>(null);
+  const [activeDocFile, setActiveDocFile] = useState<OpenedFile | null>(null);
   const [activeFileName, setActiveFileName] = useState('');
   const [activePageSizes, setActivePageSizes] = useState<PageSize[]>([]);
   const [savedCurrentPage, setSavedCurrentPage] = useState(1);
@@ -30,9 +35,13 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
   const [savedIsFitToWidth, setSavedIsFitToWidth] = useState(true);
 
   const activePdfDocRef = useRef<PdfDocument | null>(null);
+  const activeDocFileRef = useRef<OpenedFile | null>(null);
   useEffect(() => {
     activePdfDocRef.current = activePdfDoc;
   }, [activePdfDoc]);
+  useEffect(() => {
+    activeDocFileRef.current = activeDocFile;
+  }, [activeDocFile]);
 
   // Clean up PDF.js document when ViewerProvider unmounts (e.g. app shutdown or test tear-down)
   useEffect(() => {
@@ -66,6 +75,17 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       }
     });
     const unsubOpened = platform.onFileOpened((file) => {
+      const prev = activePdfDocRef.current;
+      if (prev) {
+        activePdfDocRef.current = null;
+        void safelyDestroyPdf(prev);
+      }
+      activeDocFileRef.current = null;
+      setActivePdfDoc(null);
+      setActiveDocFile(null);
+      setActiveFileName('');
+      setActivePageSizes([]);
+      setSavedCurrentPage(1);
       setIsLoading(true);
       setCurrentFile(file);
       if (getPlatformType() !== 'web') {
@@ -87,6 +107,17 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
 
   const loadFile = useCallback(
     (file: OpenedFile) => {
+      const prev = activePdfDocRef.current;
+      if (prev) {
+        activePdfDocRef.current = null;
+        void safelyDestroyPdf(prev);
+      }
+      activeDocFileRef.current = null;
+      setActivePdfDoc(null);
+      setActiveDocFile(null);
+      setActiveFileName('');
+      setActivePageSizes([]);
+      setSavedCurrentPage(1);
       setIsLoading(true);
       setCurrentFile(file);
       if (getPlatformType() !== 'web') {
@@ -98,11 +129,15 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
 
   const saveViewerDocument = useCallback(
     (doc: PdfDocument, file: OpenedFile, pageSizes: PageSize[]) => {
-      if (activePdfDocRef.current && activePdfDocRef.current !== doc) {
-        void safelyDestroyPdf(activePdfDocRef.current);
+      const prev = activePdfDocRef.current;
+      if (prev && prev !== doc) {
+        activePdfDocRef.current = null;
+        void safelyDestroyPdf(prev);
       }
-      setActivePdfDoc(doc);
       activePdfDocRef.current = doc;
+      activeDocFileRef.current = file;
+      setActivePdfDoc(doc);
+      setActiveDocFile(file);
       setCurrentFile(file);
       setActiveFileName(file.name);
       setActivePageSizes(pageSizes);
@@ -127,9 +162,11 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
   );
 
   const clearDocumentSession = useCallback(async () => {
-    if (activePdfDocRef.current) {
-      const doc = activePdfDocRef.current;
-      activePdfDocRef.current = null;
+    const doc = activePdfDocRef.current;
+    activePdfDocRef.current = null;
+    activeDocFileRef.current = null;
+    setActiveDocFile(null);
+    if (doc) {
       await safelyDestroyPdf(doc);
     }
     setActivePdfDoc(null);
@@ -175,6 +212,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       isLoading,
       setIsLoading,
       pdfDoc: activePdfDoc,
+      activeDocFile,
       fileName: activeFileName,
       pageSizes: activePageSizes,
       currentPage: savedCurrentPage,
@@ -190,6 +228,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       loadFile,
       isLoading,
       activePdfDoc,
+      activeDocFile,
       activeFileName,
       activePageSizes,
       savedCurrentPage,

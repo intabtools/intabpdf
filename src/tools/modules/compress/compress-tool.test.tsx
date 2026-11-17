@@ -328,6 +328,47 @@ describe('PDF Compression Tool: Core, Target Size, Accessibility, and UI', () =>
       expect(html).toContain('Already optimized');
       expect(html).toContain('could not be compressed further without quality degradation');
     });
+
+    it('accurately calculates and displays aggregate reduction for multiple staged files', () => {
+      const file1: StagedFile = {
+        id: '1',
+        name: 'doc1.pdf',
+        size: 500000,
+        bytes: new Uint8Array(500000),
+      };
+      const file2: StagedFile = {
+        id: '2',
+        name: 'doc2.pdf',
+        size: 700000,
+        bytes: new Uint8Array(700000),
+      };
+      // Combined original: 1,200,000 bytes. Output zip: 600,000 bytes (50% saving)
+      const zipOutput = new Uint8Array(600000);
+      const html = renderToString(
+        <ToolResultCard
+          tool={compressTool}
+          stagedFiles={[file1, file2]}
+          outputBytes={zipOutput}
+          extraState={{ presetName: 'Recommended' }}
+          customFileName=""
+          onCustomFileNameChange={() => {}}
+          defaultBaseName="compressed-documents"
+          outputExtension=".zip"
+          isSaved={false}
+          isZipOutput={true}
+          platformType="web"
+          onDownload={() => {}}
+          onViewPdf={() => {}}
+          onStartOver={() => {}}
+        />
+      );
+
+      expect(html).toContain('Compressed 2 files!');
+      expect(html).toContain('Saved');
+      expect(html).toContain('50.0');
+      expect(html).toContain('Save ZIP');
+      expect(html).not.toContain('Open in Viewer');
+    });
   });
 
   describe('5. Memory Safety and Lifecycle Execution', () => {

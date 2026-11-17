@@ -72,7 +72,7 @@ export function isValidDestination(path: string, platform: PlatformType = getPla
     if (!isScreenEnabled('tool', platform)) return false;
     const toolId = path.replace('/tool/', '').split('?')[0].split('#')[0];
     const tool = getToolById(toolId);
-    return !!tool && tool.availability === 'available';
+    return Boolean(tool);
   }
   return false;
 }

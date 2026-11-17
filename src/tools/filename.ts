@@ -19,6 +19,7 @@ export function getDefaultOutputBaseName(
 
   switch (toolId) {
     case 'rotate':
+      if (stagedFiles.length > 1) return 'rotated-documents';
       return firstFile ? `rotated-${firstFile}` : 'rotated-document';
 
     case 'remove-pages':
@@ -28,13 +29,22 @@ export function getDefaultOutputBaseName(
       return firstFile ? `split-${firstFile}` : 'split-document';
 
     case 'compress':
+      if (stagedFiles.length > 1) return 'compressed-documents';
       return firstFile ? `compressed-${firstFile}` : 'compressed-document';
 
     case 'merge':
       return firstFile ? `merged-${firstFile}` : 'merged-document';
 
+    case 'extract-text':
+      if (stagedFiles.length > 1) return 'extracted-texts';
+      return firstFile ? `extracted-${firstFile}` : 'extracted-text';
+
     case 'images-to-pdf':
       return 'images-to-pdf';
+
+    case 'pdf-to-images':
+      if (stagedFiles.length > 1) return 'pdf-images';
+      return firstFile ? `${firstFile}-images` : 'pdf-images';
 
     default:
       return firstFile ? `${toolId}-${firstFile}` : `${toolId}-document`;
@@ -42,10 +52,28 @@ export function getDefaultOutputBaseName(
 }
 
 /**
- * Returns the expected output extension (e.g. '.pdf' or '.zip') for a given tool.
+ * Returns the expected output extension (e.g. '.pdf', '.zip', or '.txt') for a given tool.
  */
-export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.zip' {
+export function getOutputExtension(
+  toolId: string,
+  outputName = '',
+  stagedCount = 1
+): '.pdf' | '.zip' | '.txt' | string {
+  if (
+    stagedCount > 1 &&
+    (toolId === 'rotate' || toolId === 'extract-text' || toolId === 'compress' || toolId === 'pdf-to-images')
+  ) {
+    return '.zip';
+  }
   if (toolId === 'split' || outputName.toLowerCase().endsWith('.zip')) {
+    return '.zip';
+  }
+  if (toolId === 'extract-text' || outputName.toLowerCase().endsWith('.txt')) {
+    return '.txt';
+  }
+  if (toolId === 'pdf-to-images') {
+    if (outputName.toLowerCase().endsWith('.png')) return '.png';
+    if (outputName.toLowerCase().endsWith('.jpg') || outputName.toLowerCase().endsWith('.jpeg')) return '.jpg';
     return '.zip';
   }
   return '.pdf';
@@ -56,7 +84,7 @@ export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.
  * 
  * Rules:
  * - Trims leading and trailing whitespace.
- * - Strips duplicate extensions if the user manually typed '.pdf' or '.zip'.
+ * - Strips duplicate extensions if the user manually typed '.pdf', '.zip', or '.txt'.
  * - Replaces illegal filesystem characters across Windows, macOS, Linux, and Android with '-'.
  * - Collapses consecutive dashes and removes leading/trailing dots or dashes.
  * - Appends '-file' to Windows reserved device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9).
@@ -66,13 +94,13 @@ export function getOutputExtension(toolId: string, outputName = ''): '.pdf' | '.
 export function sanitizeOutputFileName(
   input: string,
   fallbackBaseName: string,
-  extension: '.pdf' | '.zip' = '.pdf'
+  extension: '.pdf' | '.zip' | '.txt' | string = '.pdf'
 ): string {
   let base = (input || '').trim();
 
   // Strip duplicate extension if user typed it
   base = base.replace(new RegExp(`\\${extension}$`, 'i'), '');
-  base = base.replace(/\.(pdf|zip)$/i, '');
+  base = base.replace(/\.(pdf|zip|txt|png|jpe?g)$/i, '');
 
   // Replace illegal filesystem characters: / \ : * ? " < > | and control characters (0x00-0x1F)
   // eslint-disable-next-line no-control-regex

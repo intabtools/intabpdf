@@ -10,6 +10,7 @@ import ViewerFullscreenControls from './ViewerFullscreenControls';
 import ViewerSearchBar from './ViewerSearchBar';
 import ViewerThumbnails from './ViewerThumbnails';
 import ViewerPagesView from './ViewerPagesView';
+import ViewerSelectionMenu from './ViewerSelectionMenu';
 import PasswordDialog from '../components/PasswordDialog';
 import { createPdfLinkService } from './pdfLinks';
 import { useViewer } from '../hooks/useViewer';
@@ -385,6 +386,8 @@ export default function ViewerPage(): ReactNode {
           linkService={linkService}
         />
       </div>
+
+      <ViewerSelectionMenu containerRef={shellRef} currentPage={currentPage} />
 
       {passwordPrompt && (
         <PasswordDialog

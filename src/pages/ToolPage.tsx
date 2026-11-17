@@ -24,20 +24,24 @@ import ToolStatusCards from './tool/ToolStatusCards';
 import ToolWebLayout from './tool/ToolWebLayout';
 import { useFileReorder } from './tool/useFileReorder';
 
-function getOperationMessage(toolId: string): string {
+function getOperationMessage(toolId: string, count = 1): string {
   switch (toolId) {
     case 'images-to-pdf':
       return 'Creating PDF…';
     case 'compress':
-      return 'Compressing PDF…';
+      return count > 1 ? `Compressing ${count} PDFs…` : 'Compressing PDF…';
     case 'merge':
       return 'Merging PDFs…';
     case 'split':
       return 'Splitting PDF…';
     case 'rotate':
-      return 'Rotating pages…';
+      return count > 1 ? `Rotating ${count} PDFs…` : 'Rotating pages…';
     case 'remove-pages':
       return 'Removing pages…';
+    case 'extract-text':
+      return count > 1 ? `Extracting text from ${count} PDFs…` : 'Extracting text…';
+    case 'pdf-to-images':
+      return count > 1 ? `Converting ${count} PDFs to images…` : 'Converting to images…';
     default:
       return 'Processing PDF…';
   }
@@ -54,6 +58,7 @@ export default function ToolPage(): ReactNode {
 
   const tool = getToolById(toolId || '');
   const isImplemented = tool ? isToolImplemented(tool.id) : false;
+  const isSingleFileTool = tool?.id === 'remove-pages' || tool?.id === 'split';
 
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [optionsState, setOptionsState] = useState<Record<string, boolean>>(() => {
@@ -85,15 +90,16 @@ export default function ToolPage(): ReactNode {
     handleGripKeyDown,
   } = useFileReorder({ stagedFiles, setStagedFiles });
 
-  const defaultBaseName = useMemo(
-    () => (tool ? getDefaultOutputBaseName(tool.id, stagedFiles) : 'document'),
-    [tool, stagedFiles]
-  );
+  const defaultBaseName = useMemo(() => {
+    return tool ? getDefaultOutputBaseName(tool.id, stagedFiles) : 'document';
+  }, [tool, stagedFiles]);
 
-  const outputExtension = useMemo(
-    () => (tool ? getOutputExtension(tool.id, tool.outputName) : '.pdf'),
-    [tool]
-  );
+  const outputExtension = useMemo(() => {
+    if (typeof extraState.outputExtension === 'string') {
+      return extraState.outputExtension;
+    }
+    return tool ? getOutputExtension(tool.id, tool.outputName, stagedFiles.length) : '.pdf';
+  }, [tool, stagedFiles.length, extraState.outputExtension]);
 
   const acceptTypes = useMemo(() => {
     if (tool?.fileType === 'img') return 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
@@ -144,13 +150,17 @@ export default function ToolPage(): ReactNode {
 
   const handleFilesAdded = (files: OpenedFile[]) => {
     handleFilesSelectedEnd();
+    if (isSingleFileTool && files.length > 1) {
+      showToast(`${tool?.name || 'This tool'} accepts only one PDF at a time. Please select a single file.`);
+      return;
+    }
     const newItems: StagedFile[] = files.map((f, i) => ({
       id: `${f.name}-${Date.now()}-${i}`,
       name: f.name,
       size: f.bytes.byteLength,
       bytes: f.bytes,
     }));
-    setStagedFiles((prev) => [...prev, ...newItems]);
+    setStagedFiles((prev) => (isSingleFileTool ? newItems : [...prev, ...newItems]));
     setStatus('idle');
     setOutputBytes(null);
     setErrorMessage(null);
@@ -171,7 +181,7 @@ export default function ToolPage(): ReactNode {
     setErrorMessage(null);
     setIsSaved(false);
 
-    const message = tool ? getOperationMessage(tool.id) : 'Processing PDF…';
+    const message = tool ? getOperationMessage(tool.id, stagedFiles.length) : 'Processing PDF…';
 
     try {
       const result = await runWithProcessing(message, runner);
@@ -179,7 +189,14 @@ export default function ToolPage(): ReactNode {
       setStatus('done');
     } catch (err) {
       console.error('PDF tool processing failed:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Processing failed');
+      const isCancelled =
+        err instanceof Error &&
+        (err.name === 'AbortError' ||
+          err.name === 'RenderingCancelledException' ||
+          err.message.toLowerCase().includes('cancel'));
+      if (!isCancelled) {
+        setErrorMessage(err instanceof Error ? err.message : 'Processing failed');
+      }
       setStatus('idle');
     }
   };
@@ -187,10 +204,20 @@ export default function ToolPage(): ReactNode {
   const handleDownload = async () => {
     if (!outputBytes) return;
     try {
+      const mimeType = isZipOutput
+        ? 'application/zip'
+        : outputExtension === '.txt'
+        ? 'text/plain;charset=utf-8'
+        : outputExtension === '.png'
+        ? 'image/png'
+        : outputExtension === '.jpg' || outputExtension === '.jpeg'
+        ? 'image/jpeg'
+        : 'application/pdf';
+
       const res = await platform.saveFile?.(
         outputBytes,
         finalFileName,
-        isZipOutput ? 'application/zip' : 'application/pdf'
+        mimeType
       );
       if (res && res.saved === false) {
         return;
@@ -277,10 +304,13 @@ export default function ToolPage(): ReactNode {
         <DropZone
           title={tool.name}
           subtitle={tool.description}
-          multiple={tool.id === 'merge' || tool.id === 'images-to-pdf'}
+          multiple={!isSingleFileTool}
           accept={acceptTypes}
           onFilesSelectedStart={handleFilesSelectedStart}
           onFilesSelected={handleFilesAdded}
+          onMultipleRejected={() => {
+            showToast(`${tool.name} accepts only one PDF at a time. Please select a single file.`);
+          }}
         />
       )}
 
@@ -306,16 +336,18 @@ export default function ToolPage(): ReactNode {
               onRemoveFile={handleRemoveFile}
             />
 
-            <DropZone
-              title="Add more files"
-              subtitle="Choose additional files"
-              ctaText="Add"
-              multiple={true}
-              accept={acceptTypes}
-              onFilesSelectedStart={handleFilesSelectedStart}
-              onFilesSelected={handleFilesAdded}
-              className="add"
-            />
+            {!isSingleFileTool && (
+              <DropZone
+                title="Add more files"
+                subtitle="Choose additional files"
+                ctaText="Add"
+                multiple={true}
+                accept={acceptTypes}
+                onFilesSelectedStart={handleFilesSelectedStart}
+                onFilesSelected={handleFilesAdded}
+                className="add"
+              />
+            )}
           </div>
 
           <Suspense fallback={<div className="card opts"><div className="spin" /></div>}>

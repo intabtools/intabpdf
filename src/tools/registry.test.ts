@@ -89,22 +89,26 @@ describe('tools/registry', () => {
     const available = getAvailableTools();
     expect(available.map((t) => t.id).sort()).toEqual([
       'compress',
+      'extract-text',
       'images-to-pdf',
       'merge',
+      'pdf-to-images',
       'remove-pages',
       'rotate',
       'split',
     ]);
 
     const comingSoon = getComingSoonTools();
-    expect(comingSoon.length).toBe(7);
+    expect(comingSoon.length).toBe(5);
 
     expect(isToolImplemented('images-to-pdf')).toBe(true);
+    expect(isToolImplemented('pdf-to-images')).toBe(true);
     expect(isToolImplemented('merge')).toBe(true);
     expect(isToolImplemented('rotate')).toBe(true);
     expect(isToolImplemented('remove-pages')).toBe(true);
     expect(isToolImplemented('split')).toBe(true);
     expect(isToolImplemented('compress')).toBe(true);
+    expect(isToolImplemented('extract-text')).toBe(true);
     expect(isToolImplemented('protect')).toBe(false);
   });
 
@@ -124,13 +128,13 @@ describe('tools/registry', () => {
     }
   });
 
-  it('has truthful options for rotate tool without misleading page-selection claims', () => {
+  it('has options for rotate tool supporting direction and page selection', () => {
     const rotate = getToolById('rotate');
     expect(rotate).toBeDefined();
-    expect(rotate?.options.some((opt) => opt.id === 'all-pages')).toBe(false);
-    expect(rotate?.options.some((opt) => opt.description.includes('lets you pick pages'))).toBe(false);
+    expect(rotate?.options.some((opt) => opt.id === 'all-pages')).toBe(true);
+    expect(rotate?.options.some((opt) => opt.description.includes('Off lets you pick pages'))).toBe(true);
     const cwOption = rotate?.options.find((opt) => opt.id === 'cw');
     expect(cwOption).toBeDefined();
-    expect(cwOption?.description).toContain('all pages');
+    expect(cwOption?.defaultValue).toBe(true);
   });
 });

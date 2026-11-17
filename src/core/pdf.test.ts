@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString, PDFNumber, PDFDict } from 'pdf-lib';
 import { destroyPdf, getPageSize, loadPdf } from '../viewer/renderPage';
 import {
   calculateCompressionStats,
@@ -11,6 +11,7 @@ import {
   mergePdfs,
   parsePageRanges,
   parseRemovePageInput,
+  parseRotatePageInput,
   removePdfPages,
   rotatePdfPages,
   splitPdfPages,
@@ -67,6 +68,28 @@ async function createTestPdf(pageCount: number): Promise<Uint8Array> {
   return await doc.save();
 }
 
+async function createTestPdfWithBookmark(title: string, pageCount: number): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([400, 600]);
+  for (let i = 1; i < pageCount; i++) {
+    doc.addPage([400, 600]);
+  }
+  const outlinesDict = doc.context.obj({ Type: 'Outlines' });
+  const outlinesRef = doc.context.register(outlinesDict);
+  doc.catalog.set(PDFName.of('Outlines'), outlinesRef);
+
+  const item = doc.context.obj({
+    Title: PDFString.of(title),
+    Parent: outlinesRef,
+    Dest: [page.ref, PDFName.of('Fit')],
+  });
+  const itemRef = doc.context.register(item);
+  outlinesDict.set(PDFName.of('First'), itemRef);
+  outlinesDict.set(PDFName.of('Last'), itemRef);
+  outlinesDict.set(PDFName.of('Count'), PDFNumber.of(1));
+  return await doc.save();
+}
+
 describe('PDF Core Operations', () => {
   describe('mergePdfs', () => {
     it('merges multiple PDF buffers into a single PDF with correct page count', async () => {
@@ -84,6 +107,47 @@ describe('PDF Core Operations', () => {
       // Verify PDF magic header
       const header = new TextDecoder().decode(mergedBytes.slice(0, 5));
       expect(header).toBe('%PDF-');
+    });
+
+    it('adds page numbers when addPageNumbers option is enabled', async () => {
+      const pdf1 = await createTestPdf(1);
+      const pdf2 = await createTestPdf(2);
+
+      const defaultMerged = await mergePdfs([pdf1, pdf2]);
+      const numberedMerged = await mergePdfs([pdf1, pdf2], { addPageNumbers: true });
+
+      const numberedDoc = await PDFDocument.load(numberedMerged);
+
+      expect(numberedDoc.getPageCount()).toBe(3);
+      // Adding page numbers adds text and font stream, making byte length larger than default merge
+      expect(numberedMerged.byteLength).toBeGreaterThan(defaultMerged.byteLength);
+    });
+
+    it('preserves and chains bookmarks across documents when keepBookmarks is true', async () => {
+      const pdf1 = await createTestPdfWithBookmark('Section One', 2);
+      const pdf2 = await createTestPdfWithBookmark('Section Two', 1);
+
+      const merged = await mergePdfs([pdf1, pdf2], { keepBookmarks: true });
+      const doc = await PDFDocument.load(merged);
+
+      const outlinesRef = doc.catalog.get(PDFName.of('Outlines'));
+      expect(outlinesRef).toBeDefined();
+
+      const outlinesDict = doc.context.lookup(outlinesRef);
+      expect(outlinesDict).toBeInstanceOf(PDFDict);
+      const count = (outlinesDict as PDFDict).get(PDFName.of('Count'));
+      expect((count as PDFNumber).asNumber()).toBe(2);
+    });
+
+    it('strips bookmarks when keepBookmarks is false', async () => {
+      const pdf1 = await createTestPdfWithBookmark('Section One', 2);
+      const pdf2 = await createTestPdfWithBookmark('Section Two', 1);
+
+      const merged = await mergePdfs([pdf1, pdf2], { keepBookmarks: false });
+      const doc = await PDFDocument.load(merged);
+
+      const outlinesRef = doc.catalog.get(PDFName.of('Outlines'));
+      expect(outlinesRef).toBeUndefined();
     });
 
     it('throws when empty array is passed to merge', async () => {
@@ -227,6 +291,34 @@ describe('PDF Core Operations', () => {
         expect(res.pageNumbers).toEqual([1, 2, 3]);
         expect(res.indices).toEqual([0, 1, 2]);
         expect(res.remainingCount).toBe(2);
+      });
+    });
+
+    describe('parseRotatePageInput', () => {
+      it('rejects empty and whitespace-only input', () => {
+        expect(parseRotatePageInput('', 5).error).toBeTruthy();
+        expect(parseRotatePageInput('   ', 5).error).toBeTruthy();
+        expect(parseRotatePageInput('', 5).indices).toEqual([]);
+      });
+
+      it('rejects malformed inputs and out-of-range values', () => {
+        expect(parseRotatePageInput('abc', 5).error).toBeTruthy();
+        expect(parseRotatePageInput('4-2', 5).error).toContain('Reversed range');
+        expect(parseRotatePageInput('6', 5).error).toContain('exceeds total document page count');
+      });
+
+      it('allows rotating all pages selectively', () => {
+        const res = parseRotatePageInput('1-5', 5);
+        expect(res.error).toBeUndefined();
+        expect(res.pageNumbers).toEqual([1, 2, 3, 4, 5]);
+        expect(res.indices).toEqual([0, 1, 2, 3, 4]);
+      });
+
+      it('parses mixed ranges and single page selections', () => {
+        const res = parseRotatePageInput('1, 3-4', 5);
+        expect(res.error).toBeUndefined();
+        expect(res.pageNumbers).toEqual([1, 3, 4]);
+        expect(res.indices).toEqual([0, 2, 3]);
       });
     });
   });

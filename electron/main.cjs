@@ -120,17 +120,23 @@ async function flushPendingFiles() {
 const CANONICAL_REPO_PATH = '/intabtools/intabpdf';
 
 // External link check: restrict external browser opening strictly to the
-// canonical GitHub repository and its issues/releases.
+// canonical GitHub repository and web search queries.
 function isAllowedExternalUrl(rawUrl) {
   try {
     const parsed = new URL(rawUrl);
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com') {
+    if (parsed.protocol !== 'https:') {
       return false;
     }
-    return (
-      parsed.pathname === CANONICAL_REPO_PATH ||
-      parsed.pathname.startsWith(`${CANONICAL_REPO_PATH}/`)
-    );
+    if (parsed.hostname === 'github.com') {
+      return (
+        parsed.pathname === CANONICAL_REPO_PATH ||
+        parsed.pathname.startsWith(`${CANONICAL_REPO_PATH}/`)
+      );
+    }
+    if (parsed.hostname === 'www.google.com' || parsed.hostname === 'google.com') {
+      return parsed.pathname === '/search';
+    }
+    return false;
   } catch {
     return false;
   }

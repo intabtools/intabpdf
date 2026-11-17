@@ -2,7 +2,7 @@
 import type { ReactNode, RefObject } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import DropZone from '../components/DropZone';
-import type { OpenedFile } from '../platform';
+import { getPlatformType, type OpenedFile } from '../platform';
 import VisiblePage from './VisiblePage';
 import type { PageSize, PdfDocument } from './renderPage';
 import type { PdfLinkService } from './pdfLinks';
@@ -110,7 +110,11 @@ export default function ViewerPagesView({
           <div className="empty-card">
             <DropZone
               title="Open PDF file"
-              subtitle="Choose a PDF from your device or drop it here to read."
+              subtitle={
+                getPlatformType() === 'android'
+                  ? 'Tap to choose a PDF from your device to read.'
+                  : 'Choose a PDF from your device or drop it here to read.'
+              }
               ctaText="Choose file"
               onFilesSelectedStart={onFilesDroppedStart}
               onFilesSelected={onFilesDropped}

@@ -1,4 +1,5 @@
 // Pure core operation for converting one or more images into a single valid PDF document.
+// Zero DOM or browser dependencies: accepts typed byte arrays (Uint8Array) and returns transformed byte arrays.
 import { PDFDocument } from 'pdf-lib';
 
 export type ImageFormat = 'jpeg' | 'png' | 'webp' | 'unknown';
@@ -21,8 +22,8 @@ const A4_HEIGHT = 841.89;
 
 const MARGIN_POINTS: Record<MarginPreset, number> = {
   none: 0,
-  small: 18,     // 0.25 inch
-  standard: 36,  // 0.50 inch
+  small: 18, // 0.25 inch
+  standard: 36, // 0.50 inch
 };
 
 /**
@@ -62,82 +63,8 @@ export function detectImageFormat(bytes: Uint8Array): ImageFormat {
 }
 
 /**
- * Converts a WebP byte buffer to PNG format using standard HTML5 / OffscreenCanvas APIs.
- * Supports Web Workers (OffscreenCanvas) and DOM environments (HTMLCanvasElement & Image fallback).
- */
-export async function convertWebpToPng(bytes: Uint8Array): Promise<Uint8Array> {
-  const blob = new Blob([bytes as BlobPart], { type: 'image/webp' });
-
-  // 1. Try modern createImageBitmap path (works in workers with OffscreenCanvas, and in modern browsers)
-  if (typeof createImageBitmap !== 'undefined') {
-    try {
-      const bitmap = await createImageBitmap(blob);
-      let pngBlob: Blob | null = null;
-
-      if (typeof OffscreenCanvas !== 'undefined') {
-        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(bitmap, 0, 0);
-          pngBlob = await canvas.convertToBlob({ type: 'image/png' });
-        }
-      } else if (typeof document !== 'undefined') {
-        const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(bitmap, 0, 0);
-          pngBlob = await new Promise<Blob | null>((resolve) => {
-            canvas.toBlob((b) => resolve(b), 'image/png');
-          });
-        }
-      }
-
-      if (pngBlob) {
-        const arrayBuffer = await pngBlob.arrayBuffer();
-        return new Uint8Array(arrayBuffer);
-      }
-    } catch {
-      // Fall through to DOM Image fallback if available
-    }
-  }
-
-  // 2. DOM fallback: Image element + HTMLCanvasElement
-  if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof Image !== 'undefined') {
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error('Failed to load WebP image via Image element.'));
-        image.src = url;
-      });
-
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Could not get 2D canvas context.');
-      ctx.drawImage(img, 0, 0);
-
-      const pngBlob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((b) => resolve(b), 'image/png');
-      });
-
-      if (!pngBlob) throw new Error('Failed to convert canvas to PNG blob.');
-      const arrayBuffer = await pngBlob.arrayBuffer();
-      return new Uint8Array(arrayBuffer);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  throw new Error('WebP conversion is not supported in this runtime environment (requires OffscreenCanvas or DOM Canvas).');
-}
-
-/**
  * Converts an ordered list of image files into a single multi-page PDF document.
+ * Pure byte-oriented core operation: accepts JPEG and PNG byte arrays.
  */
 export async function imagesToPdf(
   images: InputImage[],
@@ -160,33 +87,23 @@ export async function imagesToPdf(
     }
 
     const format = detectImageFormat(item.bytes);
-    if (format === 'unknown') {
+    if (format === 'webp') {
       throw new Error(
-        `Unsupported or unreadable image format for "${item.name}". Please provide JPEG, PNG, or WebP images.`
+        `WebP image "${item.name}" must be converted to PNG or JPEG before core PDF embedding.`
       );
     }
-
-    let imageBytes = item.bytes;
-    let embedFormat = format;
-
-    if (format === 'webp') {
-      try {
-        imageBytes = await convertWebpToPng(item.bytes);
-        embedFormat = 'png';
-      } catch (convErr) {
-        throw new Error(
-          `Failed to process WebP image "${item.name}": ${convErr instanceof Error ? convErr.message : String(convErr)}`,
-          { cause: convErr }
-        );
-      }
+    if (format === 'unknown') {
+      throw new Error(
+        `Unsupported or unreadable image format for "${item.name}". Please provide JPEG or PNG images.`
+      );
     }
 
     let embeddedImage;
     try {
-      if (embedFormat === 'jpeg') {
-        embeddedImage = await doc.embedJpg(imageBytes);
+      if (format === 'jpeg') {
+        embeddedImage = await doc.embedJpg(item.bytes);
       } else {
-        embeddedImage = await doc.embedPng(imageBytes);
+        embeddedImage = await doc.embedPng(item.bytes);
       }
     } catch (embedErr) {
       throw new Error(

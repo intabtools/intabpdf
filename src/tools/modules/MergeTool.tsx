@@ -26,8 +26,14 @@ export default function MergeTool({
 
   const handleRun = async () => {
     await onExecute(async () => {
+      const keepBookmarks = optionsState['bookmarks'] ?? true;
+      const addPageNumbers = optionsState['page-nums'] ?? false;
       return await pdfProcessingService.execute('merge', {
         buffers: stagedFiles.map((f) => f.bytes),
+        options: {
+          keepBookmarks,
+          addPageNumbers,
+        },
       });
     });
   };

@@ -39,12 +39,18 @@ html, body {
   font-size: 14px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 #root {
   height: 100%;
   display: flex;
   flex-direction: column;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 button {
@@ -75,7 +81,11 @@ button:disabled {
    Deliberate UI Selection Policy
    ========================================================================== */
 
-/* Non-selectable application UI: headings, cards, navigation, controls, badges, toolbars */
+/* Non-selectable application UI: headings, cards, navigation, controls, badges, toolbars, footer */
+html,
+body,
+#root,
+.app,
 .hdr,
 .wh,
 .sb,
@@ -106,7 +116,10 @@ button:disabled {
 .tci,
 .dz,
 .cd,
+.card,
+.card.opts,
 .card.opts .sw,
+.tp,
 button,
 .ib,
 .cta,
@@ -130,9 +143,12 @@ button,
 .staged-item-controls,
 .vfs-pill,
 .vfs-btn,
-.viewer-floating-pill {
-  user-select: none;
+.viewer-floating-pill,
+dialog,
+.mo {
   -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
 }
 
 /* Explicit exceptions: areas where text selection must remain naturally available */
@@ -144,22 +160,12 @@ textarea,
 .output-filename-group input,
 .viewer-search-bar input,
 .selectable,
-.output-info,
-.summary-text,
-.doc-text,
-.error-details,
-.err,
-pre,
-code,
+.selectable-text,
 .vwr .textLayer,
-.textLayer,
-.textLayer span,
-.card.busy,
-.card.busy .lede,
-.card.opts .summary,
-.card.opts .summary b {
-  user-select: text;
+.vwr .textLayer * {
   -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 /* App container and layout structure */
@@ -1533,6 +1539,10 @@ details p {
   margin-right: 7px;
 }
 
+html[data-platform="android"] .stb {
+  display: none !important;
+}
+
 /* Command Palette Modal (Ctrl+K) */
 .mo {
   position: absolute;
@@ -1650,7 +1660,7 @@ details p {
   .main {
     background: var(--background);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    padding: 14px 16px 28px;
+    padding: 14px 16px calc(36px + env(safe-area-inset-bottom, 0px));
   }
   .main.flush {
     border-radius: 0;
@@ -1692,13 +1702,29 @@ details p {
   .done {
     padding: 20px 14px;
   }
+  .tool-result-actions {
+    grid-template-columns: 1fr !important;
+  }
   .fi {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 8px 8px;
+    gap: 6px;
+  }
+  .fi .ib.sm {
+    width: 34px;
+    height: 34px;
   }
   .cta {
     font-size: 13.5px;
     padding: 11px 12px;
+  }
+  .mo {
+    padding: 16px 12px calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .dlg {
+    max-height: calc(100vh - 100px);
+  }
+  .pin kbd {
+    display: none;
   }
 }
 
@@ -1722,7 +1748,7 @@ details p {
   .main {
     background: var(--background);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-    padding: 14px 16px 28px;
+    padding: 14px 16px calc(36px + env(safe-area-inset-bottom, 0px));
   }
   .main.flush {
     border-radius: 0;
@@ -1764,13 +1790,29 @@ details p {
   .done {
     padding: 20px 14px;
   }
+  .tool-result-actions {
+    grid-template-columns: 1fr !important;
+  }
   .fi {
-    padding: 8px 10px;
-    gap: 8px;
+    padding: 8px 8px;
+    gap: 6px;
+  }
+  .fi .ib.sm {
+    width: 34px;
+    height: 34px;
   }
   .cta {
     font-size: 13.5px;
     padding: 11px 12px;
+  }
+  .mo {
+    padding: 16px 12px calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .dlg {
+    max-height: calc(100vh - 100px);
+  }
+  .pin kbd {
+    display: none;
   }
 }
 

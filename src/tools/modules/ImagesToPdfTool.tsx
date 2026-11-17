@@ -6,6 +6,8 @@ import OutputFilenameInput from '../../components/OutputFilenameInput';
 import type { ToolComponentProps } from '../types';
 import { pdfProcessingService } from '../../core';
 import type { MarginPreset, PageSizing } from '../../core';
+import { shrinkImageIfNeeded } from './imagesToPdf/imageShrinker';
+import { convertWebpToPng, isWebpImage } from './imagesToPdf/webpConverter';
 
 export default function ImagesToPdfTool({
   tool,
@@ -33,11 +35,25 @@ export default function ImagesToPdfTool({
     if (stagedFiles.length === 0 || isProcessing) return;
 
     await onExecute(async () => {
+      const shouldShrink = optionsState['shrink'] ?? false;
+      const processedImages = await Promise.all(
+        stagedFiles.map(async (f) => {
+          let bytes = f.bytes;
+          if (isWebpImage(bytes)) {
+            bytes = await convertWebpToPng(bytes);
+          }
+          if (shouldShrink) {
+            bytes = await shrinkImageIfNeeded(bytes, f.name, { maxDimension: 1920, quality: 0.85 });
+          }
+          return {
+            name: f.name,
+            bytes,
+          };
+        })
+      );
+
       return await pdfProcessingService.execute('images-to-pdf', {
-        images: stagedFiles.map((f) => ({
-          name: f.name,
-          bytes: f.bytes,
-        })),
+        images: processedImages,
         options: {
           pageSizing,
           margin,

@@ -1,16 +1,31 @@
 // Full-screen file-processing loader for heavy operations (merging, compressing, image conversion, etc.).
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import './processing.css';
 
 interface ProcessingLoadingScreenProps {
   message?: string;
   className?: string;
+  onCancel?: () => void;
 }
 
 export default function ProcessingLoadingScreen({
   message = 'Processing PDF…',
   className = '',
+  onCancel,
 }: ProcessingLoadingScreenProps): ReactNode {
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleCancel = () => {
+    if (isCancelling || !onCancel) return;
+    setIsCancelling(true);
+    try {
+      onCancel();
+    } catch (err) {
+      console.error('Cancellation error:', err);
+    }
+  };
+
   return (
     <div
       className={`processing-full-loading-screen ${className}`}
@@ -50,6 +65,17 @@ export default function ProcessingLoadingScreen({
           </svg>
         </div>
         <span className="processing-loading-text">{message}</span>
+        {onCancel && (
+          <button
+            type="button"
+            className="processing-cancel-btn"
+            onClick={handleCancel}
+            disabled={isCancelling}
+            aria-label="Cancel processing"
+          >
+            {isCancelling ? 'Cancelling…' : 'Cancel'}
+          </button>
+        )}
       </div>
     </div>
   );

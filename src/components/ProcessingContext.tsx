@@ -6,7 +6,12 @@ import { ProcessingContext, type ProcessingContextType } from './processingConte
 export function ProcessingProvider({ children }: { children: ReactNode }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState('Processing PDF…');
+  const [cancelHandler, setCancelHandlerState] = useState<(() => void) | null>(null);
   const activeRequestIdRef = useRef(0);
+
+  const setCancelHandler = useCallback((handler: (() => void) | null) => {
+    setCancelHandlerState(() => handler);
+  }, []);
 
   const startProcessing = useCallback((msg: string): number => {
     const nextId = ++activeRequestIdRef.current;
@@ -21,6 +26,11 @@ export function ProcessingProvider({ children }: { children: ReactNode }) {
       return;
     }
     setIsProcessing(false);
+    setCancelHandlerState(null);
+  }, []);
+
+  const updateMessage = useCallback((msg: string) => {
+    setMessage(msg);
   }, []);
 
   const runWithProcessing = useCallback(
@@ -43,9 +53,12 @@ export function ProcessingProvider({ children }: { children: ReactNode }) {
       message,
       startProcessing,
       stopProcessing,
+      updateMessage,
       runWithProcessing,
+      cancelHandler,
+      setCancelHandler,
     }),
-    [isProcessing, message, startProcessing, stopProcessing, runWithProcessing]
+    [isProcessing, message, startProcessing, stopProcessing, updateMessage, runWithProcessing, cancelHandler, setCancelHandler]
   );
 
   return (

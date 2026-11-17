@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { DragEvent, ReactNode } from 'react';
 import { FileText, Plus } from 'lucide-react';
 import type { OpenedFile } from '../platform';
+import { validateFileSelectionCount } from './dropZoneValidation';
 
 interface DropZoneProps {
   title?: string;
@@ -11,6 +12,7 @@ interface DropZoneProps {
   multiple?: boolean;
   onFilesSelected?: (files: OpenedFile[]) => void;
   onFilesSelectedStart?: (files: FileList | File[]) => void;
+  onMultipleRejected?: (count: number) => void;
   className?: string;
 }
 
@@ -22,18 +24,23 @@ export default function DropZone({
   multiple = false,
   onFilesSelected,
   onFilesSelectedStart,
+  onMultipleRejected,
   className = '',
 }: DropZoneProps): ReactNode {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processFileList = async (fileList: FileList | null) => {
+  const processFileList = async (fileList: FileList | File[] | null) => {
     if (!fileList || fileList.length === 0 || !onFilesSelected) {
       return;
     }
     // Yield to the event loop so the browser paints the loading screen immediately
     await new Promise((resolve) => setTimeout(resolve, 0));
     const openedFiles: OpenedFile[] = [];
+
+    if (!validateFileSelectionCount(fileList.length, multiple, onMultipleRejected)) {
+      return;
+    }
 
     try {
       for (let i = 0; i < fileList.length; i++) {
@@ -76,10 +83,15 @@ export default function DropZone({
   const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFilesSelectedStart?.(e.dataTransfer.files);
+    const rawFiles = e.dataTransfer.files;
+    if (!rawFiles || rawFiles.length === 0) return;
+
+    if (!validateFileSelectionCount(rawFiles.length, multiple, onMultipleRejected)) {
+      return;
     }
-    void processFileList(e.dataTransfer.files);
+
+    onFilesSelectedStart?.(rawFiles);
+    void processFileList(rawFiles);
   };
 
   return (
@@ -98,10 +110,17 @@ export default function DropZone({
         multiple={multiple}
         style={{ display: 'none' }}
         onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) {
-            onFilesSelectedStart?.(e.target.files);
+          const files = e.target.files;
+          if (!files || files.length === 0) return;
+
+          if (!validateFileSelectionCount(files.length, multiple, onMultipleRejected)) {
+            e.target.value = '';
+            return;
           }
-          void processFileList(e.target.files);
+
+          onFilesSelectedStart?.(files);
+          void processFileList(files);
+          e.target.value = '';
         }}
       />
       <span className="di">

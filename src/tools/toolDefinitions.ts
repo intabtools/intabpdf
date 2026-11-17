@@ -23,7 +23,6 @@ export const TOOLS: ToolDefinition[] = [
     availability: 'available',
     component: () => import('./modules/ImagesToPdfTool'),
     options: [
-      { id: 'fit', label: 'Fit photos to page', description: 'Scale each photo to the page', defaultValue: true },
       { id: 'shrink', label: 'Shrink large photos', description: 'Smaller file, same look', defaultValue: false },
     ],
   },
@@ -76,7 +75,6 @@ export const TOOLS: ToolDefinition[] = [
     component: () => import('./modules/SplitTool'),
     options: [
       { id: 'one-per-page', label: 'One file per page', description: 'Otherwise you pick the ranges', defaultValue: false },
-      { id: 'bookmarks', label: 'Keep bookmarks', description: 'Carry them into each part', defaultValue: true },
     ],
   },
   {
@@ -97,7 +95,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: 'rotate',
     name: 'Rotate pages',
-    description: 'Turn all pages the right way up',
+    description: 'Turn pages the right way up',
     category: 'Organize',
     icon: 'rotate',
     fileType: 'pdf',
@@ -110,7 +108,13 @@ export const TOOLS: ToolDefinition[] = [
       {
         id: 'cw',
         label: 'Turn clockwise',
-        description: 'Off turns anticlockwise (rotates all pages in the document)',
+        description: 'Off turns anticlockwise',
+        defaultValue: true,
+      },
+      {
+        id: 'all-pages',
+        label: 'Rotate every page',
+        description: 'Off lets you pick pages',
         defaultValue: true,
       },
     ],
@@ -209,11 +213,9 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Convert',
     noun: 'file',
     outputName: 'pages.zip',
-    availability: 'coming-soon',
-    options: [
-      { id: 'hi-res', label: 'High resolution', description: 'Larger images', defaultValue: false },
-      { id: 'png', label: 'Use PNG', description: 'Instead of JPG', defaultValue: false },
-    ],
+    availability: 'available',
+    component: () => import('./modules/PdfToImagesTool'),
+    options: [],
   },
   {
     id: 'extract-text',
@@ -225,7 +227,8 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Extract text from',
     noun: 'file',
     outputName: 'text.txt',
-    availability: 'coming-soon',
+    availability: 'available',
+    component: () => import('./modules/ExtractTextTool'),
     options: [
       { id: 'line-breaks', label: 'Keep line breaks', description: 'Off joins lines into paragraphs', defaultValue: true },
     ],

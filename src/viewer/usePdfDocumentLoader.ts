@@ -48,6 +48,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     isLoading: contextLoading,
     setIsLoading: setContextLoading,
     pdfDoc: contextPdfDoc = null,
+    activeDocFile = null,
     fileName: contextFileName = '',
     pageSizes: contextPageSizes = [],
     currentPage: contextCurrentPage = 1,
@@ -55,12 +56,25 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     clearDocumentSession,
   } = useViewer();
 
-  const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(() => contextPdfDoc);
-  const [fileName, setFileName] = useState(() => contextFileName || (currentFile ? currentFile.name : ''));
-  const [pageSizes, setPageSizes] = useState<PageSize[]>(() => contextPageSizes);
-  const [currentPage, setCurrentPage] = useState(() => contextCurrentPage || 1);
+  // A session is active only if contextPdfDoc exists AND was created for the exact currentFile instance
+  const isSessionActive = Boolean(
+    contextPdfDoc && activeDocFile && currentFile && currentFile === activeDocFile
+  );
+
+  const [pdfDoc, setPdfDoc] = useState<PdfDocument | null>(() =>
+    isSessionActive ? contextPdfDoc : null
+  );
+  const [fileName, setFileName] = useState(() =>
+    isSessionActive ? contextFileName : currentFile ? currentFile.name : ''
+  );
+  const [pageSizes, setPageSizes] = useState<PageSize[]>(() =>
+    isSessionActive ? contextPageSizes : []
+  );
+  const [currentPage, setCurrentPage] = useState(() =>
+    isSessionActive ? contextCurrentPage || 1 : 1
+  );
   const [internalLoading, setInternalLoading] = useState(
-    () => Boolean(currentFile && !contextPdfDoc)
+    () => Boolean(currentFile && !isSessionActive)
   );
   const [error, setError] = useState<string | null>(null);
   const [passwordPrompt, setPasswordPrompt] = useState<PasswordPromptState | null>(null);
@@ -79,7 +93,9 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
   const isLoading = contextLoading || internalLoading;
 
   const loadRequestRef = useRef(0);
-  const lastOpenedFileRef = useRef<OpenedFile | null>(contextPdfDoc ? currentFile : null);
+  const lastOpenedFileRef = useRef<OpenedFile | null>(
+    isSessionActive ? currentFile : null
+  );
 
   const submitPassword = useCallback((password: string) => {
     if (!passwordCallbackRef.current) return;
