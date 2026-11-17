@@ -1,6 +1,6 @@
 // Reusable sequential batch-processing engine for multi-file PDF operations.
-import { createZip } from '../core';
-import type { ZipEntry } from '../core';
+import { createZip } from '../core/zip';
+import type { ZipEntry } from '../core/zip';
 import { getCleanBaseName } from './filename';
 import type { StagedFile } from './types';
 

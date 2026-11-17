@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import '../viewer/pdfjs-polyfills';
+import { createCanvas } from '@napi-rs/canvas';
 import { PDFDocument, PDFName, PDFString, PDFNumber, PDFDict } from 'pdf-lib';
 import { destroyPdf, getPageSize, loadPdf } from '../viewer/renderPage';
 import {
@@ -45,6 +47,18 @@ const TEST_PNG_1X2 = new Uint8Array([
   0x0b, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x60, 0x00, 0x02, 0x00,
   0x00, 0x0a, 0x00, 0x02, 0x9c, 0xec, 0x06, 0x59, 0x00, 0x00, 0x00, 0x00,
   0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+]);
+
+// Valid 2x2 asymmetric PNG bytes (TL: red, TR: green, BL: blue, BR: white)
+const TEST_PNG_ASYMMETRIC_2X2 = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02,
+  0x02, 0x03, 0x00, 0x00, 0x00, 0x0f, 0xd8, 0xe5, 0xb7, 0x00, 0x00, 0x00,
+  0x0c, 0x50, 0x4c, 0x54, 0x45, 0xff, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00,
+  0x00, 0xff, 0xff, 0xff, 0xff, 0xfb, 0x00, 0x60, 0xf6, 0x00, 0x00, 0x00,
+  0x0c, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x10, 0x60, 0xd8, 0x00,
+  0x00, 0x00, 0xe4, 0x00, 0xc1, 0x27, 0xa8, 0xe8, 0x57, 0x00, 0x00, 0x00,
+  0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 ]);
 
 // Valid 1x1 JPEG bytes
@@ -532,22 +546,260 @@ describe('PDF Core Operations', () => {
       expect(doc.getPage(2).getHeight()).toBe(2);
     });
 
-    it('creates A4 pages with automatic orientation (landscape vs portrait)', async () => {
-      const pdfBytes = await imagesToPdf([
-        { name: 'landscape.png', bytes: TEST_PNG_2X1 }, // 2x1 -> landscape
-        { name: 'portrait.png', bytes: TEST_PNG_1X2 },  // 1x2 -> portrait
-      ], { pageSizing: 'a4', margin: 'none' });
+    it('guarantees 100% uniform page dimensions in A4 Portrait mode across mixed aspect ratio images (Issue #27 fix)', async () => {
+      // Input images with different aspect ratios: landscape (2x1), square (1x1), and portrait (1x2)
+      const pdfBytes = await imagesToPdf(
+        [
+          { name: 'landscape.png', bytes: TEST_PNG_2X1 },
+          { name: 'square.jpg', bytes: TEST_JPEG_1X1 },
+          { name: 'portrait.png', bytes: TEST_PNG_1X2 },
+        ],
+        { pageSize: 'a4', orientation: 'portrait', margin: 'none' }
+      );
+
+      const doc = await PDFDocument.load(pdfBytes);
+      expect(doc.getPageCount()).toBe(3);
+
+      // Issue #27 guarantee: Every single page has identical A4 portrait dimensions
+      for (let i = 0; i < doc.getPageCount(); i++) {
+        expect(doc.getPage(i).getWidth()).toBeCloseTo(595.28, 1);
+        expect(doc.getPage(i).getHeight()).toBeCloseTo(841.89, 1);
+      }
+    });
+
+    it('guarantees 100% uniform page dimensions in A4 Landscape mode across mixed aspect ratio images', async () => {
+      const pdfBytes = await imagesToPdf(
+        [
+          { name: 'portrait.png', bytes: TEST_PNG_1X2 },
+          { name: 'square.jpg', bytes: TEST_JPEG_1X1 },
+          { name: 'landscape.png', bytes: TEST_PNG_2X1 },
+        ],
+        { pageSize: 'a4', orientation: 'landscape', margin: 'small' }
+      );
+
+      const doc = await PDFDocument.load(pdfBytes);
+      expect(doc.getPageCount()).toBe(3);
+
+      for (let i = 0; i < doc.getPageCount(); i++) {
+        expect(doc.getPage(i).getWidth()).toBeCloseTo(841.89, 1);
+        expect(doc.getPage(i).getHeight()).toBeCloseTo(595.28, 1);
+      }
+    });
+
+    it('resolves Auto orientation via commutative majority vote with tie-breaker', async () => {
+      // Test 1: Majority Landscape (2 landscape, 1 portrait) -> Landscape A4 across all pages
+      const landscapeMajorityPdf = await imagesToPdf(
+        [
+          { name: 'l1.png', bytes: TEST_PNG_2X1 },
+          { name: 'l2.png', bytes: TEST_PNG_2X1 },
+          { name: 'p1.png', bytes: TEST_PNG_1X2 },
+        ],
+        { pageSize: 'a4', orientation: 'auto' }
+      );
+      const docL = await PDFDocument.load(landscapeMajorityPdf);
+      for (let i = 0; i < docL.getPageCount(); i++) {
+        expect(docL.getPage(i).getWidth()).toBeCloseTo(841.89, 1);
+        expect(docL.getPage(i).getHeight()).toBeCloseTo(595.28, 1);
+      }
+
+      // Test 2: Majority Portrait (1 landscape, 2 portrait) -> Portrait A4 across all pages
+      const portraitMajorityPdf = await imagesToPdf(
+        [
+          { name: 'l1.png', bytes: TEST_PNG_2X1 },
+          { name: 'p1.png', bytes: TEST_PNG_1X2 },
+          { name: 'p2.png', bytes: TEST_PNG_1X2 },
+        ],
+        { pageSize: 'a4', orientation: 'auto' }
+      );
+      const docP = await PDFDocument.load(portraitMajorityPdf);
+      for (let i = 0; i < docP.getPageCount(); i++) {
+        expect(docP.getPage(i).getWidth()).toBeCloseTo(595.28, 1);
+        expect(docP.getPage(i).getHeight()).toBeCloseTo(841.89, 1);
+      }
+
+      // Test 3: Equal counts (1 landscape, 1 portrait) -> Portrait tie-breaker
+      const tiePdf = await imagesToPdf(
+        [
+          { name: 'l1.png', bytes: TEST_PNG_2X1 },
+          { name: 'p1.png', bytes: TEST_PNG_1X2 },
+        ],
+        { pageSize: 'a4', orientation: 'auto' }
+      );
+      const docTie = await PDFDocument.load(tiePdf);
+      for (let i = 0; i < docTie.getPageCount(); i++) {
+        expect(docTie.getPage(i).getWidth()).toBeCloseTo(595.28, 1);
+        expect(docTie.getPage(i).getHeight()).toBeCloseTo(841.89, 1);
+      }
+
+      // Test 4: Reordering invariance (reordering images does not change the document orientation)
+      const tiePdfReordered = await imagesToPdf(
+        [
+          { name: 'p1.png', bytes: TEST_PNG_1X2 },
+          { name: 'l1.png', bytes: TEST_PNG_2X1 },
+        ],
+        { pageSize: 'a4', orientation: 'auto' }
+      );
+      const docTieReordered = await PDFDocument.load(tiePdfReordered);
+      for (let i = 0; i < docTieReordered.getPageCount(); i++) {
+        expect(docTieReordered.getPage(i).getWidth()).toBeCloseTo(595.28, 1);
+        expect(docTieReordered.getPage(i).getHeight()).toBeCloseTo(841.89, 1);
+      }
+    });
+
+    it('supports native image rotation and swaps dimensions correctly in Fit to Photo', async () => {
+      // 2x1 landscape image rotated 90° CW becomes 1x2 portrait shape
+      const pdfBytes = await imagesToPdf(
+        [
+          { name: 'unrotated.png', bytes: TEST_PNG_2X1, rotation: 0 },
+          { name: 'rotated90.png', bytes: TEST_PNG_2X1, rotation: 90 },
+          { name: 'rotated180.png', bytes: TEST_PNG_2X1, rotation: 180 },
+          { name: 'rotated270.png', bytes: TEST_PNG_2X1, rotation: 270 },
+        ],
+        { pageSize: 'fit', margin: 'none' }
+      );
+
+      const doc = await PDFDocument.load(pdfBytes);
+      expect(doc.getPageCount()).toBe(4);
+
+      // Page 0 (0°): 2x1
+      expect(doc.getPage(0).getWidth()).toBe(2);
+      expect(doc.getPage(0).getHeight()).toBe(1);
+
+      // Page 1 (90° CW): width and height swapped -> 1x2
+      expect(doc.getPage(1).getWidth()).toBe(1);
+      expect(doc.getPage(1).getHeight()).toBe(2);
+
+      // Page 2 (180° CW): 2x1
+      expect(doc.getPage(2).getWidth()).toBe(2);
+      expect(doc.getPage(2).getHeight()).toBe(1);
+
+      // Page 3 (270° CW): width and height swapped -> 1x2
+      expect(doc.getPage(3).getWidth()).toBe(1);
+      expect(doc.getPage(3).getHeight()).toBe(2);
+    });
+
+    it('supports Cover mode and Black background color', async () => {
+      const pdfBytes = await imagesToPdf(
+        [
+          { name: 'cover-test.png', bytes: TEST_PNG_2X1 },
+        ],
+        {
+          pageSize: 'a4',
+          orientation: 'portrait',
+          imageFit: 'cover',
+          backgroundColor: 'black',
+          margin: 'small',
+        }
+      );
+
+      const doc = await PDFDocument.load(pdfBytes);
+      expect(doc.getPageCount()).toBe(1);
+      expect(doc.getPage(0).getWidth()).toBeCloseTo(595.28, 1);
+      expect(doc.getPage(0).getHeight()).toBeCloseTo(841.89, 1);
+    });
+
+    it('reserves footer space and prevents overlap when page numbering is enabled with None margins', async () => {
+      const pdfBytes = await imagesToPdf(
+        [
+          { name: 'p1.png', bytes: TEST_PNG_1X1 },
+          { name: 'p2.png', bytes: TEST_PNG_1X1 },
+        ],
+        {
+          pageSize: 'a4',
+          orientation: 'portrait',
+          margin: 'none',
+          addPageNumbers: true,
+        }
+      );
 
       const doc = await PDFDocument.load(pdfBytes);
       expect(doc.getPageCount()).toBe(2);
+      expect(doc.getPage(0).getWidth()).toBeCloseTo(595.28, 1);
+      expect(doc.getPage(0).getHeight()).toBeCloseTo(841.89, 1);
+    });
 
-      // A4 page 1 (landscape): width ~841.89, height ~595.28
-      expect(doc.getPage(0).getWidth()).toBeCloseTo(841.89, 1);
-      expect(doc.getPage(0).getHeight()).toBeCloseTo(595.28, 1);
+    it('renders asymmetric image across all 4 rotation angles and verifies orientation placement (Safeguard 2)', async () => {
+      const pdfBytes = await imagesToPdf(
+        [
+          { name: 'rot0.png', bytes: TEST_PNG_ASYMMETRIC_2X2, rotation: 0 },
+          { name: 'rot90.png', bytes: TEST_PNG_ASYMMETRIC_2X2, rotation: 90 },
+          { name: 'rot180.png', bytes: TEST_PNG_ASYMMETRIC_2X2, rotation: 180 },
+          { name: 'rot270.png', bytes: TEST_PNG_ASYMMETRIC_2X2, rotation: 270 },
+        ],
+        { pageSize: 'fit', margin: 'none' }
+      );
 
-      // A4 page 2 (portrait): width ~595.28, height ~841.89
-      expect(doc.getPage(1).getWidth()).toBeCloseTo(595.28, 1);
-      expect(doc.getPage(1).getHeight()).toBeCloseTo(841.89, 1);
+      // Verify with PDF.js independent reader
+      const doc = await loadPdf(pdfBytes);
+      expect(doc.numPages).toBe(4);
+
+      // Corner color expectations for genuine 2x2 asymmetric image:
+      // Original: TL=Red [255,0,0,255], TR=Green [0,255,0,255], BL=Blue [0,0,255,255], BR=White [255,255,255,255]
+      const expectedCorners: Record<number, { tl: number[]; tr: number[]; bl: number[]; br: number[] }> = {
+        // Page 1 (0° CW): natural orientation
+        1: {
+          tl: [255, 0, 0, 255],
+          tr: [0, 255, 0, 255],
+          bl: [0, 0, 255, 255],
+          br: [255, 255, 255, 255],
+        },
+        // Page 2 (90° CW):
+        // (0,0) Red -> TR; (1,0) Green -> BR; (0,1) Blue -> TL; (1,1) White -> BL
+        2: {
+          tl: [0, 0, 255, 255],
+          tr: [255, 0, 0, 255],
+          bl: [255, 255, 255, 255],
+          br: [0, 255, 0, 255],
+        },
+        // Page 3 (180° CW):
+        // (0,0) Red -> BR; (1,0) Green -> BL; (0,1) Blue -> TR; (1,1) White -> TL
+        3: {
+          tl: [255, 255, 255, 255],
+          tr: [0, 0, 255, 255],
+          bl: [0, 255, 0, 255],
+          br: [255, 0, 0, 255],
+        },
+        // Page 4 (270° CW):
+        // (0,0) Red -> BL; (1,0) Green -> TL; (0,1) Blue -> BR; (1,1) White -> TR
+        4: {
+          tl: [0, 255, 0, 255],
+          tr: [255, 255, 255, 255],
+          bl: [255, 0, 0, 255],
+          br: [0, 0, 255, 255],
+        },
+      };
+
+      for (let p = 1; p <= 4; p++) {
+        const pageSize = await getPageSize(doc, p);
+        expect(pageSize.width).toBe(2);
+        expect(pageSize.height).toBe(2);
+
+        // Rasterize page onto genuine canvas via PDF.js and @napi-rs/canvas
+        const page = await doc.getPage(p);
+        const viewport = page.getViewport({ scale: 100 }); // 2x2 pt scaled to 200x200 px
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const ctx = canvas.getContext('2d');
+        await page.render({
+          canvasContext: ctx as unknown as CanvasRenderingContext2D,
+          canvas: canvas as unknown as HTMLCanvasElement,
+          viewport,
+        }).promise;
+
+        // Sample center of all 4 corners: TL (50,50), TR (150,50), BL (50,150), BR (150,150)
+        const samplePixel = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data);
+        const tl = samplePixel(50, 50);
+        const tr = samplePixel(150, 50);
+        const bl = samplePixel(50, 150);
+        const br = samplePixel(150, 150);
+
+        const exp = expectedCorners[p];
+        expect(tl).toEqual(exp.tl);
+        expect(tr).toEqual(exp.tr);
+        expect(bl).toEqual(exp.bl);
+        expect(br).toEqual(exp.br);
+      }
+
+      await destroyPdf(doc);
     });
 
     it('applies margin presets correctly', async () => {

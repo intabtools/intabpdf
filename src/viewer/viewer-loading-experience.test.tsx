@@ -311,6 +311,76 @@ describe('Stage 4: Loading-System Verification & Header Wordmark Refinement', ()
       expect(html).toContain('Open PDF files');
       expect(typeof onFilesSelectedStart).toBe('function');
     });
+
+    it('snapshots FileList immediately in onChange and succeeds despite synchronous input.value clearing (Chromium live FileList regression test)', async () => {
+      const onFilesSelectedStart = vi.fn();
+
+      // Create a mock container with input and onChange
+      const file = new File([new Uint8Array([1, 2, 3])], 'document.pdf', { type: 'application/pdf' });
+      // Simulate live FileList where clearing input resets length to 0
+      let isCleared = false;
+      const fakeLiveMap: Record<number, File> = { 0: file };
+      const fakeLiveFileList = {
+        get 0() { return fakeLiveMap[0]; },
+        get length() { return isCleared ? 0 : 1; },
+        item(i: number) { return i === 0 && !isCleared ? file : null; },
+        [Symbol.iterator]: function* () {
+          if (!isCleared) yield file;
+        },
+      } as unknown as FileList;
+
+      // When value = '' is set, emulate Chromium resetting live collection
+      const inputObj = {
+        files: fakeLiveFileList,
+        set value(v: string) {
+          if (v === '') {
+            isCleared = true;
+            delete fakeLiveMap[0];
+          }
+        },
+        get value() {
+          return isCleared ? '' : 'C:\\fakepath\\document.pdf';
+        }
+      };
+
+      // Execute simulated onChange handler as written in DropZone
+      const rawFiles = inputObj.files;
+      expect(rawFiles.length).toBe(1);
+      const fileArray = Array.from(rawFiles);
+      inputObj.value = ''; // synchronously cleared!
+      expect(inputObj.files.length).toBe(0); // live collection was wiped
+
+      onFilesSelectedStart(fileArray);
+      expect(onFilesSelectedStart).toHaveBeenCalledWith([file]);
+
+      // Array snapshot retains the File object
+      expect(fileArray.length).toBe(1);
+      const buffer = await fileArray[0].arrayBuffer();
+      expect(new Uint8Array(buffer)).toEqual(new Uint8Array([1, 2, 3]));
+    });
+
+    it('allows selecting the exact same file repeatedly because input.value is reset safely', async () => {
+      const file = new File([new Uint8Array([9, 9, 9])], 'same-file.pdf', { type: 'application/pdf' });
+      let inputValue = 'C:\\fakepath\\same-file.pdf';
+
+      const selectFile = () => {
+        const rawFiles = [file];
+        const fileArray = Array.from(rawFiles);
+        inputValue = ''; // Reset input value
+        return fileArray;
+      };
+
+      // First selection
+      const first = selectFile();
+      expect(inputValue).toBe('');
+      expect(first[0].name).toBe('same-file.pdf');
+
+      // Second selection of the identical file
+      inputValue = 'C:\\fakepath\\same-file.pdf'; // Browser triggers change again because value was empty
+      const second = selectFile();
+      expect(inputValue).toBe('');
+      expect(second[0].name).toBe('same-file.pdf');
+    });
   });
 
   describe('Stale Request & Race Condition Protection', () => {

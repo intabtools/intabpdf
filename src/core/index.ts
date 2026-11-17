@@ -32,11 +32,19 @@ export type { ZipEntry } from './zip';
 export {
   imagesToPdf,
   detectImageFormat,
+  A4_WIDTH,
+  A4_HEIGHT,
+  MARGIN_POINTS,
+  FOOTER_RESERVE_POINTS,
 } from './images-to-pdf';
 export type {
   InputImage,
   ImagesToPdfOptions,
+  PageSize,
   PageSizing,
+  PageOrientation,
+  ImageFit,
+  PageBackground,
   MarginPreset,
   ImageFormat,
 } from './images-to-pdf';

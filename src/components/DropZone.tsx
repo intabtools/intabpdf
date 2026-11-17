@@ -85,13 +85,14 @@ export default function DropZone({
     setIsDragging(false);
     const rawFiles = e.dataTransfer.files;
     if (!rawFiles || rawFiles.length === 0) return;
+    const fileArray = Array.from(rawFiles);
 
-    if (!validateFileSelectionCount(rawFiles.length, multiple, onMultipleRejected)) {
+    if (!validateFileSelectionCount(fileArray.length, multiple, onMultipleRejected)) {
       return;
     }
 
-    onFilesSelectedStart?.(rawFiles);
-    void processFileList(rawFiles);
+    onFilesSelectedStart?.(fileArray);
+    void processFileList(fileArray);
   };
 
   return (
@@ -110,17 +111,17 @@ export default function DropZone({
         multiple={multiple}
         style={{ display: 'none' }}
         onChange={(e) => {
-          const files = e.target.files;
-          if (!files || files.length === 0) return;
+          const rawFiles = e.target.files;
+          if (!rawFiles || rawFiles.length === 0) return;
+          const fileArray = Array.from(rawFiles);
+          e.target.value = '';
 
-          if (!validateFileSelectionCount(files.length, multiple, onMultipleRejected)) {
-            e.target.value = '';
+          if (!validateFileSelectionCount(fileArray.length, multiple, onMultipleRejected)) {
             return;
           }
 
-          onFilesSelectedStart?.(files);
-          void processFileList(files);
-          e.target.value = '';
+          onFilesSelectedStart?.(fileArray);
+          void processFileList(fileArray);
         }}
       />
       <span className="di">
