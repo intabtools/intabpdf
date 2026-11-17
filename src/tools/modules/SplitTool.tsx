@@ -94,17 +94,21 @@ export default function SplitTool({
   const handleRun = async () => {
     if (!isValidToSplit || !file) return;
 
-    await onExecute(async () => {
+    await onExecute(async (signal) => {
       const cleanBase = (outputBaseName && outputBaseName.trim())
         ? outputBaseName.trim()
         : (defaultBaseName || file.name);
-      return await pdfProcessingService.execute('split', {
-        buffer: file.bytes,
-        ranges: activeRanges,
-        splitOptions: {
-          baseName: cleanBase,
+      return await pdfProcessingService.execute(
+        'split',
+        {
+          buffer: file.bytes,
+          ranges: activeRanges,
+          splitOptions: {
+            baseName: cleanBase,
+          },
         },
-      });
+        { signal }
+      );
     });
   };
 

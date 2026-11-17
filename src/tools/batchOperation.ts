@@ -21,7 +21,8 @@ export interface BatchOperationOptions {
   stagedFiles: StagedFile[];
   processFile: (
     file: StagedFile,
-    index: number
+    index: number,
+    signal?: AbortSignal
   ) => Promise<BatchItemOutput | BatchItemOutput[]>;
   updateMessage?: (message: string) => void;
   onExtraStateChange?: (key: string, value: unknown) => void;
@@ -71,7 +72,7 @@ export async function executeBatchOperation({
     }
 
     try {
-      const result = await processFile(curFile, i);
+      const result = await processFile(curFile, i, signal);
 
       // Check if cancelled immediately after processFile finishes
       if (signal?.aborted) {

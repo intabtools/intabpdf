@@ -38,7 +38,7 @@ export interface ToolComponentProps {
   onFilesChange?: (files: StagedFile[]) => void;
   optionsState: Record<string, boolean>;
   onOptionsChange: (options: Record<string, boolean>) => void;
-  onExecute: (runner: () => Promise<Uint8Array>) => Promise<void>;
+  onExecute: (runner: (signal: AbortSignal) => Promise<Uint8Array>) => Promise<void>;
   isProcessing: boolean;
   extraState?: Record<string, unknown>;
   onExtraStateChange?: (key: string, value: unknown) => void;

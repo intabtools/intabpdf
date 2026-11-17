@@ -34,57 +34,43 @@ export default function ExtractTextTool({
   const handleRun = async () => {
     if (stagedFiles.length === 0) return;
 
-    const isMultiFile = stagedFiles.length > 1;
-    const abortController = isMultiFile ? new AbortController() : null;
-    if (abortController) {
-      processing?.setCancelHandler?.(() => {
-        abortController.abort();
-      });
-    }
+    await onExecute(async (signal) => {
+      const keepLineBreaks = optionsState['line-breaks'] ?? true;
 
-    try {
-      await onExecute(async () => {
-        const keepLineBreaks = optionsState['line-breaks'] ?? true;
-
-        if (stagedFiles.length === 1) {
-          const res = await extractTextFromPdf(stagedFiles[0].bytes, { keepLineBreaks });
-          onExtraStateChange?.('hasImages', res.hasImages ?? false);
-          onExtraStateChange?.('wordCount', res.wordCount);
-          onExtraStateChange?.('isScanned', Boolean(res.hasImages && res.wordCount === 0));
-          return new TextEncoder().encode(res.text);
-        }
-
-        let totalWordCount = 0;
-        let hasAnyImages = false;
-
-        const zipBytes = await executeBatchOperation({
-          actionVerb: 'Extracting text',
-          stagedFiles,
-          updateMessage: processing?.updateMessage,
-          onExtraStateChange,
-          signal: abortController?.signal,
-          processFile: async (curFile) => {
-            const res = await extractTextFromPdf(curFile.bytes, { keepLineBreaks });
-            totalWordCount += res.wordCount;
-            if (res.hasImages) hasAnyImages = true;
-
-            const cleanBase = getCleanBaseName(curFile.name) || 'document';
-            return {
-              name: `${cleanBase}.txt`,
-              bytes: new TextEncoder().encode(res.text),
-            };
-          },
-        });
-
-        onExtraStateChange?.('hasImages', hasAnyImages);
-        onExtraStateChange?.('wordCount', totalWordCount);
-        return zipBytes;
-      });
-    } finally {
-      if (isMultiFile) {
-        processing?.setCancelHandler?.(null);
+      if (stagedFiles.length === 1) {
+        const res = await extractTextFromPdf(stagedFiles[0].bytes, { keepLineBreaks }, signal);
+        onExtraStateChange?.('hasImages', res.hasImages ?? false);
+        onExtraStateChange?.('wordCount', res.wordCount);
+        onExtraStateChange?.('isScanned', Boolean(res.hasImages && res.wordCount === 0));
+        return new TextEncoder().encode(res.text);
       }
-    }
+
+      let totalWordCount = 0;
+      let hasAnyImages = false;
+
+      const zipBytes = await executeBatchOperation({
+        actionVerb: 'Extracting text',
+        stagedFiles,
+        updateMessage: processing?.updateMessage,
+        onExtraStateChange,
+        signal,
+        processFile: async (curFile) => {
+          const res = await extractTextFromPdf(curFile.bytes, { keepLineBreaks }, signal);
+          totalWordCount += res.wordCount;
+          if (res.hasImages) hasAnyImages = true;
+
+          const cleanBase = getCleanBaseName(curFile.name) || 'document';
+          return {
+            name: `${cleanBase}.txt`,
+            bytes: new TextEncoder().encode(res.text),
+          };
+        },
+      });
+
+      onExtraStateChange?.('hasImages', hasAnyImages);
+      onExtraStateChange?.('wordCount', totalWordCount);
+      return zipBytes;
+    });
   };
 
   return (

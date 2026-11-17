@@ -187,10 +187,14 @@ export async function getPdfPageCount(buffer: Uint8Array): Promise<number> {
 export async function splitPdfPages(
   buffer: Uint8Array,
   ranges: PageRange[],
-  options?: SplitOptions
+  options?: SplitOptions,
+  signal?: AbortSignal
 ): Promise<SplitPdfResult> {
   if (!buffer || buffer.byteLength === 0) {
     throw new Error('No PDF buffer provided to split.');
+  }
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   let srcDoc: PDFDocument;
@@ -211,6 +215,15 @@ export async function splitPdfPages(
   const outputs: SplitOutput[] = [];
 
   for (let i = 0; i < ranges.length; i++) {
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+    // Yield to event loop between ranges
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+
     const range = ranges[i];
     const newDoc = await PDFDocument.create();
 
@@ -236,6 +249,10 @@ export async function splitPdfPages(
       endPage: range.end,
       pageCount: pageIndices.length,
     });
+  }
+
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   // Create ZIP archive containing all split files

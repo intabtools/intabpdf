@@ -81,66 +81,61 @@ export default function RotateTool({
   const handleRun = async () => {
     if (!canExecute || stagedFiles.length === 0) return;
 
-    const abortController = isMultiFile ? new AbortController() : null;
-    if (abortController) {
-      processing?.setCancelHandler?.(() => {
-        abortController.abort();
-      });
-    }
-
-    try {
-      await onExecute(async () => {
-        if (stagedFiles.length === 1) {
-          const pageIndices = !allPages && validation ? validation.indices : undefined;
-          return await pdfProcessingService.execute('rotate', {
+    await onExecute(async (signal) => {
+      if (stagedFiles.length === 1) {
+        const pageIndices = !allPages && validation ? validation.indices : undefined;
+        return await pdfProcessingService.execute(
+          'rotate',
+          {
             buffer: stagedFiles[0].bytes,
             options: {
               clockwise: isCw,
               allPages,
               pageIndices,
             },
-          });
-        }
+          },
+          { signal }
+        );
+      }
 
-        return await executeBatchOperation({
-          actionVerb: 'Rotating',
-          stagedFiles,
-          updateMessage: processing?.updateMessage,
-          onExtraStateChange,
-          signal: abortController?.signal,
-          processFile: async (curFile) => {
-            let pageIndices: number[] | undefined;
-            if (!allPages) {
-              const docPageCount = await getPdfPageCount(curFile.bytes);
-              const parsed = parseRotatePageInput(pagesInput, docPageCount);
-              if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-              pageIndices = parsed.indices;
+      return await executeBatchOperation({
+        actionVerb: 'Rotating',
+        stagedFiles,
+        updateMessage: processing?.updateMessage,
+        onExtraStateChange,
+        signal,
+        processFile: async (curFile) => {
+          let pageIndices: number[] | undefined;
+          if (!allPages) {
+            const docPageCount = await getPdfPageCount(curFile.bytes);
+            const parsed = parseRotatePageInput(pagesInput, docPageCount);
+            if (parsed.error) {
+              throw new Error(parsed.error);
             }
+            pageIndices = parsed.indices;
+          }
 
-            const rotatedBytes = await pdfProcessingService.execute('rotate', {
+          const rotatedBytes = await pdfProcessingService.execute(
+            'rotate',
+            {
               buffer: curFile.bytes,
               options: {
                 clockwise: isCw,
                 allPages,
                 pageIndices,
               },
-            });
+            },
+            { signal }
+          );
 
-            const cleanBase = getCleanBaseName(curFile.name) || 'document';
-            return {
-              name: `rotated-${cleanBase}.pdf`,
-              bytes: rotatedBytes,
-            };
-          },
-        });
+          const cleanBase = getCleanBaseName(curFile.name) || 'document';
+          return {
+            name: `rotated-${cleanBase}.pdf`,
+            bytes: rotatedBytes,
+          };
+        },
       });
-    } finally {
-      if (isMultiFile) {
-        processing?.setCancelHandler?.(null);
-      }
-    }
+    });
   };
 
   const ctaLabel = isProcessing

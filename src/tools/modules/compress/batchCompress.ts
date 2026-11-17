@@ -54,15 +54,19 @@ export async function executeBatchCompression(
     }
 
     try {
-      const compressedBytes = await pdfProcessingService.execute('compress', {
-        buffer: curFile.bytes,
-        options: {
-          targetBytes: options.mode === 'target' ? (options.targetBytes ?? undefined) : undefined,
-          preset: options.corePreset,
-          downsampleImages: options.downsampleImages ?? true,
-          stripMetadata: options.stripMetadata ?? true,
+      const compressedBytes = await pdfProcessingService.execute(
+        'compress',
+        {
+          buffer: curFile.bytes,
+          options: {
+            targetBytes: options.mode === 'target' ? (options.targetBytes ?? undefined) : undefined,
+            preset: options.corePreset,
+            downsampleImages: options.downsampleImages ?? true,
+            stripMetadata: options.stripMetadata ?? true,
+          },
         },
-      });
+        { signal: callbacks?.signal }
+      );
 
       if (callbacks?.signal?.aborted) {
         throw new DOMException('Operation cancelled', 'AbortError');

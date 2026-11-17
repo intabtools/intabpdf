@@ -163,8 +163,13 @@ export function parseRemovePageInput(
  */
 export async function removePdfPages(
   pdfBuffer: Uint8Array,
-  pageIndicesToRemove: number[]
+  pageIndicesToRemove: number[],
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+  }
+
   const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
 
@@ -188,6 +193,10 @@ export async function removePdfPages(
   const sortedIndices = Array.from(toRemove).sort((a, b) => b - a);
   for (const idx of sortedIndices) {
     pdfDoc.removePage(idx);
+  }
+
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   return await pdfDoc.save();

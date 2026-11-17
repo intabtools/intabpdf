@@ -1,5 +1,5 @@
 // Full-screen file-processing loader for heavy operations (merging, compressing, image conversion, etc.).
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import './processing.css';
 
@@ -16,7 +16,7 @@ export default function ProcessingLoadingScreen({
 }: ProcessingLoadingScreenProps): ReactNode {
   const [isCancelling, setIsCancelling] = useState(false);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     if (isCancelling || !onCancel) return;
     setIsCancelling(true);
     try {
@@ -24,7 +24,22 @@ export default function ProcessingLoadingScreen({
     } catch (err) {
       console.error('Cancellation error:', err);
     }
-  };
+  }, [isCancelling, onCancel]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !onCancel) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleCancel();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCancel, onCancel]);
 
   return (
     <div
