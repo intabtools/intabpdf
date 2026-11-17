@@ -1,11 +1,11 @@
 // List of staged files with drag-and-drop, touch fling, and keyboard reordering support.
 import { useEffect, useRef } from 'react';
 import type { DragEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode, TouchEvent } from 'react';
-import { ChevronDown, ChevronUp, FileText, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, GripVertical, RotateCw, X } from 'lucide-react';
 import { formatBytes } from '../../core/formatBytes';
 import type { StagedFile } from '../../tools/types';
 
-function ThumbnailPreview({ file }: { file: StagedFile }): ReactNode {
+function ThumbnailPreview({ file, rotation = 0 }: { file: StagedFile; rotation?: number }): ReactNode {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const isImage = Boolean(file.name.match(/\.(jpe?g|png|webp|gif|bmp)$/i) && file.bytes);
 
@@ -36,6 +36,8 @@ function ThumbnailPreview({ file }: { file: StagedFile }): ReactNode {
         maxHeight: '100%',
         objectFit: 'cover',
         borderRadius: '2px',
+        transform: rotation ? `rotate(${rotation}deg)` : undefined,
+        transition: 'transform 0.15s ease',
       }}
     />
   );
@@ -46,6 +48,8 @@ interface StagedFileListProps {
   stagedFiles: StagedFile[];
   draggedIndex: number | null;
   dragOver: { index: number; position: 'before' | 'after' } | null;
+  imageEdits?: Record<string, { rotation?: number; crop?: unknown }>;
+  onRotateFile?: (index: number) => void;
   onDragStart: (e: DragEvent, index: number) => void;
   onDragOver: (e: DragEvent, index: number) => void;
   onDragLeave: (e: DragEvent) => void;
@@ -65,6 +69,8 @@ export default function StagedFileList({
   stagedFiles,
   draggedIndex,
   dragOver,
+  imageEdits,
+  onRotateFile,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -148,7 +154,7 @@ export default function StagedFileList({
                       padding: 0,
                     }}
                   >
-                    <ThumbnailPreview file={file} />
+                    <ThumbnailPreview file={file} rotation={imageEdits?.[file.id]?.rotation || 0} />
                   </div>
                 </div>
               </button>
@@ -178,10 +184,34 @@ export default function StagedFileList({
                   {file.name}
                 </b>
               </div>
-              <small>{formatBytes(file.size)}</small>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <small>{formatBytes(file.size)}</small>
+                {Boolean(imageEdits?.[file.id]?.rotation && imageEdits[file.id]!.rotation !== 0) && (
+                  <small style={{ color: 'var(--primary, #3b82f6)', fontWeight: 500 }}>
+                    {imageEdits?.[file.id]?.rotation}°
+                  </small>
+                )}
+                {Boolean(imageEdits?.[file.id]?.crop) && (
+                  <small style={{ color: 'var(--primary, #3b82f6)', fontWeight: 500 }}>
+                    cropped
+                  </small>
+                )}
+              </div>
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {onRotateFile && isFileImage && (
+                <button
+                  type="button"
+                  className="ib sm"
+                  onClick={() => onRotateFile(index)}
+                  aria-label={`Rotate ${file.name} 90 degrees`}
+                  title="Rotate 90° clockwise"
+                  draggable={false}
+                >
+                  <RotateCw size={15} />
+                </button>
+              )}
               {stagedFiles.length > 1 && (
                 <>
                   <button

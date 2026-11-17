@@ -2,7 +2,6 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
 import { useShell } from '../hooks/useShell';
 import { ViewerContext } from '../viewer/viewerContextDef';
 import { ProcessingContext } from './processingContextDef';
@@ -125,33 +124,43 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
     if (typeof window === 'undefined' || !Capacitor.isNativePlatform()) return;
 
     let cleanup: (() => void) | undefined;
-    App.addListener('backButton', () => {
-      const escapeEvent = new KeyboardEvent('keydown', {
-        key: 'Escape',
-        bubbles: true,
-        cancelable: true,
-      });
-      window.dispatchEvent(escapeEvent);
-      if (escapeEvent.defaultPrevented) {
-        return;
-      }
+    let isMounted = true;
 
-      if (!showAppLayout) {
-        setShowAppLayout(true);
-      } else if (isPaletteOpen) {
-        setIsPaletteOpen(false);
-      } else if (isDrawerOpen) {
-        setIsDrawerOpen(false);
-      } else if (location.pathname !== '/') {
-        navigate(-1);
-      } else {
-        void App.exitApp();
-      }
-    }).then((handle) => {
-      cleanup = () => handle.remove();
+    void import('@capacitor/app').then(({ App }) => {
+      if (!isMounted) return;
+      App.addListener('backButton', () => {
+        const escapeEvent = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        });
+        window.dispatchEvent(escapeEvent);
+        if (escapeEvent.defaultPrevented) {
+          return;
+        }
+
+        if (!showAppLayout) {
+          setShowAppLayout(true);
+        } else if (isPaletteOpen) {
+          setIsPaletteOpen(false);
+        } else if (isDrawerOpen) {
+          setIsDrawerOpen(false);
+        } else if (location.pathname !== '/') {
+          navigate(-1);
+        } else {
+          void App.exitApp();
+        }
+      }).then((handle) => {
+        if (!isMounted) {
+          handle.remove();
+          return;
+        }
+        cleanup = () => handle.remove();
+      }).catch(() => undefined);
     }).catch(() => undefined);
 
     return () => {
+      isMounted = false;
       if (cleanup) cleanup();
     };
   }, [isPaletteOpen, isDrawerOpen, location.pathname, navigate, showAppLayout, setShowAppLayout]);

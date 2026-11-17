@@ -1,9 +1,10 @@
 // Screen component for staging files, executing operations, and downloading results for PDF tools.
-import { Suspense, createElement, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, createElement, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import DropZone from '../components/DropZone';
-import ImagePreviewModal from '../components/ImagePreviewModal';
+
+const ImagePreviewModal = lazy(() => import('../components/ImagePreviewModal'));
 import { useShell } from '../hooks/useShell';
 import { useToast } from '../hooks/useToast';
 import { useViewer } from '../hooks/useViewer';
@@ -17,6 +18,7 @@ import {
 } from '../tools/filename';
 import { TOOLS, getToolById, getToolComponent, isToolImplemented } from '../tools/registry';
 import type { StagedFile } from '../tools/types';
+import type { NormalizedRect } from '../tools/modules/imagesToPdf/imageFilters';
 import StagedFileList from './tool/StagedFileList';
 import ToolMissingState from './tool/ToolMissingState';
 import ToolResultCard from './tool/ToolResultCard';
@@ -252,15 +254,56 @@ export default function ToolPage(): ReactNode {
 
   const otherTools = TOOLS.filter((t) => t.id !== tool.id).slice(0, 8);
 
+  const imageEdits =
+    (extraState.imageEdits as Record<
+      string,
+      { rotation?: number; crop?: NormalizedRect }
+    >) || {};
+
+  const handleRotateImage = (index: number) => {
+    const file = stagedFiles[index];
+    if (!file) return;
+    const current = imageEdits[file.id] || { rotation: 0 };
+    const updated = {
+      ...imageEdits,
+      [file.id]: {
+        ...current,
+        rotation: (((current.rotation || 0) + 90) % 360),
+      },
+    };
+    handleExtraStateChange('imageEdits', updated);
+  };
+
+  const handleCropImage = (index: number, crop: NormalizedRect | null) => {
+    const file = stagedFiles[index];
+    if (!file) return;
+    const current = imageEdits[file.id] || { rotation: 0 };
+    const updated = {
+      ...imageEdits,
+      [file.id]: {
+        ...current,
+        crop: crop ?? undefined,
+      },
+    };
+    handleExtraStateChange('imageEdits', updated);
+  };
+
   const mainToolContent = (
     <>
-      <ImagePreviewModal
-        files={stagedFiles}
-        currentIndex={previewIndex ?? 0}
-        isOpen={previewIndex !== null}
-        onClose={() => setPreviewIndex(null)}
-        onNavigate={(idx) => setPreviewIndex(idx)}
-      />
+      {previewIndex !== null && (
+        <Suspense fallback={null}>
+          <ImagePreviewModal
+            files={stagedFiles}
+            currentIndex={previewIndex ?? 0}
+            isOpen={previewIndex !== null}
+            imageEdits={imageEdits}
+            onRotate={handleRotateImage}
+            onCrop={handleCropImage}
+            onClose={() => setPreviewIndex(null)}
+            onNavigate={(idx) => setPreviewIndex(idx)}
+          />
+        </Suspense>
+      )}
 
       <ToolStatusCards
         status={status}
@@ -322,6 +365,8 @@ export default function ToolPage(): ReactNode {
               stagedFiles={stagedFiles}
               draggedIndex={draggedIndex}
               dragOver={dragOver}
+              imageEdits={imageEdits}
+              onRotateFile={tool.fileType === 'img' ? handleRotateImage : undefined}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}

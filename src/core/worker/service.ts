@@ -1,12 +1,4 @@
 // PDF Processing Service: dispatches operations to Web Worker with main-thread fallback.
-import {
-  compressPdf,
-  imagesToPdf,
-  mergePdfs,
-  removePdfPages,
-  rotatePdfPages,
-  splitPdfPages,
-} from '../index';
 import type { PageRange, SplitOptions } from '../split';
 import type { ImagesToPdfOptions, InputImage } from '../images-to-pdf';
 import type { RotateOptions } from '../rotate';
@@ -106,27 +98,33 @@ class PdfProcessingService {
   ): Promise<Uint8Array> {
     switch (operation) {
       case 'merge': {
+        const { mergePdfs } = await import('../merge');
         const p = payload as OperationPayloads['merge'];
         return await mergePdfs(p.buffers, p.options);
       }
       case 'rotate': {
+        const { rotatePdfPages } = await import('../rotate');
         const p = payload as OperationPayloads['rotate'];
         return await rotatePdfPages(p.buffer, p.options);
       }
       case 'remove-pages': {
+        const { removePdfPages } = await import('../remove-pages');
         const p = payload as OperationPayloads['remove-pages'];
         return await removePdfPages(p.buffer, p.pageIndices);
       }
       case 'split': {
+        const { splitPdfPages } = await import('../split');
         const p = payload as OperationPayloads['split'];
         const res = await splitPdfPages(p.buffer, p.ranges, p.splitOptions);
         return res.zipBytes;
       }
       case 'images-to-pdf': {
+        const { imagesToPdf } = await import('../images-to-pdf');
         const p = payload as OperationPayloads['images-to-pdf'];
         return await imagesToPdf(p.images, p.options);
       }
       case 'compress': {
+        const { compressPdf } = await import('../compress');
         const p = payload as OperationPayloads['compress'];
         return await compressPdf(p.buffer, p.options);
       }
