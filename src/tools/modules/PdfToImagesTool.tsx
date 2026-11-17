@@ -1,5 +1,5 @@
 // Tool module for converting PDF pages into PNG or JPEG images.
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, FileImage, Image as ImageIcon, Info, Layers, Sliders } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
@@ -43,8 +43,6 @@ export default function PdfToImagesTool({
   const [jpegQuality, setJpegQuality] = useState<number>(0.85); // High 85% by default
   const [pageSelectionMode, setPageSelectionMode] = useState<'all' | 'range'>('all');
   const [rangeInput, setRangeInput] = useState('');
-
-  const activeAbortControllerRef = useRef<AbortController | null>(null);
 
   // Determine total page count of staged PDF
   useEffect(() => {
@@ -102,22 +100,15 @@ export default function PdfToImagesTool({
       return;
     }
 
-    const abortController = new AbortController();
-    activeAbortControllerRef.current = abortController;
-
-    processing?.setCancelHandler?.(() => {
-      abortController.abort();
-    });
-
-    try {
-      await onExecute(async () => {
+    await onExecute(async (signal) => {
+      try {
         if (!isMultiFile) {
           const result = await renderPdfToImages(file.bytes, {
             format,
             scale,
             jpegQuality,
             pages: selectionValidation.pages,
-            signal: abortController.signal,
+            signal,
             onProgress: (progress) => {
               processing?.updateMessage?.(
                 `Converting page ${progress.current} of ${progress.total} (${progress.percent}%)…`
@@ -141,7 +132,7 @@ export default function PdfToImagesTool({
           stagedFiles,
           updateMessage: processing?.updateMessage,
           onExtraStateChange,
-          signal: abortController.signal,
+          signal,
           processFile: async (curFile, fileIndex) => {
             const curDocPageCount = await getPdfPageCount(curFile.bytes);
             let targetPages: number[];
@@ -161,7 +152,7 @@ export default function PdfToImagesTool({
               scale,
               jpegQuality,
               pages: targetPages,
-              signal: abortController.signal,
+              signal,
               onProgress: (progress) => {
                 processing?.updateMessage?.(
                   `[${fileIndex + 1}/${stagedFiles.length}] Converting page ${progress.current} of ${progress.total} (${progress.percent}%)…`
@@ -186,21 +177,18 @@ export default function PdfToImagesTool({
         onExtraStateChange?.('isZip', true);
 
         return zipBytes;
-      });
-    } catch (err: unknown) {
-      if (
-        abortController.signal.aborted ||
-        (err instanceof Error && err.message.toLowerCase().includes('cancel'))
-      ) {
-        showToast('Conversion cancelled');
-      } else {
-        showToast(err instanceof Error ? err.message : 'Conversion failed');
+      } catch (err: unknown) {
+        if (
+          signal.aborted ||
+          (err instanceof Error && err.message.toLowerCase().includes('cancel'))
+        ) {
+          showToast('Conversion cancelled');
+        } else {
+          showToast(err instanceof Error ? err.message : 'Conversion failed');
+        }
+        throw err;
       }
-      throw err;
-    } finally {
-      activeAbortControllerRef.current = null;
-      processing?.setCancelHandler?.(null);
-    }
+    });
   };
 
   const isInvalid = Boolean(

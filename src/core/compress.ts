@@ -188,13 +188,27 @@ interface PassSettings {
  */
 async function runCompressionPass(
   buffer: Uint8Array,
-  settings: PassSettings
+  settings: PassSettings,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+  }
+
   const doc = await PDFDocument.load(buffer, { ignoreEncryption: false });
 
   // Process embedded raster images: both DCTDecode (JPEG) and FlateDecode (uncompressed/zlib bitmaps)
   const objects = doc.context.enumerateIndirectObjects();
   for (const [ref, obj] of objects) {
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+    // Micro-yield between objects to ensure responsive cancellation
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+
     if (!(obj instanceof PDFRawStream) || !obj.dict) continue;
 
     const subtype = obj.dict.get(PDFName.of('Subtype'));
@@ -328,6 +342,10 @@ async function runCompressionPass(
     }
   }
 
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+  }
+
   // 4. Save with Flate object streams enabled, comparing with non-object-stream to pick smallest
   const withObjStreams = await doc.save({ useObjectStreams: true, addDefaultPage: false });
   if (withObjStreams.byteLength < buffer.byteLength) {
@@ -346,10 +364,14 @@ async function runCompressionPass(
  */
 export async function compressPdf(
   buffer: Uint8Array,
-  options?: CompressOptions
+  options?: CompressOptions,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
   if (!buffer || buffer.byteLength === 0) {
     throw new Error('The provided PDF file is empty.');
+  }
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   // Pre-validate encryption and corrupt structure upfront
@@ -381,11 +403,15 @@ export async function compressPdf(
   if (targetBytes !== undefined && targetBytes > 0) {
     // 1. If original is already within target bytes, run light structural pass
     if (buffer.byteLength <= targetBytes) {
-      const lightResult = await runCompressionPass(buffer, {
-        quality: 0.85,
-        maxDimension: undefined,
-        stripMetadata: options?.stripMetadata ?? false,
-      });
+      const lightResult = await runCompressionPass(
+        buffer,
+        {
+          quality: 0.85,
+          maxDimension: undefined,
+          stripMetadata: options?.stripMetadata ?? false,
+        },
+        signal
+      );
       return lightResult.byteLength < buffer.byteLength ? lightResult : buffer;
     }
 
@@ -502,7 +528,7 @@ export async function compressPdf(
         break;
       }
 
-      const passResult = await runCompressionPass(buffer, stage);
+      const passResult = await runCompressionPass(buffer, stage, signal);
 
       if (passResult.byteLength < bestSize) {
         const improvement = bestSize - passResult.byteLength;
@@ -570,11 +596,15 @@ export async function compressPdf(
       break;
   }
 
-  const result = await runCompressionPass(buffer, {
-    quality,
-    maxDimension: maxDim,
-    stripMetadata: shouldStripMeta,
-  });
+  const result = await runCompressionPass(
+    buffer,
+    {
+      quality,
+      maxDimension: maxDim,
+      stripMetadata: shouldStripMeta,
+    },
+    signal
+  );
 
   return result.byteLength < buffer.byteLength ? result : buffer;
 }

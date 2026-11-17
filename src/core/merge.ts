@@ -187,7 +187,10 @@ function transferBookmarks(
  * Draws page numbers ("X / Y") at the bottom center of each page in the merged document,
  * respecting the page's orientation/rotation.
  */
-async function addPageNumbersToDocument(mergedDoc: PDFDocument): Promise<void> {
+async function addPageNumbersToDocument(
+  mergedDoc: PDFDocument,
+  signal?: AbortSignal
+): Promise<void> {
   const font = await mergedDoc.embedFont(StandardFonts.Helvetica);
   const totalPages = mergedDoc.getPageCount();
   const fontSize = 10;
@@ -195,6 +198,9 @@ async function addPageNumbersToDocument(mergedDoc: PDFDocument): Promise<void> {
   const margin = 20;
 
   for (let i = 0; i < totalPages; i++) {
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
     const page = mergedDoc.getPage(i);
     const { width, height } = page.getSize();
     const text = `${i + 1} / ${totalPages}`;
@@ -246,10 +252,14 @@ async function addPageNumbersToDocument(mergedDoc: PDFDocument): Promise<void> {
  */
 export async function mergePdfs(
   pdfBuffers: Uint8Array[],
-  options: MergeOptions = {}
+  options: MergeOptions = {},
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
   if (pdfBuffers.length === 0) {
     throw new Error('No PDF files provided to merge.');
+  }
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   const mergedDoc = await PDFDocument.create();
@@ -257,6 +267,15 @@ export async function mergePdfs(
   let currentOffset = 0;
 
   for (const buffer of pdfBuffers) {
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+    // Yield to event loop between documents for paint & cancel responsiveness
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+
     const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
     const pageIndices = srcDoc.getPageIndices();
     const copiedPages = await mergedDoc.copyPages(srcDoc, pageIndices);
@@ -274,6 +293,10 @@ export async function mergePdfs(
     currentOffset += pageIndices.length;
   }
 
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+  }
+
   // Preserve outlines/bookmarks if requested (defaults to true)
   if (options.keepBookmarks !== false) {
     transferBookmarks(mergedDoc, loadedSources);
@@ -281,7 +304,11 @@ export async function mergePdfs(
 
   // Add page numbers if requested
   if (options.addPageNumbers) {
-    await addPageNumbersToDocument(mergedDoc);
+    await addPageNumbersToDocument(mergedDoc, signal);
+  }
+
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   return await mergedDoc.save();

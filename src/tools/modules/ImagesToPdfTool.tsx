@@ -87,7 +87,7 @@ export default function ImagesToPdfTool({
   const handleRun = async () => {
     if (stagedFiles.length === 0 || isProcessing) return;
 
-    await onExecute(async () => {
+    await onExecute(async (signal) => {
       const shouldShrink = optionsState['shrink'] ?? false;
 
       // Dynamic import of image processing helpers on demand
@@ -135,6 +135,9 @@ export default function ImagesToPdfTool({
 
       const processedImages = await Promise.all(
         stagedFiles.map(async (f) => {
+          if (signal?.aborted) {
+            throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+          }
           let bytes = f.bytes;
 
           // Convert WebP to PNG if needed (pdf-lib only embeds PNG/JPEG)
@@ -183,17 +186,21 @@ export default function ImagesToPdfTool({
         })
       );
 
-      return await pdfProcessingService.execute('images-to-pdf', {
-        images: processedImages,
-        options: {
-          pageSize,
-          orientation,
-          imageFit,
-          backgroundColor: imageFit === 'cover' ? 'white' : backgroundColor,
-          margin,
-          addPageNumbers,
+      return await pdfProcessingService.execute(
+        'images-to-pdf',
+        {
+          images: processedImages,
+          options: {
+            pageSize,
+            orientation,
+            imageFit,
+            backgroundColor: imageFit === 'cover' ? 'white' : backgroundColor,
+            margin,
+            addPageNumbers,
+          },
         },
-      });
+        { signal }
+      );
     });
   };
 

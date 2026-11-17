@@ -90,11 +90,15 @@ export default function RemovePagesTool({
     setShowConfirmModal(false);
     if (!isValidToRemove || !file || !validation || validation.indices.length === 0) return;
 
-    await onExecute(async () => {
-      return await pdfProcessingService.execute('remove-pages', {
-        buffer: file.bytes,
-        pageIndices: validation.indices,
-      });
+    await onExecute(async (signal) => {
+      return await pdfProcessingService.execute(
+        'remove-pages',
+        {
+          buffer: file.bytes,
+          pageIndices: validation.indices,
+        },
+        { signal }
+      );
     });
   };
 

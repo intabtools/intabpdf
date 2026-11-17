@@ -91,10 +91,14 @@ export function detectImageFormat(bytes: Uint8Array): ImageFormat {
  */
 export async function imagesToPdf(
   images: InputImage[],
-  options?: ImagesToPdfOptions
+  options?: ImagesToPdfOptions,
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
   if (!images || images.length === 0) {
     throw new Error('At least one image file is required.');
+  }
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   // Resolve options with backward compatibility
@@ -127,6 +131,15 @@ export async function imagesToPdf(
   const embeddedList: EmbeddedItem[] = [];
 
   for (let i = 0; i < images.length; i++) {
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+    // Yield to event loop between images
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (signal?.aborted) {
+      throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+    }
+
     const item = images[i];
     if (!item.bytes || item.bytes.byteLength === 0) {
       throw new Error(`Image "${item.name}" has empty data.`);
@@ -298,6 +311,9 @@ export async function imagesToPdf(
     const totalPages = embeddedList.length;
 
     for (let i = 0; i < totalPages; i++) {
+      if (signal?.aborted) {
+        throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+      }
       const page = doc.getPage(i);
       const { width: pWidth } = page.getSize();
       const text = `${i + 1} / ${totalPages}`;
@@ -313,6 +329,10 @@ export async function imagesToPdf(
         color: textColor,
       });
     }
+  }
+
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   return await doc.save({ useObjectStreams: true });

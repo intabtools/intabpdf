@@ -155,8 +155,13 @@ export function parseRotatePageInput(
  */
 export async function rotatePdfPages(
   pdfBuffer: Uint8Array,
-  options: RotateOptions = {}
+  options: RotateOptions = {},
+  signal?: AbortSignal
 ): Promise<Uint8Array> {
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+  }
+
   const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
 
@@ -181,6 +186,10 @@ export async function rotatePdfPages(
     const currentAngle = page.getRotation().angle;
     const newAngle = ((currentAngle + angleDelta) % 360 + 360) % 360;
     page.setRotation(degrees(newAngle));
+  }
+
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   return await pdfDoc.save();

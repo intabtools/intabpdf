@@ -177,7 +177,7 @@ export default function ToolPage(): ReactNode {
     setPreviewIndex(null);
   };
 
-  const handleExecuteRunner = async (runner: () => Promise<Uint8Array>) => {
+  const handleExecuteRunner = async (runner: (signal: AbortSignal) => Promise<Uint8Array>) => {
     setStatus('busy');
     setOutputBytes(null);
     setErrorMessage(null);
@@ -186,7 +186,7 @@ export default function ToolPage(): ReactNode {
     const message = tool ? getOperationMessage(tool.id, stagedFiles.length) : 'Processing PDF…';
 
     try {
-      const result = await runWithProcessing(message, runner);
+      const result = await runWithProcessing(message, (signal) => runner(signal));
       setOutputBytes(result);
       setStatus('done');
     } catch (err) {
@@ -195,7 +195,8 @@ export default function ToolPage(): ReactNode {
         err instanceof Error &&
         (err.name === 'AbortError' ||
           err.name === 'RenderingCancelledException' ||
-          err.message.toLowerCase().includes('cancel'));
+          err.message.toLowerCase().includes('cancel') ||
+          err.message.toLowerCase().includes('aborted'));
       if (!isCancelled) {
         setErrorMessage(err instanceof Error ? err.message : 'Processing failed');
       }

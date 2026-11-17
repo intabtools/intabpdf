@@ -82,10 +82,14 @@ export function formatPageTextContent(
  */
 export async function extractTextFromPdf(
   pdfBytes: Uint8Array,
-  options: ExtractTextOptions = {}
+  options: ExtractTextOptions = {},
+  signal?: AbortSignal
 ): Promise<ExtractTextResult> {
   if (!pdfBytes || pdfBytes.byteLength === 0) {
     throw new Error('No PDF file provided for text extraction.');
+  }
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }
 
   const doc = await loadPdf(pdfBytes);
@@ -95,6 +99,15 @@ export async function extractTextFromPdf(
     const pageTexts: string[] = [];
 
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+      if (signal?.aborted) {
+        throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+      }
+      // Micro-yield between pages for cancel responsiveness
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (signal?.aborted) {
+        throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+      }
+
       const page = await doc.getPage(pageNum);
       const content = await page.getTextContent();
       const pageStr = formatPageTextContent(content.items, keepLineBreaks);
