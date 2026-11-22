@@ -46,4 +46,4 @@ Anything else is not ours. If you find a fake copy of InTab PDF, or a channel pr
 
 ## Supported versions
 
-There is no release yet. Once we have releases, only the latest one will be supported.
+Only the latest released version (v1.1.2+) is supported. Please keep your installation up to date.

@@ -31,9 +31,10 @@ flowchart TD
    - Configures default shell visibility (`showAppLayout: true`).
    - Implements `resolveDestination(path, platform)` to provide deterministic fallbacks (e.g. redirecting `/viewer` to `/` on web).
 
-2. **Screen and Tool Registry (`src/tools/registry.ts`)**
+2. **Screen and Tool Registry (`src/tools/registry.ts`, `src/tools/toolDefinitions.ts`)**
    - Authoritative registry of all 13 PDF tools across 4 categories (`Create`, `Organize`, `Shrink and secure`, `Sign and convert`).
-   - 6 tools are fully implemented: `merge`, `rotate`, `remove-pages`, `split`, `images-to-pdf`, and `compress`.
+   - 8 tools are fully implemented: `merge`, `rotate`, `remove-pages`, `split`, `images-to-pdf`, `compress`, `pdf-to-images`, and `extract-text`.
+   - 5 tools are planned and marked `coming-soon`: `text-to-pdf`, `reorder`, `protect`, `unlock`, and `sign`.
    - Encapsulates tool metadata, icon names, action verbs, input file types, default options, and availability (`'available' | 'coming-soon'`).
    - Exposes lazy module references (`component?: () => import(...)`) for on-demand loading.
    - Enforces validation via `validateRegistry()` with runtime assertions for ID uniqueness and availability consistency.
@@ -49,21 +50,25 @@ flowchart TD
    - Supports temporary full-screen mode via `showAppLayout === false`, automatically unmounting headers, sidebars, and navigation rails while retaining Escape / Android back button dismissal.
 
 5. **Dynamic Tool Modules (`src/tools/modules/`)**
-   - Independent options panels and action runners for each tool (e.g., `MergeTool.tsx`, `RotateTool.tsx`, `RemovePagesTool.tsx`).
+   - Independent options panels and action runners for each tool (e.g., `MergeTool.tsx`, `RotateTool.tsx`, `RemovePagesTool.tsx`, `PdfToImagesTool.tsx`, `ExtractTextTool.tsx`).
    - Code-split into isolated chunks; neither the UI nor their PDF dependencies (`pdf-lib`) are bundled into the initial startup payload.
 
-6. **Web Worker Processing Service (`src/core/worker/`)**
-   - Dispatches heavy PDF processing tasks off the main JavaScript UI thread.
-   - Zero-copy data transfer utilizing transferable `ArrayBuffer` objects.
-   - Built-in 60-second execution timeout guard.
+6. **Centralized Web Worker Processing Service (`src/core/worker/`)**
+   - Dispatches heavy PDF processing tasks off the main JavaScript UI thread via a centralized singleton `pdfProcessingService` (`src/core/worker/service.ts`).
+   - Dedicated Web Worker thread (`src/core/worker/pdfWorker.ts`) executes `pdf-lib` document manipulations.
+   - Zero-copy data transfer utilizing transferable `ArrayBuffer` objects with defensive buffer isolation.
+   - Built-in operation-specific timeout guards (60-second default).
    - Automatic graceful fallback to main-thread execution if Web Workers are unavailable, disabled, or encounter fatal startup errors.
+   - Tools leveraging Mozilla PDF.js (`pdf-to-images` and `extract-text`) utilize `pdfjs-dist` and its dedicated worker (`pdf.worker.min.mjs`) rather than `pdf-lib`.
 
 7. **Pure PDF Core (`src/core/`)**
    - Zero DOM or browser dependencies: accepts typed byte arrays (`Uint8Array`) and returns transformed byte arrays.
    - 100% testable via unit tests in headless environments without DOM mocking.
 
-8. **Platform Integration Layer (`src/platform/`)**
+8. **Platform Integration Layer & Electron IPC Bridge (`src/platform/`, `electron/preload.cjs`)**
    - Standardizes file selection, saving, sharing, and OS-level file opening across Web, Electron IPC, and Capacitor plugins.
+   - Electron desktop shell communicates securely via context isolation and the `window.intab` bridge API (`hasPendingPdf`, `clearPendingPdf`, `onOpenPdf`, `onOpenPdfError`, `onOpenPdfStart`, `openExternalUrl`).
+   - Capacitor Android integration coordinates native file opening via `window.NativeIntent` and file saving via `@capacitor/filesystem` and `@capacitor/share`.
 
 ---
 
@@ -86,6 +91,8 @@ Heavy libraries such as `pdf-lib` (~420 KB) and `pdfjs-dist` (~440 KB + 1.2 MB w
 | `SplitTool-<hash>.js` (~1.5 KB) | Split mode & range selection | Active tool is `split` |
 | `ImagesToPdfTool-<hash>.js` (~2.5 KB) | Image reorder, preview lightbox, page setup | Active tool is `images-to-pdf` |
 | `CompressTool-<hash>.js` (~2.2 KB) | Target size input & presets | Active tool is `compress` |
+| `PdfToImagesTool-<hash>.js` (~3.4 KB) | Image format, DPI, quality & ZIP export | Active tool is `pdf-to-images` |
+| `ExtractTextTool-<hash>.js` (~2.1 KB) | Multi-page text preview & TXT download | Active tool is `extract-text` |
 | `core-<hash>.js` (~423 KB) | `pdf-lib` manipulation engine | Any tool executes or loads core |
 | `pdfWorker-<hash>.js` (~426 KB) | Background worker executing operations | Dispatched tool operation |
 
@@ -140,8 +147,17 @@ To provide a native-quality feel across target operating systems, InTabPDF uses 
 ## 5. Security & Privacy Model
 
 - **Local Execution:** PDFs are loaded into browser memory buffers. No remote API endpoints or analytics trackers exist.
-- **Content Security Policy (CSP):** Enforces `default-src 'self' blob:; object-src 'none'; script-src 'self' 'wasm-unsafe-eval'`.
+- **Content Security Policy (CSP):** Delivered via Cloudflare Pages HTTP response headers in `public/_headers`:
+  ```http
+  Content-Security-Policy: default-src 'self' blob:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';
+  ```
+  - `'wasm-unsafe-eval'` is required to allow WebAssembly compilation for PDF.js fast-path rendering.
+  - `'unsafe-inline'` in `style-src` is required for dynamic canvas positioning and UI component styling.
+  - `connect-src 'self'` prevents outbound network exfiltration while allowing local same-origin asset fetching.
+  - `object-src 'none'` prevents plugin embedding exploits.
+- **Permissions-Policy:** Enforces `camera=(), microphone=(), geolocation=(), payment=()`, locking down device sensors in the browser. (Note: The planned Android document scanner will request platform-native permissions on mobile without weakening web policy).
 - **Zero Third-Party CDNs:** Fonts, icons, and PDF worker scripts are compiled into local production assets.
+- **Verification Status:** Production CSP was verified locally with zero violations and clean runtime console logs via `scripts/test-csp-runtime.mjs`. Live verification on Cloudflare's edge will occur upon production deployment.
 
 ---
 
@@ -170,3 +186,18 @@ To provide a refined application feel and prevent accidental text selection duri
   - Detailed error messages, crash reports, and technical callouts.
   - Code blocks (`code`, `pre`) and documentation snippets.
   - PDF text layer elements (`.textLayer`) within the desktop/Android viewer.
+
+---
+
+## 8. Electron IPC Bridge Architecture
+
+In the desktop application (`platform === 'electron'`), communication between the Node.js main process (`electron/main.cjs`) and the isolated React renderer is strictly governed by `electron/preload.cjs`:
+
+- **Security Boundaries:** Context isolation (`contextIsolation: true`) and sandbox (`sandbox: true`) are strictly enabled. Node integration (`nodeIntegration: false`) is disabled.
+- **`window.intab` Bridge Interface:** Exposes only a minimal, safe API surface:
+  - `hasPendingPdf(): boolean`: Synchronously checks if a PDF file was passed via OS CLI argument or file association on launch.
+  - `clearPendingPdf(): void`: Clears pending launch file queues in main process and preload backlog.
+  - `onOpenPdf(callback: (file: OpenedFile) => void): () => void`: Subscribes to OS file open events. Backlogs events if the renderer is still initializing; notifies the main process via `renderer-ready`.
+  - `onOpenPdfError(callback: (errorData: { name: string; error: string }) => void): () => void`: Receives notification if an OS-opened file cannot be read.
+  - `onOpenPdfStart(callback: (startData: { name: string }) => void): () => void`: Receives notice when reading a large file from disk commences.
+  - `openExternalUrl(url: string): void`: Requests the main process to open an external HTTP/HTTPS link in the user's default OS browser (sanitizing protocol to `http:`/`https:` only).

@@ -2,17 +2,18 @@
 
 This page shares some simple habits to keep our code clean and easy to understand. These are friendly tips, not exam rules. Nobody will reject your PR only because a tip was missed. We will just help you in the review.
 
-## Tools we use or plan to use
+## Tools we use
 
 | Tool | What it helps with | Command | Status |
 |---|---|---|---|
-| TypeScript (strict) | Catches mistakes before running | `npm run build` | Use now |
-| ESLint | Finds bad patterns | `npm run lint` | Use now |
-| Prettier | Keeps formatting same for everyone | Format on save | Recommended, config to be added soon |
-| Vitest | Tests for `core` | `npm test` | To be added with the first `core` function |
-| GitHub Actions (CI) | Runs the checks on every PR | automatic | Planned for later |
+| TypeScript (strict) | Catches mistakes before running | `npm run build` | Active |
+| ESLint | Finds bad patterns | `npm run lint` | Active |
+| Prettier | Keeps formatting same for everyone | Format on save / lint | Active |
+| Vitest | Fast unit/integration tests for `core` and tools | `npm test` | Active (`vitest.config.ts`) |
+| Playwright | End-to-end browser workflow and download testing | `npm run test:e2e` | Active (`playwright.config.ts`) |
+| GitHub Actions (CI) | Runs lint, unit tests, build, and E2E on every PR | Automatic | Active (`.github/workflows/ci.yml`) |
 
-Once CI is ready, we would like all checks to pass before a PR is merged. Until then, please just run the checks on your own computer.
+All checks must pass on GitHub Actions CI before a PR is merged. You can run all of them locally before opening a pull request.
 
 ## Keep it simple and easy to explain
 
@@ -89,10 +90,11 @@ All logic in `core` should have tests. Try the normal case and a few bad cases.
 
 Some small tips:
 
-- Keep tiny sample PDFs in `src/core/__fixtures__/`. A few KB each is enough.
+- Keep tiny sample PDFs in `src/core/__fixtures__/` or `e2e/fixtures/`. A few KB each is enough.
 - Please do not commit real personal documents. Make your own sample files.
-- Tests should run without internet.
-- For screens, test by hand for now: a normal file, a big file and a bad file. We can add automatic screen tests later.
+- Unit tests (`npm test`) run headless without internet or DOM requirements.
+- Screen workflows and downloads are tested via Playwright (`npm run test:e2e` in `e2e/`).
+- When adding a new tool, add both unit tests for the core algorithm and an E2E spec verifying browser download integrity.
 
 ## Error handling
 

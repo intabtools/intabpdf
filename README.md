@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/intabtools/intabpdf/actions/workflows/build.yml"><img src="https://github.com/intabtools/intabpdf/actions/workflows/build.yml/badge.svg?branch=main" alt="Build status of main"></a>
+  <a href="https://github.com/intabtools/intabpdf/actions/workflows/ci.yml"><img src="https://github.com/intabtools/intabpdf/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build status of main"></a>
   <a href="https://github.com/intabtools/intabpdf/releases/latest"><img src="https://img.shields.io/github/v/release/intabtools/intabpdf?include_prereleases&label=latest" alt="Latest release"></a>
 </p>
 
@@ -45,8 +45,10 @@ InTab PDF provides private, local PDF tools and viewing across Web, Desktop (Ele
 - **Split PDF**: Extract page ranges or split documents into multiple PDFs.
 - **Images to PDF**: Convert JPG, PNG, and WebP images to PDF with reordering, A4/Fit sizing, and preview lightbox.
 - **Compress PDF**: Optimize PDF size by setting target file size (KB/MB) or presets.
+- **PDF to Images**: Convert PDF pages into PNG, JPEG, or WebP images with customizable DPI, rendering quality, and batch ZIP archive download.
+- **Extract Text**: Extract plain text from PDF documents with multi-page preview and instant TXT export.
 
-*Coming soon in upcoming updates:* Text to PDF, Reorder pages, Protect, Unlock, Sign, PDF to images, and Extract text.
+*Coming soon in upcoming updates:* Text to PDF, Reorder pages, Protect, Unlock, and Sign.
 
 ### Viewing workflow by platform
 - **Web**: Generated PDFs and opened files open directly in a new browser tab using native browser PDF capabilities, avoiding redundant embedded reader overhead.
@@ -74,12 +76,12 @@ We are a group of students, so the code must be easy for everyone to read and ch
 | Platform | Technology | Deployment / Packaging | Status |
 |---|---|---|---|
 | Web | Vite + React + TypeScript | Static site on Cloudflare Pages (`dist/`) | Fully functional client-side tools with native tab PDF viewing |
-| Desktop | Electron | NSIS/ZIP (Windows), AppImage/DEB/RPM (Linux) | Fully functional with embedded PDF viewer and offline tools |
-| Android | Capacitor | Android APK | Fully functional mobile app with embedded viewer and offline tools |
+| Desktop | Electron | NSIS/ZIP (Windows), AppImage/DEB/RPM (Linux) | Fully functional with embedded PDF viewer and offline tools (macOS packaging deferred pending app icons and code signing/notarization) |
+| Android | Capacitor | Android APK (`android/`) | Fully functional mobile app with embedded viewer and offline tools; asset synchronization guarded by Gradle `checkWebAssets` task |
 
 ## Quick start
 
-You need [Node.js](https://nodejs.org) (v18+ or v20+ LTS).
+You need [Node.js](https://nodejs.org) (v20+ LTS recommended; Node 22 for Capacitor CLI engine check, or Node 20 supported via `scripts/cap.cjs` wrapper).
 
 ```bash
 git clone https://github.com/intabtools/intabpdf.git
@@ -91,8 +93,11 @@ npm run dev
 ### Contributor commands
 
 ```bash
-# Run unit and integration tests
+# Run unit and integration tests (Vitest)
 npm test
+
+# Run end-to-end tests (Playwright)
+npm run test:e2e
 
 # Check code formatting and linting
 npm run lint
@@ -105,6 +110,15 @@ npm run preview
 
 # Build desktop application for Electron
 npm run build:desktop
+
+# Package desktop installer (Linux/Windows)
+npm run dist
+
+# Build and synchronize web assets into Android Capacitor project
+npm run sync:android
+
+# Build Android debug APK
+npm run android:build
 ```
 
 ## Want to help?

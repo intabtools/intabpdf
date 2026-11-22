@@ -182,7 +182,7 @@ export function useShell(): ShellContextValue;
 
 ---
 
-## 5. Platform Adapters (`src/platform/types.ts`)
+## 5. Platform Adapters (`src/platform/types.ts`, `src/platform/electron.ts`)
 
 Standard interface across Web, Electron desktop, and Capacitor Android.
 
@@ -192,10 +192,44 @@ export interface OpenedFile {
   bytes: Uint8Array;
 }
 
+export interface SaveFileResult {
+  saved: boolean;
+  fileName?: string;
+}
+
 export interface PlatformAdapter {
-  pickPdfFile(): Promise<OpenedFile | null>;
+  hasPendingFile?(): boolean;
+  clearPendingFile?(): void;
+  pickPdfFile(onStart?: (fileName: string) => void): Promise<OpenedFile | null>;
   onFileOpened(handler: (file: OpenedFile) => void): () => void;
-  saveFile?(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<void>;
+  onFileOpenStart?(handler: (fileName: string) => void): () => void;
+  onFileOpenError?(handler: (error: string) => void): () => void;
+  saveFile?(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<SaveFileResult | void>;
+}
+```
+
+### Desktop & Mobile Bridge Extensions (`window.intab`, `window.NativeIntent`)
+
+```typescript
+declare global {
+  interface Window {
+    /** Electron preload IPC bridge */
+    intab?: {
+      hasPendingPdf?(): boolean;
+      clearPendingPdf?(): void;
+      onOpenPdf(callback: (file: OpenedFile) => void): () => void;
+      onOpenPdfError?(callback: (errorData: { name: string; error: string }) => void): () => void;
+      onOpenPdfStart?(callback: (startData: { name: string }) => void): () => void;
+      openExternalUrl?(url: string): void;
+    };
+    /** Android Capacitor native intent bridge */
+    NativeIntent?: {
+      hasPendingPdf?(): boolean;
+      getPendingPdf?(): string;
+      clearPendingPdf?(): void;
+      resolveNativePdf?(uri: string): string;
+    };
+  }
 }
 ```
 
@@ -216,12 +250,12 @@ export function getDefaultOutputBaseName(
 export function getOutputExtension(
   toolId: string,
   outputName?: string
-): '.pdf' | '.zip';
+): '.pdf' | '.zip' | string;
 
 export function sanitizeOutputFileName(
   input: string,
   fallbackBaseName: string,
-  extension?: '.pdf' | '.zip'
+  extension?: '.pdf' | '.zip' | string
 ): string;
 ```
 

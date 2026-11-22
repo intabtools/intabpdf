@@ -32,5 +32,9 @@ scratch
 .env.*
 !.env.example
 
+# Test artifacts
+test-results/
+playwright-report/
+
 /InTabPDF.html
 /InTabPDF_UI_Design_Spec_v2.md

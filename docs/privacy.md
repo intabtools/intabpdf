@@ -25,7 +25,16 @@ flowchart TD
     E --> F["Anyone can verify in the browser Network tab"]
 ```
 
-1. **A strict Content-Security-Policy** in `index.html`. The desktop app loads the same file, so the same policy applies there also. For example: `default-src 'self'; connect-src 'none'; img-src 'self' data: blob:; worker-src 'self' blob:`. We will adjust it when the first tool is ready.
+1. **A strict Content-Security-Policy** served via Cloudflare Pages HTTP headers in `public/_headers`:
+   ```http
+   Content-Security-Policy: default-src 'self' blob:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';
+   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+   ```
+   - All network connections outside the local origin are blocked.
+   - `'wasm-unsafe-eval'` is restricted strictly for PDF.js WebAssembly fast paths.
+   - `'unsafe-inline'` for styles is used for dynamic canvas rendering and layout styles.
+   - Camera and sensors are disabled on the web via `Permissions-Policy`. (When the planned Android document scanner is introduced, mobile-specific permissions will be used natively without weakening web isolation).
+   - Local production-header emulation verified 0 CSP violations; live Cloudflare edge verification will be completed on production deployment.
 2. **Reviewer check.** Reviewers search the PR for `fetch(`, `XMLHttpRequest`, `WebSocket`, `sendBeacon` and new `<script>` tags.
 3. **Library check.** New packages are checked for tracking or network code, not only for the licence.
 4. **Anyone can verify.** Open the browser Network tab, process a file, and see that no request is made.

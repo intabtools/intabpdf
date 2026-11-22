@@ -53,10 +53,11 @@ flowchart LR
 4. Run these checks before you open the PR:
    ```bash
    npm run lint
-   npm run build
    npm test
+   npm run test:e2e
+   npm run build
    ```
-   The project is very new, so some of these may not be ready yet. Just run what is available.
+   All checks will run automatically on GitHub Actions CI (`.github/workflows/ci.yml`) when you open your PR.
 5. Open the PR and tell us what you changed and why. For screen changes, a screenshot helps a lot.
 6. Reply to review comments. Reviews are normal, and everyone gets them, so please do not feel bad.
 

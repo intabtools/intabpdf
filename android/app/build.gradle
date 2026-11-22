@@ -44,3 +44,17 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
+tasks.register('checkWebAssets') {
+    doLast {
+        def indexFile = file('src/main/assets/public/index.html')
+        if (!indexFile.exists()) {
+            throw new GradleException(
+                "Missing web assets in src/main/assets/public/index.html. " +
+                "Please run 'npm run sync:android' before building the Android project."
+            )
+        }
+    }
+}
+preBuild.dependsOn checkWebAssets
+
+

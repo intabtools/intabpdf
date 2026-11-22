@@ -46,6 +46,13 @@ Please check the current licence and how active the project is before choosing. 
 
 `@capacitor/core`, `@capacitor/android` and `@capacitor/cli` are used for the Android app. Check every Capacitor plugin like any other library, and read its source for network code. Do not add plugins that talk to a server (push notifications, analytics, Firebase, crash reporting) without a new entry in the [decisions log](decisions.md). Keep Capacitor and the Android build setup updated.
 
+> **Node.js Engine Note:** `@capacitor/cli` v7 declares a Node.js `>=22.0.0` engine in its `package.json`. InTabPDF wraps Capacitor invocations with `scripts/cap.cjs` (`npm run cap`), allowing developers on Node 20 LTS to synchronize assets and execute commands safely without semver errors.
+
+## Testing tooling
+
+- `vitest`: Fast, headless unit test runner for `src/core/` and component logic.
+- `@playwright/test`: Chromium-based end-to-end testing verifying real browser startup, tool workflows, and downloaded output integrity.
+
 ## Updating dependencies
 
 - Use a `deps:` commit.

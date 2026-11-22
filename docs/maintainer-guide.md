@@ -56,7 +56,7 @@ Look at the most important things first. If privacy or structure has a problem, 
 
 | Rule | Detail |
 |---|---|
-| Checks pass | Lint, build and tests (once CI is set up) |
+| Checks pass | All 4 GitHub Actions checks pass in `.github/workflows/ci.yml`: `lint` (ESLint), `unit-tests` (Vitest), `build` (web and desktop builds), and `e2e` (Playwright workflows) |
 | Approvals | 1 approval is enough. For changes to `core/`, `platform/`, `electron/`, `android/`, `registry.ts`, build config, CI or libraries, please try to get a second maintainer to look, if one is available |
 | Merge type | Squash merge. The final commit message follows `area: description` |
 | Your own PR | Please get another person to review it, except for tiny typo fixes |
@@ -158,14 +158,16 @@ Use [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 
 Before releasing:
 
-- [ ] Checks pass on `main`
+- [ ] All CI checks pass on `main` (`.github/workflows/ci.yml`)
+- [ ] Unit tests (`npm test`) and E2E browser tests (`npm run test:e2e`) pass with zero errors
 - [ ] Every tool tried by hand with a normal, a big and a bad file
 - [ ] Network tab check: process a file and confirm **zero** requests are made with user data
-- [ ] CSP is still strict (no new allowed outside domains)
+- [ ] CSP is still strict (no new allowed outside domains in `public/_headers`)
 - [ ] `npm audit` has no serious open issues
 - [ ] Tried in Chrome, Firefox and Safari if possible
-- [ ] Desktop packages built with `npm run dist` and `npm run dist:win`
+- [ ] Desktop packages built with `npm run dist`, `npm run dist:win`, and `npm run dist:linux` (Note: macOS packaging deferred pending app icons and code signing)
 - [ ] Installed on Windows and Linux, and a PDF opened through the operating system (check the file association after install)
+- [ ] Android: Web assets synchronized via `npm run sync:android`, verified via Gradle `checkWebAssets` during `npm run android:build`
 - [ ] Android: APK built, signed with the release key and installed on a real phone (a low-end one if possible)
 - [ ] Android: a PDF opened from the file manager opens in InTab PDF
 - [ ] Android: no new permissions in the manifest compared with the last release

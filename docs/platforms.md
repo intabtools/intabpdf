@@ -2,7 +2,7 @@
 
 InTabPDF targets three distinct distribution targets from a single TypeScript + React codebase:
 1. **Web App / Website** (Static site, standard browser)
-2. **Desktop App** (Electron packaging for Windows, macOS, Linux)
+2. **Desktop App** (Electron packaging for Windows and Linux; macOS deferred pending icons and signing)
 3. **Android Mobile App** (Capacitor Android wrapper)
 
 All platforms run the same compiled code from `dist/` with zero remote dependencies.
@@ -17,19 +17,34 @@ Platform detection is centralized in [src/platform/index.ts](file:///home/ayusma
 export type PlatformType = 'web' | 'electron' | 'android';
 
 export function getPlatformType(): PlatformType {
-  // 1. Electron: window.electronAPI injected via preload script
-  if (typeof window !== 'undefined' && 'electronAPI' in window) {
-    return 'electron';
+  if (typeof window === 'undefined') return 'web';
+
+  // 1. URL query parameter override for automated testing (?platform=android|electron|web)
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('platform');
+    if (p === 'android' || p === 'electron' || p === 'web') {
+      return p;
+    }
+  } catch {
+    // Ignore
   }
-  // 2. Capacitor Android: window.Capacitor isNativePlatform() === true
-  if (
-    typeof window !== 'undefined' &&
-    'Capacitor' in window &&
-    (window as any).Capacitor?.isNativePlatform?.()
-  ) {
+
+  // 2. Native Capacitor Android runtime
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
     return 'android';
   }
-  // 3. Fallback: Web browser
+
+  // 3. Electron desktop runtime
+  if (
+    window.intab !== undefined ||
+    (typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron')) ||
+    import.meta.env.MODE === 'desktop'
+  ) {
+    return 'electron';
+  }
+
+  // 4. Default: Web browser
   return 'web';
 }
 ```
@@ -145,12 +160,28 @@ npm run build
 # Electron desktop build (outputs to dist/ with base: './')
 npm run build:desktop
 
-# Package desktop installer (Linux/Windows)
+# Package desktop installers (Linux/Windows)
 npm run dist
+npm run dist:win
+npm run dist:linux
 
-# Android native Java compilation
-cd android && ./gradlew compileDebugJavaWithJavac
+# Android asset synchronization (builds web assets and syncs to android/app/src/main/assets/public/)
+npm run sync:android
+
+# Android native Java compilation & debug APK packaging
+npm run android:build
+# (or: cd android && ./gradlew assembleDebug)
+
+# Run Vitest unit/integration tests
+npm test
+
+# Run Playwright E2E browser tests
+npm run test:e2e
 ```
+
+### Android Asset Synchronization & Engine Guard
+- **Pre-Packaging Verification:** The Android build enforces asset freshness via a custom Gradle task `checkWebAssets` in `android/app/build.gradle`. If `android/app/src/main/assets/public/index.html` is missing or out-of-sync, the Gradle task immediately fails compilation, directing developers to run `npm run sync:android`.
+- **Node.js Compatibility:** Capacitor CLI v7 expects Node >= 22. InTabPDF provides `scripts/cap.cjs` to allow developers on Node 20 LTS to build and synchronize assets without false-positive engine errors.
 
 ---
 
@@ -167,6 +198,15 @@ The web edition of InTabPDF is deployed as a static client-side application via 
 - **Build Output Directory:** `dist`
 - **Environment Variables:**
   - `NODE_VERSION`: `20` (Node.js 18+ or 20+ LTS required)
+
+### HTTP Headers & Content Security Policy (CSP)
+
+Cloudflare Pages enforces security headers via [public/_headers](file:///home/ayusman/Desktop/intabpdf/public/_headers):
+- `Content-Security-Policy`: Restricts scripts to `'self'` and `'wasm-unsafe-eval'`; styles to `'self' 'unsafe-inline'`; workers to `'self' blob:`; and explicitly disables plugins (`object-src 'none'`) and frame embedding (`frame-ancestors 'none'`).
+- `Permissions-Policy`: Restricts browser hardware access (`camera=(), microphone=(), geolocation=(), payment=()`).
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
 
 ### SPA Routing & Redirects
 
@@ -205,7 +245,7 @@ Vite automatically copies this file to `dist/_redirects` during `npm run build`.
 
 ### Implemented Tools vs. Coming Soon Status
 
-The web production deployment includes 6 fully implemented, client-side tools and 7 tools marked "Coming soon":
+The web production deployment includes 8 fully implemented, client-side tools and 5 tools marked "Coming soon":
 
 | Implemented (Live) | Coming Soon (Guarded & Redirects to Home) |
 |---|---|
@@ -214,5 +254,6 @@ The web production deployment includes 6 fully implemented, client-side tools an
 | **Compress** (`/tool/compress`) | **Protect** (`/tool/protect`) |
 | **Rotate pages** (`/tool/rotate`) | **Unlock** (`/tool/unlock`) |
 | **Remove pages** (`/tool/remove-pages`) | **Sign** (`/tool/sign`) |
-| **Images to PDF** (`/tool/images-to-pdf`) | **PDF to images** (`/tool/pdf-to-images`) |
-| | **Extract text** (`/tool/extract-text`) |
+| **Images to PDF** (`/tool/images-to-pdf`) | |
+| **PDF to images** (`/tool/pdf-to-images`) | |
+| **Extract text** (`/tool/extract-text`) | |
