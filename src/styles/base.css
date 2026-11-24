@@ -1451,6 +1451,41 @@ textarea,
   border-color: transparent;
 }
 
+/* Password input visibility toggle */
+.password-toggle-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
+}
+
+.password-toggle-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.password-toggle-btn:active:not(:disabled) {
+  color: var(--accent);
+}
+
+.password-toggle-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .busy {
   padding: 34px 20px;
   text-align: center;

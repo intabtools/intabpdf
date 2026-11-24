@@ -1,8 +1,9 @@
 // Tool module for removing passwords and unlocking protected PDF documents locally.
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { AlertCircle, Eye, EyeOff, Lock, ShieldCheck, Unlock } from 'lucide-react';
+import { AlertCircle, Lock, ShieldCheck, Unlock } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import PasswordInput from '../../components/PasswordInput';
 import type { ToolComponentProps } from '../types';
 import type { UnlockPdfOptions } from '../../core/unlock';
 import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
@@ -20,7 +21,6 @@ export default function UnlockTool({
   const passwordInputId = useId();
 
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isDocEncrypted, setIsDocEncrypted] = useState<boolean | null>(null);
   const [detectedAlgorithm, setDetectedAlgorithm] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -171,56 +171,16 @@ export default function UnlockTool({
         )}
 
         {/* Password input */}
-        <div>
-          <label
-            htmlFor={passwordInputId}
-            style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}
-          >
-            Password <span style={{ color: 'var(--danger, #e53e3e)' }}>*</span>
-          </label>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input
-              id={passwordInputId}
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={handlePasswordChange}
-              placeholder="Enter password to unlock document"
-              autoComplete="current-password"
-              style={{
-                width: '100%',
-                padding: '8px 36px 8px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                fontSize: '13px',
-                userSelect: 'text',
-              }}
-            />
-            <button
-              type="button"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: 'absolute',
-                right: '8px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-            Enter either the user (open) password or owner (permissions) password.
-          </small>
-        </div>
+        <PasswordInput
+          id={passwordInputId}
+          label="Password"
+          required
+          value={password}
+          onChange={handlePasswordChange}
+          placeholder="Enter password to unlock document"
+          autoComplete="current-password"
+          helperText="Enter either the user (open) password or owner (permissions) password."
+        />
 
         {/* Security assurance notice */}
         <div

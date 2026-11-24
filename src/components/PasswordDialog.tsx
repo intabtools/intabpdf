@@ -1,7 +1,8 @@
 // Password prompt modal dialog for encrypted PDFs across Web, Desktop, and Android.
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { AlertTriangle, Eye, EyeOff, Lock, X } from 'lucide-react';
+import { Lock, X } from 'lucide-react';
+import PasswordInput from './PasswordInput';
 
 export interface PasswordDialogProps {
   fileName: string;
@@ -19,7 +20,6 @@ export default function PasswordDialog({
   onCancel,
 }: PasswordDialogProps): ReactNode {
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus and select input on mount and after each incorrect attempt
@@ -143,81 +143,29 @@ export default function PasswordDialog({
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label
-              htmlFor="pdf-password-input"
-              style={{
-                fontSize: '12px',
-                fontWeight: 500,
-                color: 'var(--text-muted)',
-              }}
-            >
-              Password:
-            </label>
-            <div style={{ position: 'relative', width: '100%' }}>
-              <input
-                ref={inputRef}
-                id="pdf-password-input"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                disabled={isSubmitting}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck="false"
-                placeholder="Enter document password"
-                style={{
-                  padding: '9px 38px 9px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  border: `1px solid ${isIncorrect ? 'var(--danger)' : 'var(--border)'}`,
-                  background: 'var(--surface-2)',
-                  color: 'var(--text)',
-                  fontSize: '13.5px',
-                  width: '100%',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                style={{
-                  position: 'absolute',
-                  right: '8px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-            {isIncorrect && (
-              <div
-                role="alert"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: 'var(--danger)',
-                  fontSize: '12px',
-                  marginTop: '2px',
-                }}
-              >
-                <AlertTriangle size={14} />
-                <span>Incorrect password. Please try again.</span>
-              </div>
-            )}
-          </div>
+          <PasswordInput
+            ref={inputRef}
+            id="pdf-password-input"
+            label="Password:"
+            labelStyle={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: 'var(--text-muted)',
+              marginBottom: '6px',
+            }}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isSubmitting}
+            autoComplete="off"
+            placeholder="Enter document password"
+            variant="surface-2"
+            inputStyle={{
+              padding: '9px 44px 9px 12px',
+              fontSize: '13.5px',
+            }}
+            toggleTabIndex={-1}
+            error={isIncorrect ? 'Incorrect password. Please try again.' : undefined}
+          />
 
           <div
             style={{

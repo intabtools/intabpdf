@@ -1,8 +1,9 @@
 // Tool module for password-protecting PDF documents locally.
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { AlertCircle, Eye, EyeOff, Lock, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { AlertCircle, Lock, ShieldCheck, ShieldAlert } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import PasswordInput from '../../components/PasswordInput';
 import type { ToolComponentProps } from '../types';
 import type { ProtectPdfOptions } from '../../core/protect';
 import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
@@ -53,8 +54,6 @@ export default function ProtectTool({
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [algorithm, setAlgorithm] = useState<'AES-256' | 'RC4'>('AES-256');
 
   const [allowPrinting, setAllowPrinting] = useState<boolean>(() => !optionsState['block-print']);
@@ -202,53 +201,15 @@ export default function ProtectTool({
         )}
 
         {/* Password input field */}
-        <div>
-          <label
-            htmlFor={passwordInputId}
-            style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}
-          >
-            Document Password <span style={{ color: 'var(--danger, #e53e3e)' }}>*</span>
-          </label>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input
-              id={passwordInputId}
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={handlePasswordChange}
-              placeholder="Enter password to open this PDF"
-              autoComplete="new-password"
-              style={{
-                width: '100%',
-                padding: '8px 36px 8px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                fontSize: '13px',
-                userSelect: 'text',
-              }}
-            />
-            <button
-              type="button"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: 'absolute',
-                right: '8px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-
+        <PasswordInput
+          id={passwordInputId}
+          label="Document Password"
+          required
+          value={password}
+          onChange={handlePasswordChange}
+          placeholder="Enter password to open this PDF"
+          autoComplete="new-password"
+        >
           {/* Password strength indicator */}
           {password.length > 0 && (
             <div style={{ marginTop: '6px' }}>
@@ -287,61 +248,20 @@ export default function ProtectTool({
               </div>
             </div>
           )}
-        </div>
+        </PasswordInput>
 
         {/* Confirm password input field */}
-        <div>
-          <label
-            htmlFor={confirmPasswordInputId}
-            style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}
-          >
-            Confirm Password
-          </label>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <input
-              id={confirmPasswordInputId}
-              type={showConfirmPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={handleConfirmPasswordChange}
-              placeholder="Re-enter password to confirm"
-              autoComplete="new-password"
-              style={{
-                width: '100%',
-                padding: '8px 36px 8px 10px',
-                borderRadius: 'var(--radius-sm)',
-                border: `1px solid ${!passwordsMatch ? '#e53e3e' : 'var(--border)'}`,
-                background: 'var(--surface)',
-                color: 'var(--text)',
-                fontSize: '13px',
-                userSelect: 'text',
-              }}
-            />
-            <button
-              type="button"
-              aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              style={{
-                position: 'absolute',
-                right: '8px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-muted)',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-          {!passwordsMatch && (
-            <span style={{ color: '#e53e3e', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-              Passwords do not match
-            </span>
-          )}
-        </div>
+        <PasswordInput
+          id={confirmPasswordInputId}
+          label="Confirm Password"
+          value={confirmPassword}
+          onChange={handleConfirmPasswordChange}
+          placeholder="Re-enter password to confirm"
+          autoComplete="new-password"
+          showPasswordLabel="Show confirm password"
+          hidePasswordLabel="Hide confirm password"
+          error={!passwordsMatch ? 'Passwords do not match' : undefined}
+        />
 
         {/* Client-Side Security Assurance Notice */}
         <div
