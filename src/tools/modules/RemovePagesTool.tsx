@@ -392,25 +392,17 @@ export default function RemovePagesTool({
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                className="sb"
+                className="btn btn-secondary"
                 onClick={() => setShowConfirmModal(false)}
                 disabled={isProcessing}
-                style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm)' }}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="cta"
+                className="btn btn-danger"
                 onClick={() => void executeRemoval()}
                 disabled={isProcessing}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'var(--danger)',
-                  borderColor: 'var(--danger)',
-                  color: '#ffffff',
-                }}
               >
                 {isProcessing ? 'Removing...' : 'Confirm removal'}
               </button>

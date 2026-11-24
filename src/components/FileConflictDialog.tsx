@@ -205,13 +205,8 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
               >
                 <button
                   type="submit"
-                  className="cta"
-                  style={{
-                    width: '100%',
-                    padding: '9px 14px',
-                    fontSize: '13px',
-                    justifyContent: 'center',
-                  }}
+                  className="btn btn-primary"
+                  style={{ width: '100%' }}
                 >
                   Save as new name
                 </button>
@@ -220,29 +215,16 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
                   <button
                     type="button"
                     onClick={handleReplace}
-                    className="vtb-btn"
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      fontSize: '12.5px',
-                      justifyContent: 'center',
-                      background: 'var(--danger-soft)',
-                      borderColor: 'var(--danger)',
-                      color: 'var(--danger)',
-                    }}
+                    className="btn btn-danger-soft"
+                    style={{ flex: 1 }}
                   >
                     Replace
                   </button>
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="vtb-btn"
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      fontSize: '12.5px',
-                      justifyContent: 'center',
-                    }}
+                    className="btn btn-secondary"
+                    style={{ flex: 1 }}
                   >
                     Cancel
                   </button>

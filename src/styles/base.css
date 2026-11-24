@@ -1238,6 +1238,17 @@ textarea,
   padding: 0;
   transition: background-color 0.2s;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* Expanded touch target for mobile (at least 44px touch area) */
+.tg::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  bottom: -9px;
+  left: -4px;
+  right: -4px;
 }
 
 .tg.on {
@@ -1304,6 +1315,140 @@ textarea,
 
 .cta.o:hover:not(:disabled) {
   background: var(--surface-2);
+}
+
+/* Reusable button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, filter 0.15s, transform 0.1s;
+  min-height: 38px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn.sm, .btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+}
+
+/* Primary variant */
+.btn-primary {
+  background: var(--button);
+  color: #ffffff;
+  border-color: var(--button);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+/* Secondary variant (neutral bordered) */
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-secondary:active:not(:disabled) {
+  background: var(--surface-active);
+}
+
+.btn-secondary.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Danger variant */
+.btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+  font-weight: 600;
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+/* Danger soft / outline variant */
+.btn-danger-soft {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btn-danger-soft:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+/* Reorder page item controls (Move Earlier & Move Later) */
+.reorder-move-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.reorder-move-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.reorder-move-btn:active:not(:disabled) {
+  background: var(--surface-active);
+}
+
+.reorder-move-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+  background: transparent;
+  border-color: transparent;
 }
 
 .busy {
@@ -1716,8 +1861,15 @@ html[data-platform="android"] .stb {
     gap: 6px;
   }
   .fi .ib.sm {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .reorder-header-actions .btn {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
   }
   .cta {
     font-size: 13.5px;
@@ -1804,8 +1956,15 @@ html[data-platform="android"] .stb {
     gap: 6px;
   }
   .fi .ib.sm {
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .reorder-header-actions .btn {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
   }
   .cta {
     font-size: 13.5px;

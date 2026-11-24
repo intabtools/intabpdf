@@ -266,7 +266,7 @@ export default function PdfToImagesTool({
             className={`tc ${format === 'png' ? 'active' : ''}`}
             onClick={() => setFormat('png')}
             aria-pressed={format === 'png'}
-            style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
+            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
           >
             PNG (Lossless)
           </button>
@@ -275,7 +275,7 @@ export default function PdfToImagesTool({
             className={`tc ${format === 'jpeg' ? 'active' : ''}`}
             onClick={() => setFormat('jpeg')}
             aria-pressed={format === 'jpeg'}
-            style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
+            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
           >
             JPEG (Smaller file)
           </button>
@@ -310,7 +310,7 @@ export default function PdfToImagesTool({
                 className={`tc ${jpegQuality === q.quality ? 'active' : ''}`}
                 onClick={() => setJpegQuality(q.quality)}
                 aria-pressed={jpegQuality === q.quality}
-                style={{ flex: 1, minHeight: '36px', justifyContent: 'center', fontSize: '12.5px' }}
+                style={{ flex: 1, minHeight: '44px', justifyContent: 'center', fontSize: '12.5px' }}
               >
                 {q.label}
               </button>
@@ -341,7 +341,7 @@ export default function PdfToImagesTool({
               className={`tc ${scale === r.scale ? 'active' : ''}`}
               onClick={() => setScale(r.scale)}
               aria-pressed={scale === r.scale}
-              style={{ flex: 1, minHeight: '40px', justifyContent: 'center', fontSize: '12.5px' }}
+              style={{ flex: 1, minHeight: '44px', justifyContent: 'center', fontSize: '12.5px' }}
             >
               {r.label}
             </button>
@@ -369,7 +369,7 @@ export default function PdfToImagesTool({
             className={`tc ${pageSelectionMode === 'all' ? 'active' : ''}`}
             onClick={() => setPageSelectionMode('all')}
             aria-pressed={pageSelectionMode === 'all'}
-            style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
+            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
           >
             All pages {effectivePageCount !== null ? `(${effectivePageCount})` : ''}
           </button>
@@ -378,7 +378,7 @@ export default function PdfToImagesTool({
             className={`tc ${pageSelectionMode === 'range' ? 'active' : ''}`}
             onClick={() => setPageSelectionMode('range')}
             aria-pressed={pageSelectionMode === 'range'}
-            style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
+            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
           >
             Select range
           </button>

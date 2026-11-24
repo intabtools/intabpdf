@@ -243,14 +243,7 @@ export default function TextToPdfTool({
             />
             <button
               type="button"
-              className="btn btn-secondary"
-              style={{
-                fontSize: '12px',
-                padding: '4px 10px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
+              className="btn btn-secondary sm"
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload size={13} />
@@ -260,18 +253,12 @@ export default function TextToPdfTool({
             {text.length > 0 && (
               <button
                 type="button"
-                className="btn btn-secondary"
-                style={{
-                  fontSize: '12px',
-                  padding: '4px 8px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
+                className="btn btn-secondary sm"
                 onClick={() => setText('')}
                 title="Clear all text"
+                aria-label="Clear all text"
               >
-                <RotateCcw size={12} />
+                <RotateCcw size={13} />
                 Clear
               </button>
             )}

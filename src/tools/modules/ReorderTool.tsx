@@ -159,39 +159,27 @@ export default function ReorderTool({
           </div>
 
           {pageCount !== null && pageCount > 1 && (
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div className="reorder-header-actions" style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
-                className="btn btn-secondary"
-                style={{
-                  fontSize: '12px',
-                  padding: '4px 8px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
+                className="btn btn-secondary sm"
                 onClick={handleReverse}
                 title="Reverse all pages"
+                aria-label="Reverse all pages"
               >
-                <ArrowUpDown size={13} />
+                <ArrowUpDown size={14} />
                 Reverse
               </button>
 
               {isOrderChanged && (
                 <button
                   type="button"
-                  className="btn btn-secondary"
-                  style={{
-                    fontSize: '12px',
-                    padding: '4px 8px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
+                  className="btn btn-secondary sm"
                   onClick={handleReset}
                   title="Reset to original order"
+                  aria-label="Reset to original order"
                 >
-                  <RefreshCw size={13} />
+                  <RefreshCw size={14} />
                   Reset
                 </button>
               )}
@@ -299,39 +287,31 @@ export default function ReorderTool({
                       #{currentPos + 1}
                     </span>
 
-                    <div style={{ display: 'flex', gap: '2px' }}>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                       <button
                         type="button"
+                        className="reorder-move-btn"
                         aria-label={`Move page ${originalIndex + 1} earlier`}
                         disabled={currentPos === 0}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: currentPos === 0 ? 'default' : 'pointer',
-                          padding: '2px',
-                          opacity: currentPos === 0 ? 0.3 : 0.8,
-                          color: 'var(--text)',
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMove(currentPos, currentPos - 1);
                         }}
-                        onClick={() => handleMove(currentPos, currentPos - 1)}
                       >
-                        <ArrowUp size={13} />
+                        <ArrowUp size={16} />
                       </button>
 
                       <button
                         type="button"
+                        className="reorder-move-btn"
                         aria-label={`Move page ${originalIndex + 1} later`}
                         disabled={currentPos === pageOrder.length - 1}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: currentPos === pageOrder.length - 1 ? 'default' : 'pointer',
-                          padding: '2px',
-                          opacity: currentPos === pageOrder.length - 1 ? 0.3 : 0.8,
-                          color: 'var(--text)',
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMove(currentPos, currentPos + 1);
                         }}
-                        onClick={() => handleMove(currentPos, currentPos + 1)}
                       >
-                        <ArrowDown size={13} />
+                        <ArrowDown size={16} />
                       </button>
                     </div>
                   </div>

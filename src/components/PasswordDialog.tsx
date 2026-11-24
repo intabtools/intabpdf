@@ -231,12 +231,7 @@ export default function PasswordDialog({
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
-              className="vtb-btn"
-              style={{
-                padding: '8px 14px',
-                fontSize: '13px',
-                justifyContent: 'center',
-              }}
+              className="btn btn-secondary"
             >
               Cancel
             </button>
@@ -244,13 +239,8 @@ export default function PasswordDialog({
             <button
               type="submit"
               disabled={isSubmitting || !password.trim()}
-              className="cta"
-              style={{
-                padding: '8px 16px',
-                fontSize: '13px',
-                justifyContent: 'center',
-                minWidth: '100px',
-              }}
+              className="btn btn-primary"
+              style={{ minWidth: '100px' }}
             >
               {isSubmitting ? 'Unlocking…' : 'Unlock PDF'}
             </button>

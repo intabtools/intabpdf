@@ -392,12 +392,12 @@ export default function SignTool({
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 type="button"
-                className="btn btn-secondary"
-                style={{ fontSize: '12px', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                className="btn btn-secondary sm"
                 onClick={clearCanvas}
                 disabled={!hasDrawn}
+                aria-label="Clear signature canvas"
               >
-                <RotateCcw size={12} />
+                <RotateCcw size={13} />
                 Clear
               </button>
             </div>
@@ -474,9 +474,9 @@ export default function SignTool({
             <label
               htmlFor="signature-image-upload"
               className="btn btn-secondary"
-              style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              style={{ cursor: 'pointer' }}
             >
-              <Image size={14} />
+              <Image size={15} />
               Choose signature image
             </label>
             <small style={{ color: 'var(--text-muted)', fontSize: '12px' }}>

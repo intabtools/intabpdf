@@ -376,17 +376,10 @@ export default function ToolResultCard({
             </span>
             <button
               type="button"
-              className="sb sm"
+              className="btn btn-secondary sm"
               onClick={() => void handleCopyText()}
               disabled={!textPreview || wordCount === 0}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                fontSize: '12px',
-                borderRadius: 'var(--radius-sm)',
-              }}
+              aria-label="Copy extracted text to clipboard"
             >
               {isCopied ? <Check size={13} color="var(--accent)" /> : <Copy size={13} />}
               <span>{isCopied ? 'Copied!' : 'Copy text'}</span>
