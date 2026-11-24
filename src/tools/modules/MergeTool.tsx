@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Layers } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import type { ToolComponentProps } from '../types';
-import { pdfProcessingService } from '../../core';
+import { pdfProcessingService } from '../../core/worker/service';
 
 export default function MergeTool({
   tool,

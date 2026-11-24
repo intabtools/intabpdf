@@ -1,7 +1,7 @@
 // Sub-component for manual compression preset cards and explanatory details.
 import type { ReactNode } from 'react';
 import { Info } from 'lucide-react';
-import type { CompressionPreset } from '../../../core';
+import type { CompressionPreset } from '../../../core/compress';
 import { PRESET_CARDS } from './compressConfig';
 
 export interface QualityPresetSectionProps {

@@ -5,7 +5,9 @@ import { AlertCircle, CheckCircle2, Info, RotateCw } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import { ProcessingContext } from '../../components/processingContextDef';
 import type { ToolComponentProps } from '../types';
-import { getPdfPageCount, parseRotatePageInput, pdfProcessingService } from '../../core';
+import { parseRotatePageInput } from '../../core/rotate';
+import { getPdfPageCount } from '../../core/split';
+import { pdfProcessingService } from '../../core/worker/service';
 import { executeBatchOperation } from '../batchOperation';
 import { getCleanBaseName } from '../filename';
 

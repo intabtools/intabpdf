@@ -4,7 +4,9 @@ import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Info, Trash2, X } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import type { ToolComponentProps } from '../types';
-import { getPdfPageCount, parseRemovePageInput, pdfProcessingService } from '../../core';
+import { parseRemovePageInput } from '../../core/remove-pages';
+import { getPdfPageCount } from '../../core/split';
+import { pdfProcessingService } from '../../core/worker/service';
 
 export default function RemovePagesTool({
   tool,

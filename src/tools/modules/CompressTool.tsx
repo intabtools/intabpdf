@@ -5,9 +5,10 @@ import { FileDown, Gauge, Info, Sparkles, Target, Zap } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import { ProcessingContext } from '../../components/processingContextDef';
 import type { ToolComponentProps } from '../types';
-import { analyzePdfDocument, pdfProcessingService } from '../../core';
-import type { CompressionPreset } from '../../core';
+import type { CompressionPreset } from '../../core/compress';
+import { analyzePdfDocument } from '../../core/document-analysis';
 import { formatBytes } from '../../core/formatBytes';
+import { pdfProcessingService } from '../../core/worker/service';
 import {
   PRESET_CARDS,
   type CompressionMode,

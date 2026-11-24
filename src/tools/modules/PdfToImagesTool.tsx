@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, FileImage, Image as ImageIcon, Info, Layers,
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import { ProcessingContext } from '../../components/processingContextDef';
 import { useToast } from '../../hooks/useToast';
-import { getPdfPageCount } from '../../core';
+import { getPdfPageCount } from '../../core/split';
 import type { ToolComponentProps } from '../types';
 import { parseImagePageSelection } from './pdfToImages/pageSelection';
 import { renderPdfToImages } from './pdfToImages/renderer';

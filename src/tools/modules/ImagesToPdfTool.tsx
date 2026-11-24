@@ -4,14 +4,14 @@ import type { ReactNode } from 'react';
 import { FileImage, Info } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import type { ToolComponentProps } from '../types';
-import { pdfProcessingService } from '../../core';
 import type {
   ImageFit,
   MarginPreset,
   PageBackground,
   PageOrientation,
   PageSize,
-} from '../../core';
+} from '../../core/images-to-pdf';
+import { pdfProcessingService } from '../../core/worker/service';
 import type { DocumentFilter, NormalizedRect, ProcessImageOptions } from './imagesToPdf/imageFilters';
 
 export default function ImagesToPdfTool({

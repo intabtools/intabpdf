@@ -4,8 +4,9 @@ import type { ReactNode } from 'react';
 import { AlertCircle, Files, Info } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import type { ToolComponentProps } from '../types';
-import { getPdfPageCount, parsePageRanges, pdfProcessingService } from '../../core';
-import type { PageRange } from '../../core';
+import { getPdfPageCount, parsePageRanges } from '../../core/split';
+import type { PageRange } from '../../core/split';
+import { pdfProcessingService } from '../../core/worker/service';
 import SplitRangeInput from './split/SplitRangeInput';
 
 export default function SplitTool({
