@@ -1,8 +1,9 @@
 // Result card displayed when a PDF tool completes execution, with stats, download, and viewing options.
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertTriangle, Check, Copy, Download, Eye, Info, RefreshCw, XCircle } from 'lucide-react';
+import { Check, Copy, Download, Eye, Info, RefreshCw, XCircle } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import { formatBytes } from '../../core/formatBytes';
 import type { PlatformType } from '../../platform';
 import type { StagedFile, ToolDefinition } from '../../tools/types';
@@ -141,46 +142,25 @@ export default function ToolResultCard({
       <b>{cardTitle}</b>
 
       {batchStats && batchStats.failureCount > 0 && (
-        <div
+        <NoticeBanner
+          variant="warning"
           role="alert"
-          style={{
-            marginTop: '8px',
-            marginBottom: '4px',
-            padding: '10px 12px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--warning-soft)',
-            border: '1px solid var(--warning)',
-            color: 'var(--text)',
-            fontSize: '13px',
-            lineHeight: 1.5,
-          }}
+          title={`${batchStats.failureCount} of ${batchStats.total} files could not be ${tool.id === 'compress' ? 'compressed' : 'processed'}`}
+          style={{ marginTop: '8px', marginBottom: '4px' }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 600,
-              color: 'var(--warning)',
-              marginBottom: '4px',
-            }}
-          >
-            <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-            <span>
-              {`${batchStats.failureCount} of ${batchStats.total} files could not be ${tool.id === 'compress' ? 'compressed' : 'processed'}`}
-            </span>
+          <div>
+            <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              {`${batchStats.successCount} file${batchStats.successCount === 1 ? '' : 's'} successfully ${tool.id === 'compress' ? 'compressed' : 'processed'} and included in the ZIP. Failed files were excluded:`}
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px' }}>
+              {batchStats.failures.map((f, idx) => (
+                <li key={idx} style={{ marginBottom: '2px' }}>
+                  <strong>{f.fileName}</strong>: {f.reason}
+                </li>
+              ))}
+            </ul>
           </div>
-          <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-            {`${batchStats.successCount} file${batchStats.successCount === 1 ? '' : 's'} successfully ${tool.id === 'compress' ? 'compressed' : 'processed'} and included in the ZIP. Failed files were excluded:`}
-          </p>
-          <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px' }}>
-            {batchStats.failures.map((f, idx) => (
-              <li key={idx} style={{ marginBottom: '2px' }}>
-                <strong>{f.fileName}</strong>: {f.reason}
-              </li>
-            ))}
-          </ul>
-        </div>
+        </NoticeBanner>
       )}
 
       {tool.id === 'compress' ? (

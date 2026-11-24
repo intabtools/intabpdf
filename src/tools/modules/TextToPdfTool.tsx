@@ -3,6 +3,7 @@ import { useId, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent, ReactNode } from 'react';
 import { AlertCircle, FileText, RotateCcw, Upload } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import type { ToolComponentProps } from '../types';
 import type {
   TextFontFamily,
@@ -321,21 +322,11 @@ export default function TextToPdfTool({
 
         {/* Unsupported Characters Banner */}
         {uniqueUnsupported.length > 0 && (
-          <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--warning-surface, #fffaf0)',
-              border: '1px solid var(--warning-border, #feebc8)',
-              color: 'var(--warning-text, #744210)',
-              fontSize: '12px',
-              lineHeight: 1.5,
-              display: 'flex',
-              gap: '10px',
-              alignItems: 'flex-start',
-            }}
+          <NoticeBanner
+            variant="warning"
+            role="alert"
+            icon={<AlertCircle size={16} />}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
               <strong>Unsupported characters detected:</strong>{' '}
               {uniqueUnsupported.map((u, idx) => (
@@ -347,7 +338,7 @@ export default function TextToPdfTool({
                 Standard PDF fonts only support Western European characters (Windows-1252). Please remove these characters to proceed.
               </div>
             </div>
-          </div>
+          </NoticeBanner>
         )}
       </div>
 

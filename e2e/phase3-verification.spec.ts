@@ -85,4 +85,40 @@ test.describe('Phase 3: PasswordInput Shared Component Verification', () => {
 
     await page.screenshot({ path: path.join(SCRATCH_DIR, 'unlock-password-mobile-dark.png') });
   });
+
+  test('NoticeBanner: verifies responsive wrapping and contrast across light and dark viewports', async ({ page }) => {
+    // 1. Desktop Light on Text to PDF with warning banner
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/tool/text-to-pdf');
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+
+    const textarea = page.locator('textarea');
+    await textarea.fill('Document with unsupported Chinese character: 漢字');
+
+    const warningBanner = page.locator('.notice-banner.notice-banner-warning');
+    await expect(warningBanner).toBeVisible();
+    await expect(warningBanner).toContainText('Unsupported characters detected');
+    await expect(warningBanner).toHaveAttribute('role', 'alert');
+
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'notice-banner-desktop-light.png') });
+
+    // 2. Desktop Dark on Text to PDF
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'notice-banner-desktop-dark.png') });
+
+    // 3. Mobile Light on Text to PDF
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    const boxLight = await warningBanner.boundingBox();
+    expect(boxLight).toBeTruthy();
+    expect(boxLight!.width).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'notice-banner-mobile-light.png') });
+
+    // 4. Mobile Dark on Text to PDF
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    const boxDark = await warningBanner.boundingBox();
+    expect(boxDark).toBeTruthy();
+    expect(boxDark!.width).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'notice-banner-mobile-dark.png') });
+  });
 });

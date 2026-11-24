@@ -1,9 +1,10 @@
 // Tool module for password-protecting PDF documents locally.
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { AlertCircle, Lock, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Lock, ShieldCheck, ShieldAlert } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import PasswordInput from '../../components/PasswordInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import type { ToolComponentProps } from '../types';
 import type { ProtectPdfOptions } from '../../core/protect';
 import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
@@ -158,46 +159,20 @@ export default function ProtectTool({
 
         {/* Already encrypted warning banner */}
         {isDocEncrypted === true && (
-          <div
+          <NoticeBanner
+            variant="danger"
             role="alert"
-            style={{
-              padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--danger-soft)',
-              border: '1px solid var(--danger)',
-              color: 'var(--danger)',
-              fontSize: '13px',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-            }}
+            icon={<ShieldAlert size={18} />}
           >
-            <ShieldAlert size={18} style={{ flexShrink: 0 }} />
-            <div>
-              <strong>Document is already protected:</strong> This PDF is already password protected. Unlock it first before applying new protection.
-            </div>
-          </div>
+            <strong>Document is already protected:</strong> This PDF is already password protected. Unlock it first before applying new protection.
+          </NoticeBanner>
         )}
 
         {/* Validation error banner */}
         {validationError && (
-          <div
-            role="alert"
-            style={{
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--danger-soft)',
-              border: '1px solid var(--danger)',
-              color: 'var(--danger)',
-              fontSize: '13px',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-            }}
-          >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
-            <span>{validationError}</span>
-          </div>
+          <NoticeBanner variant="danger" role="alert">
+            {validationError}
+          </NoticeBanner>
         )}
 
         {/* Password input field */}
@@ -264,27 +239,16 @@ export default function ProtectTool({
         />
 
         {/* Client-Side Security Assurance Notice */}
-        <div
-          style={{
-            padding: '12px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            fontSize: '12px',
-            lineHeight: 1.5,
-            color: 'var(--text-muted)',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'flex-start',
-            marginTop: 'auto',
-          }}
+        <NoticeBanner
+          variant="info"
+          icon={<ShieldCheck size={16} style={{ color: 'var(--accent)' }} />}
+          style={{ marginTop: 'auto' }}
         >
-          <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--accent)' }} />
           <div>
             <strong>Client-Side Local Encryption:</strong> Your document is encrypted directly in your browser.
             The password is never transmitted to any server. Keep your password safe: there is no recovery option if forgotten.
           </div>
-        </div>
+        </NoticeBanner>
       </div>
 
       {/* Right Column: Security Options & Action */}

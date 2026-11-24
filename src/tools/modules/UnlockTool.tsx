@@ -1,9 +1,10 @@
 // Tool module for removing passwords and unlocking protected PDF documents locally.
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { AlertCircle, Lock, ShieldCheck, Unlock } from 'lucide-react';
+import { Lock, ShieldCheck, Unlock } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import PasswordInput from '../../components/PasswordInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import type { ToolComponentProps } from '../types';
 import type { UnlockPdfOptions } from '../../core/unlock';
 import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
@@ -108,66 +109,30 @@ export default function UnlockTool({
 
         {/* Protection detection badge */}
         {isDocEncrypted === true && (
-          <div
-            style={{
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              fontSize: '12px',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-            }}
+          <NoticeBanner
+            variant="info"
+            role="status"
+            icon={<Lock size={15} style={{ color: 'var(--accent)' }} />}
           >
-            <Lock size={15} style={{ flexShrink: 0, color: 'var(--accent)' }} />
-            <span>
-              Protected PDF detected {detectedAlgorithm ? `(${detectedAlgorithm})` : ''}. Enter the password to remove encryption.
-            </span>
-          </div>
+            Protected PDF detected {detectedAlgorithm ? `(${detectedAlgorithm})` : ''}. Enter the password to remove encryption.
+          </NoticeBanner>
         )}
 
         {isDocEncrypted === false && (
-          <div
-            role="alert"
-            style={{
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              fontSize: '12px',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-              color: 'var(--text-muted)',
-            }}
+          <NoticeBanner
+            variant="info"
+            role="status"
+            icon={<ShieldCheck size={16} style={{ color: 'var(--accent)' }} />}
           >
-            <ShieldCheck size={16} style={{ flexShrink: 0, color: 'var(--accent)' }} />
-            <span>
-              This document is not password protected. Unlocking is not required.
-            </span>
-          </div>
+            This document is not password protected. Unlocking is not required.
+          </NoticeBanner>
         )}
 
         {/* Error message banner */}
         {errorMessage && (
-          <div
-            role="alert"
-            style={{
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--danger-soft)',
-              border: '1px solid var(--danger)',
-              color: 'var(--danger)',
-              fontSize: '13px',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-            }}
-          >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
-            <span>{errorMessage}</span>
-          </div>
+          <NoticeBanner variant="danger" role="alert">
+            {errorMessage}
+          </NoticeBanner>
         )}
 
         {/* Password input */}
@@ -183,27 +148,16 @@ export default function UnlockTool({
         />
 
         {/* Security assurance notice */}
-        <div
-          style={{
-            padding: '12px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            fontSize: '12px',
-            lineHeight: 1.5,
-            color: 'var(--text-muted)',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'flex-start',
-            marginTop: 'auto',
-          }}
+        <NoticeBanner
+          variant="info"
+          icon={<ShieldCheck size={16} style={{ color: 'var(--accent)' }} />}
+          style={{ marginTop: 'auto' }}
         >
-          <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--accent)' }} />
           <div>
             <strong>Client-Side Decryption:</strong> Unlocking is processed entirely on your local device.
             Your password and document contents are never transmitted to any external server.
           </div>
-        </div>
+        </NoticeBanner>
       </div>
 
       {/* Right Column: Execution Options & Action */}

@@ -1,8 +1,9 @@
 // Tool module for extracting page ranges and splitting PDF documents.
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertCircle, Files, Info } from 'lucide-react';
+import { Files, Info } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import type { ToolComponentProps } from '../types';
 import { getPdfPageCount, parsePageRanges } from '../../core/split';
 import type { PageRange } from '../../core/split';
@@ -146,27 +147,13 @@ export default function SplitTool({
       </div>
 
       {pageError && (
-        <div
-          style={{
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'flex-start',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'var(--danger-soft)',
-            border: '1px solid var(--danger)',
-            color: 'var(--danger)',
-            fontSize: '13px',
-            marginBottom: '12px',
-            width: '100%',
-            minWidth: 0,
-            boxSizing: 'border-box',
-          }}
+        <NoticeBanner
+          variant="danger"
           role="alert"
+          style={{ marginBottom: '12px' }}
         >
-          <AlertCircle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-          <span style={{ minWidth: 0, wordBreak: 'break-word' }}>{pageError}</span>
-        </div>
+          {pageError}
+        </NoticeBanner>
       )}
 
       {/* Option: One file per page */}
