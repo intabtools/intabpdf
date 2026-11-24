@@ -40,6 +40,24 @@ describe('tools/registry', () => {
       expect(tool.outputName).toBeTruthy();
       expect(Array.isArray(tool.options)).toBe(true);
       expect(['available', 'coming-soon']).toContain(tool.availability);
+      expect(typeof tool.multipleFiles).toBe('boolean');
+    });
+  });
+
+  it('correctly designates single-file vs multi-file tools', () => {
+    const singleFileIds = ['protect', 'unlock', 'sign', 'reorder', 'remove-pages', 'split', 'text-to-pdf'];
+    const multiFileIds = ['images-to-pdf', 'merge', 'rotate', 'compress', 'pdf-to-images', 'extract-text'];
+
+    singleFileIds.forEach((id) => {
+      const tool = getToolById(id);
+      expect(tool).toBeDefined();
+      expect(tool?.multipleFiles).toBe(false);
+    });
+
+    multiFileIds.forEach((id) => {
+      const tool = getToolById(id);
+      expect(tool).toBeDefined();
+      expect(tool?.multipleFiles).toBe(true);
     });
   });
 
@@ -59,7 +77,7 @@ describe('tools/registry', () => {
     const protectTool = getToolById('protect');
     expect(protectTool).toBeDefined();
     expect(protectTool?.name).toBe('Protect');
-    expect(protectTool?.availability).toBe('coming-soon');
+    expect(protectTool?.availability).toBe('available');
 
     const nonExistent = getToolById('unknown-tool');
     expect(nonExistent).toBeUndefined();
@@ -93,14 +111,22 @@ describe('tools/registry', () => {
       'images-to-pdf',
       'merge',
       'pdf-to-images',
+      'protect',
       'remove-pages',
+      'reorder',
       'rotate',
+      'sign',
       'split',
+      'text-to-pdf',
+      'unlock',
     ]);
 
     const comingSoon = getComingSoonTools();
-    expect(comingSoon.length).toBe(5);
+    expect(comingSoon.length).toBe(0);
 
+    expect(isToolImplemented('sign')).toBe(true);
+    expect(isToolImplemented('reorder')).toBe(true);
+    expect(isToolImplemented('text-to-pdf')).toBe(true);
     expect(isToolImplemented('images-to-pdf')).toBe(true);
     expect(isToolImplemented('pdf-to-images')).toBe(true);
     expect(isToolImplemented('merge')).toBe(true);
@@ -109,7 +135,8 @@ describe('tools/registry', () => {
     expect(isToolImplemented('split')).toBe(true);
     expect(isToolImplemented('compress')).toBe(true);
     expect(isToolImplemented('extract-text')).toBe(true);
-    expect(isToolImplemented('protect')).toBe(false);
+    expect(isToolImplemented('protect')).toBe(true);
+    expect(isToolImplemented('unlock')).toBe(true);
   });
 
   it('passes comprehensive registry validation', () => {

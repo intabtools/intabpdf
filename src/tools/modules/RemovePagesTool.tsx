@@ -149,7 +149,7 @@ export default function RemovePagesTool({
             borderRadius: 'var(--radius-sm)',
             border:
               removePagesInput.trim().length > 0 && validation?.error
-                ? '1px solid #E81123'
+                ? '1px solid var(--danger)'
                 : '1px solid var(--border)',
             background: 'var(--surface-2)',
             color: 'var(--text)',
@@ -185,7 +185,7 @@ export default function RemovePagesTool({
               display: 'flex',
               gap: '6px',
               alignItems: 'flex-start',
-              color: '#E81123',
+              color: 'var(--danger)',
               fontSize: '12px',
               lineHeight: '1.4',
               width: '100%',
@@ -206,7 +206,7 @@ export default function RemovePagesTool({
                   display: 'flex',
                   gap: '6px',
                   alignItems: 'flex-start',
-                  color: '#E81123',
+                  color: 'var(--danger)',
                   fontSize: '12px',
                   lineHeight: '1.4',
                   width: '100%',
@@ -344,7 +344,7 @@ export default function RemovePagesTool({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Trash2 size={20} color="#E81123" />
+                <Trash2 size={20} color="var(--danger)" />
                 <h3
                   id="confirm-remove-title"
                   style={{
@@ -407,8 +407,8 @@ export default function RemovePagesTool({
                 style={{
                   padding: '8px 16px',
                   borderRadius: 'var(--radius-sm)',
-                  backgroundColor: '#E81123',
-                  borderColor: '#E81123',
+                  backgroundColor: 'var(--danger)',
+                  borderColor: 'var(--danger)',
                   color: '#ffffff',
                 }}
               >

@@ -47,6 +47,7 @@ export default function OutputFilenameInput({
       )}
 
       <div
+        className="output-filename-box"
         style={{
           display: 'flex',
           alignItems: 'center',

@@ -556,7 +556,7 @@
 }
 
 .viewer-state-box .state-err-icon {
-  color: #e81123;
+  color: var(--danger);
 }
 
 .viewer-state-box .cta {
@@ -758,7 +758,7 @@
 }
 
 .viewer-search-bar .search-count.no-match {
-  color: #e81123;
+  color: var(--danger);
   font-weight: 600;
 }
 
@@ -788,8 +788,8 @@
   margin: 20px auto;
   padding: 12px 16px;
   border-radius: var(--radius-md);
-  border: 1px solid #e81123;
-  background-color: rgba(232, 17, 35, 0.1);
+  border: 1px solid var(--danger);
+  background-color: var(--danger-soft);
   color: var(--text);
   font-size: 13.5px;
 }

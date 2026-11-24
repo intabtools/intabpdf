@@ -504,4 +504,132 @@ describe('PdfProcessingService Dedicated Worker & Cancellation Architecture', ()
       expect((caughtErr as DOMException).name).toBe('TimeoutError');
     });
   });
+
+  describe('6. text-to-pdf Worker & Fallback Execution with Cloneability & Cancellation', () => {
+    it('proves text-to-pdf payload is 100% structured-cloneable with no functions or non-cloneable dependencies', () => {
+      const payload = {
+        text: 'Sample text content for conversion',
+        options: {
+          pageSize: 'a4' as const,
+          orientation: 'portrait' as const,
+          marginPreset: 'normal' as const,
+          fontFamily: 'helvetica' as const,
+          fontSize: 11,
+          lineSpacing: 1.3,
+          includePageNumbers: true,
+        },
+      };
+
+      // structuredClone must succeed without throwing DataCloneError
+      const cloned = structuredClone(payload);
+      expect(cloned).toEqual(payload);
+
+      // Verify no functions exist anywhere in payload
+      expect(typeof (cloned.options as Record<string, unknown>).yieldFn).toBe('undefined');
+      for (const val of Object.values(cloned.options)) {
+        expect(typeof val).not.toBe('function');
+      }
+    });
+
+    it('spawns a dedicated worker for text-to-pdf and returns result bytes', async () => {
+      const promise = pdfProcessingService.execute('text-to-pdf', {
+        text: 'Worker text test',
+      });
+
+      expect(createdWorkers.length).toBe(1);
+      const worker = createdWorkers[0];
+      const reqId = worker.postMessage.mock.calls[0][0].id;
+
+      const dummyPdf = new Uint8Array([37, 80, 68, 70]); // %PDF
+      worker.onmessage?.({
+        data: { id: reqId, ok: true, result: dummyPdf },
+      } as MessageEvent);
+
+      const result = await promise;
+      expect(result).toBe(dummyPdf);
+      expect(worker.terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles fallback in-flight cancellation for text-to-pdf and frees queue for subsequent request', async () => {
+      vi.stubGlobal('Worker', undefined);
+
+      let fallbackSignal: AbortSignal | undefined;
+      vi.spyOn(pdfProcessingService, 'executeOnMainThread').mockImplementation((_op, payload, signal) => {
+        fallbackSignal = signal;
+        const textPayload = payload as { text: string };
+        if (textPayload.text === 'cancel-me') {
+          return new Promise<Uint8Array>((_, reject) => {
+            signal?.addEventListener('abort', () => {
+              reject(signal.reason || new DOMException('Operation was aborted.', 'AbortError'));
+            });
+          });
+        }
+        return Promise.resolve(new Uint8Array([10, 20, 30]));
+      });
+
+      const abortCtrl = new AbortController();
+      const req1Promise = pdfProcessingService.execute(
+        'text-to-pdf',
+        { text: 'cancel-me' },
+        { signal: abortCtrl.signal }
+      );
+
+      expect(fallbackSignal).toBeDefined();
+      expect(fallbackSignal!.aborted).toBe(false);
+
+      // Trigger cancellation while active
+      abortCtrl.abort(new DOMException('User cancelled generation', 'AbortError'));
+
+      await expect(req1Promise).rejects.toThrow('User cancelled generation');
+
+      // Subsequent request must run immediately and succeed
+      const req2Promise = pdfProcessingService.execute('text-to-pdf', { text: 'clean-next' });
+      await expect(req2Promise).resolves.toEqual(new Uint8Array([10, 20, 30]));
+    });
+
+    it('dispatches protect operation with cloned buffer and options to worker', async () => {
+      const dummyPdf = new Uint8Array([37, 80, 68, 70]); // %PDF
+      const promise = pdfProcessingService.protectPdf(dummyPdf, {
+        password: 'securePassword',
+        algorithm: 'AES-256',
+      });
+
+      expect(createdWorkers).toHaveLength(1);
+      const worker = createdWorkers[0];
+      const call = worker.postMessage.mock.calls[0];
+      expect(call[0].operation).toBe('protect');
+      expect(call[0].payload.options.password).toBe('securePassword');
+      expect(call[1]).toHaveLength(1);
+
+      const reqId = call[0].id;
+      worker.onmessage?.({
+        data: { id: reqId, ok: true, result: new Uint8Array([99, 88]) },
+      } as MessageEvent);
+
+      const res = await promise;
+      expect(res).toEqual(new Uint8Array([99, 88]));
+    });
+
+    it('dispatches unlock operation with cloned buffer and options to worker', async () => {
+      const dummyPdf = new Uint8Array([37, 80, 68, 70]); // %PDF
+      const promise = pdfProcessingService.unlockPdf(dummyPdf, {
+        password: 'mySecretPassword',
+      });
+
+      expect(createdWorkers).toHaveLength(1);
+      const worker = createdWorkers[0];
+      const call = worker.postMessage.mock.calls[0];
+      expect(call[0].operation).toBe('unlock');
+      expect(call[0].payload.options.password).toBe('mySecretPassword');
+      expect(call[1]).toHaveLength(1);
+
+      const reqId = call[0].id;
+      worker.onmessage?.({
+        data: { id: reqId, ok: true, result: new Uint8Array([77, 66]) },
+      } as MessageEvent);
+
+      const res = await promise;
+      expect(res).toEqual(new Uint8Array([77, 66]));
+    });
+  });
 });

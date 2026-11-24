@@ -111,7 +111,7 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertTriangle size={20} color="#eab308" />
+                <AlertTriangle size={20} color="var(--warning)" />
                 <h3
                   id="conflict-dialog-title"
                   style={{
@@ -180,17 +180,16 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
                   style={{
                     padding: '8px 10px',
                     borderRadius: 'var(--radius-sm)',
-                    border: `1px solid ${nameError ? '#ef4444' : 'var(--border)'}`,
+                    border: `1px solid ${nameError ? 'var(--danger)' : 'var(--border)'}`,
                     background: 'var(--surface-2)',
                     color: 'var(--text)',
                     fontSize: '13px',
-                    outline: 'none',
                     width: '100%',
                     boxSizing: 'border-box',
                   }}
                 />
                 {nameError && (
-                  <span style={{ fontSize: '11.5px', color: '#ef4444' }}>
+                  <span style={{ fontSize: '11.5px', color: 'var(--danger)' }}>
                     {nameError}
                   </span>
                 )}
@@ -227,9 +226,9 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
                       padding: '8px 12px',
                       fontSize: '12.5px',
                       justifyContent: 'center',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      borderColor: 'rgba(239, 68, 68, 0.3)',
-                      color: '#ef4444',
+                      background: 'var(--danger-soft)',
+                      borderColor: 'var(--danger)',
+                      color: 'var(--danger)',
                     }}
                   >
                     Replace

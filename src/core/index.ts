@@ -12,6 +12,12 @@ export type { RotateOptions, ParsedRotatePagesResult } from './rotate';
 export { removePdfPages, parseRemovePageInput } from './remove-pages';
 export type { RemovePagesOptions, ParsedRemovePagesResult } from './remove-pages';
 
+export { reorderPdfPages, validatePageOrder } from './reorder';
+export type { ReorderOptions } from './reorder';
+
+export { signPdf } from './sign';
+export type { SignOptions, SignaturePosition } from './sign';
+
 export {
   splitPdfPages,
   getPdfPageCount,
@@ -70,6 +76,27 @@ export type {
   DocumentAnalysis,
   ImageStreamInfo,
 } from './document-analysis';
+
+export {
+  textToPdf,
+  findUnsupportedCharacters,
+  PAGE_SIZES as TEXT_PAGE_SIZES,
+  MARGIN_PRESETS as TEXT_MARGIN_PRESETS,
+} from './text-to-pdf';
+export type {
+  TextPageSize,
+  TextOrientation,
+  TextMarginPreset,
+  TextFontFamily,
+  TextToPdfOptions,
+  UnsupportedCharacterInfo,
+} from './text-to-pdf';
+
+export { protectPdf } from './protect';
+export type { ProtectPdfOptions } from './protect';
+
+export { unlockPdf } from './unlock';
+export type { UnlockPdfOptions } from './unlock';
 
 export { pdfProcessingService } from './worker/service';
 export type { PdfOperation, OperationPayloads } from './worker/service';

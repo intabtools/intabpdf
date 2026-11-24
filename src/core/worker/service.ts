@@ -5,6 +5,11 @@ import type { ImagesToPdfOptions, InputImage } from '../images-to-pdf';
 import type { RotateOptions } from '../rotate';
 import type { CompressOptions } from '../compress';
 import type { MergeOptions } from '../merge';
+import type { TextToPdfOptions } from '../text-to-pdf';
+import type { ReorderOptions } from '../reorder';
+import type { SignOptions } from '../sign';
+import type { ProtectPdfOptions } from '../protect';
+import type { UnlockPdfOptions } from '../unlock';
 
 export type PdfOperation =
   | 'merge'
@@ -12,7 +17,12 @@ export type PdfOperation =
   | 'remove-pages'
   | 'split'
   | 'images-to-pdf'
-  | 'compress';
+  | 'compress'
+  | 'text-to-pdf'
+  | 'reorder'
+  | 'sign'
+  | 'protect'
+  | 'unlock';
 
 export interface OperationPayloads {
   merge: { buffers: Uint8Array[]; options?: MergeOptions };
@@ -21,6 +31,11 @@ export interface OperationPayloads {
   split: { buffer: Uint8Array; ranges: PageRange[]; splitOptions?: SplitOptions };
   'images-to-pdf': { images: InputImage[]; options?: ImagesToPdfOptions };
   compress: { buffer: Uint8Array; options?: CompressOptions };
+  'text-to-pdf': { text: string; options?: TextToPdfOptions };
+  reorder: { buffer: Uint8Array; pageOrder: number[]; options?: ReorderOptions };
+  sign: { buffer: Uint8Array; signatureBytes: Uint8Array; options?: SignOptions };
+  protect: { buffer: Uint8Array; options: ProtectPdfOptions };
+  unlock: { buffer: Uint8Array; options: UnlockPdfOptions };
 }
 
 export interface ExecuteOptions {
@@ -61,6 +76,11 @@ class PdfProcessingService {
     switch (op) {
       case 'rotate':
       case 'remove-pages':
+      case 'text-to-pdf':
+      case 'reorder':
+      case 'sign':
+      case 'protect':
+      case 'unlock':
         return 60_000; // 60 seconds
       case 'merge':
       case 'split':
@@ -470,6 +490,11 @@ class PdfProcessingService {
       const copy = payload.buffer.slice();
       transferList.push(copy.buffer);
       workerPayload = { ...payload, buffer: copy };
+      if ('signatureBytes' in payload && (payload as OperationPayloads['sign']).signatureBytes instanceof Uint8Array) {
+        const sigCopy = (payload as OperationPayloads['sign']).signatureBytes.slice();
+        transferList.push(sigCopy.buffer);
+        workerPayload = { ...workerPayload, signatureBytes: sigCopy };
+      }
     } else if ('buffers' in payload && Array.isArray(payload.buffers)) {
       const copies = payload.buffers.map((b) => {
         if (b instanceof Uint8Array) {
@@ -541,9 +566,91 @@ class PdfProcessingService {
         const p = payload as OperationPayloads['compress'];
         return await compressPdf(p.buffer, p.options, signal);
       }
+      case 'text-to-pdf': {
+        const { textToPdf } = await import('../text-to-pdf');
+        const p = payload as OperationPayloads['text-to-pdf'];
+        return await textToPdf(p.text, p.options, signal);
+      }
+      case 'reorder': {
+        const { reorderPdfPages } = await import('../reorder');
+        const p = payload as OperationPayloads['reorder'];
+        return await reorderPdfPages(p.buffer, p.pageOrder, p.options, signal);
+      }
+      case 'sign': {
+        const { signPdf } = await import('../sign');
+        const p = payload as OperationPayloads['sign'];
+        return await signPdf(p.buffer, p.signatureBytes, p.options, signal);
+      }
+      case 'protect': {
+        const { protectPdf } = await import('../protect');
+        const p = payload as OperationPayloads['protect'];
+        return await protectPdf(p.buffer, p.options, signal);
+      }
+      case 'unlock': {
+        const { unlockPdf } = await import('../unlock');
+        const p = payload as OperationPayloads['unlock'];
+        return await unlockPdf(p.buffer, p.options, signal);
+      }
       default:
         throw new Error(`Unsupported operation on main thread: ${String(operation)}`);
     }
+  }
+
+  /**
+   * Convenience runner for textToPdf operation.
+   */
+  public textToPdf(
+    text: string,
+    options?: TextToPdfOptions,
+    executeOptions?: ExecuteOptions
+  ): Promise<Uint8Array> {
+    return this.execute('text-to-pdf', { text, options }, executeOptions);
+  }
+
+  /**
+   * Convenience runner for reorder operation.
+   */
+  public reorderPages(
+    buffer: Uint8Array,
+    pageOrder: number[],
+    options?: ReorderOptions,
+    executeOptions?: ExecuteOptions
+  ): Promise<Uint8Array> {
+    return this.execute('reorder', { buffer, pageOrder, options }, executeOptions);
+  }
+
+  /**
+   * Convenience runner for sign operation.
+   */
+  public signPdf(
+    buffer: Uint8Array,
+    signatureBytes: Uint8Array,
+    options?: SignOptions,
+    executeOptions?: ExecuteOptions
+  ): Promise<Uint8Array> {
+    return this.execute('sign', { buffer, signatureBytes, options }, executeOptions);
+  }
+
+  /**
+   * Convenience runner for protect operation.
+   */
+  public protectPdf(
+    buffer: Uint8Array,
+    options: ProtectPdfOptions,
+    executeOptions?: ExecuteOptions
+  ): Promise<Uint8Array> {
+    return this.execute('protect', { buffer, options }, executeOptions);
+  }
+
+  /**
+   * Convenience runner for unlock operation.
+   */
+  public unlockPdf(
+    buffer: Uint8Array,
+    options: UnlockPdfOptions,
+    executeOptions?: ExecuteOptions
+  ): Promise<Uint8Array> {
+    return this.execute('unlock', { buffer, options }, executeOptions);
   }
 
   /**

@@ -148,8 +148,8 @@ export default function ToolResultCard({
             marginBottom: '4px',
             padding: '10px 12px',
             borderRadius: 'var(--radius-sm)',
-            background: 'rgba(216, 59, 1, 0.08)',
-            border: '1px solid rgba(216, 59, 1, 0.3)',
+            background: 'var(--warning-soft)',
+            border: '1px solid var(--warning)',
             color: 'var(--text)',
             fontSize: '13px',
             lineHeight: 1.5,
@@ -161,7 +161,7 @@ export default function ToolResultCard({
               alignItems: 'center',
               gap: '6px',
               fontWeight: 600,
-              color: 'var(--accent, #d83b01)',
+              color: 'var(--warning)',
               marginBottom: '4px',
             }}
           >
@@ -197,13 +197,13 @@ export default function ToolResultCard({
                   borderRadius: 'var(--radius-pill)',
                   background: targetAchieved
                     ? 'var(--success-soft)'
-                    : 'rgba(216, 59, 1, 0.12)',
-                  color: targetAchieved ? 'var(--success)' : 'var(--accent, #d83b01)',
+                    : 'var(--warning-soft)',
+                  color: targetAchieved ? 'var(--success)' : 'var(--warning)',
                   fontWeight: 600,
                   fontSize: '12px',
                   border: targetAchieved
                     ? '1px solid var(--success)'
-                    : '1px solid rgba(216, 59, 1, 0.3)',
+                    : '1px solid var(--warning)',
                 }}
               >
                 {targetAchieved
@@ -230,11 +230,11 @@ export default function ToolResultCard({
                 style={{
                   padding: '3px 10px',
                   borderRadius: 'var(--radius-pill)',
-                  background: 'rgba(216, 59, 1, 0.12)',
-                  color: 'var(--accent, #d83b01)',
+                  background: 'var(--warning-soft)',
+                  color: 'var(--warning)',
                   fontWeight: 600,
                   fontSize: '12px',
-                  border: '1px solid rgba(216, 59, 1, 0.3)',
+                  border: '1px solid var(--warning)',
                 }}
               >
                 Larger by +{formatBytes(newBytesCount - originalBytesCount)}
@@ -342,7 +342,7 @@ export default function ToolResultCard({
                   alignItems: 'center',
                   gap: '6px',
                   fontWeight: 600,
-                  color: extraState.hasImages ? 'var(--accent, #d83b01)' : 'var(--text)',
+                  color: extraState.hasImages ? 'var(--info)' : 'var(--text)',
                   marginBottom: '4px',
                 }}
               >

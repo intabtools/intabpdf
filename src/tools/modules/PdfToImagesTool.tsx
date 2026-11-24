@@ -235,7 +235,7 @@ export default function PdfToImagesTool({
             display: 'flex',
             gap: '6px',
             alignItems: 'flex-start',
-            color: '#E81123',
+            color: 'var(--danger)',
             fontSize: '12px',
             marginBottom: '10px',
           }}
@@ -265,6 +265,7 @@ export default function PdfToImagesTool({
             type="button"
             className={`tc ${format === 'png' ? 'active' : ''}`}
             onClick={() => setFormat('png')}
+            aria-pressed={format === 'png'}
             style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
           >
             PNG (Lossless)
@@ -273,6 +274,7 @@ export default function PdfToImagesTool({
             type="button"
             className={`tc ${format === 'jpeg' ? 'active' : ''}`}
             onClick={() => setFormat('jpeg')}
+            aria-pressed={format === 'jpeg'}
             style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
           >
             JPEG (Smaller file)
@@ -307,6 +309,7 @@ export default function PdfToImagesTool({
                 type="button"
                 className={`tc ${jpegQuality === q.quality ? 'active' : ''}`}
                 onClick={() => setJpegQuality(q.quality)}
+                aria-pressed={jpegQuality === q.quality}
                 style={{ flex: 1, minHeight: '36px', justifyContent: 'center', fontSize: '12.5px' }}
               >
                 {q.label}
@@ -337,6 +340,7 @@ export default function PdfToImagesTool({
               type="button"
               className={`tc ${scale === r.scale ? 'active' : ''}`}
               onClick={() => setScale(r.scale)}
+              aria-pressed={scale === r.scale}
               style={{ flex: 1, minHeight: '40px', justifyContent: 'center', fontSize: '12.5px' }}
             >
               {r.label}
@@ -364,6 +368,7 @@ export default function PdfToImagesTool({
             type="button"
             className={`tc ${pageSelectionMode === 'all' ? 'active' : ''}`}
             onClick={() => setPageSelectionMode('all')}
+            aria-pressed={pageSelectionMode === 'all'}
             style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
           >
             All pages {effectivePageCount !== null ? `(${effectivePageCount})` : ''}
@@ -372,6 +377,7 @@ export default function PdfToImagesTool({
             type="button"
             className={`tc ${pageSelectionMode === 'range' ? 'active' : ''}`}
             onClick={() => setPageSelectionMode('range')}
+            aria-pressed={pageSelectionMode === 'range'}
             style={{ flex: 1, minHeight: '38px', justifyContent: 'center' }}
           >
             Select range
@@ -391,7 +397,7 @@ export default function PdfToImagesTool({
                 borderRadius: 'var(--radius-sm)',
                 border:
                   rangeInput.trim().length > 0 && selectionValidation.error
-                    ? '1px solid #E81123'
+                    ? '1px solid var(--danger)'
                     : '1px solid var(--border)',
                 background: 'var(--surface-2)',
                 color: 'var(--text)',
@@ -407,7 +413,7 @@ export default function PdfToImagesTool({
                   display: 'flex',
                   gap: '6px',
                   alignItems: 'flex-start',
-                  color: '#E81123',
+                  color: 'var(--danger)',
                   fontSize: '12px',
                   lineHeight: '1.4',
                   marginTop: '6px',

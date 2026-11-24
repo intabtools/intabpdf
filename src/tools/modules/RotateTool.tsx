@@ -234,7 +234,7 @@ export default function RotateTool({
               padding: '6px 10px',
               borderRadius: 'var(--radius-sm)',
               border: validation?.error
-                ? '1px solid #E81123'
+                ? '1px solid var(--danger)'
                 : '1px solid var(--border)',
               background: 'var(--surface-2)',
               color: 'var(--text)',
@@ -250,7 +250,7 @@ export default function RotateTool({
                 display: 'flex',
                 gap: '6px',
                 alignItems: 'flex-start',
-                color: '#E81123',
+                color: 'var(--danger)',
                 fontSize: '12px',
                 lineHeight: '1.4',
                 width: '100%',
@@ -271,7 +271,7 @@ export default function RotateTool({
                     display: 'flex',
                     gap: '6px',
                     alignItems: 'flex-start',
-                    color: '#E81123',
+                    color: 'var(--danger)',
                     fontSize: '12px',
                     lineHeight: '1.4',
                     width: '100%',

@@ -73,6 +73,12 @@ button:disabled {
   outline-offset: 2px;
 }
 
+.output-filename-box:focus-within {
+  border-color: var(--accent) !important;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .mono {
   font-family: var(--font-mono);
 }

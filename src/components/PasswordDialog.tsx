@@ -170,11 +170,10 @@ export default function PasswordDialog({
                 style={{
                   padding: '9px 38px 9px 12px',
                   borderRadius: 'var(--radius-sm)',
-                  border: `1px solid ${isIncorrect ? '#ef4444' : 'var(--border)'}`,
+                  border: `1px solid ${isIncorrect ? 'var(--danger)' : 'var(--border)'}`,
                   background: 'var(--surface-2)',
                   color: 'var(--text)',
                   fontSize: '13.5px',
-                  outline: 'none',
                   width: '100%',
                   boxSizing: 'border-box',
                 }}
@@ -209,7 +208,7 @@ export default function PasswordDialog({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  color: '#ef4444',
+                  color: 'var(--danger)',
                   fontSize: '12px',
                   marginTop: '2px',
                 }}

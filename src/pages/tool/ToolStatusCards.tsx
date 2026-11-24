@@ -29,8 +29,8 @@ export default function ToolStatusCards({
         <div
           className="card busy"
           style={{
-            borderColor: '#E81123',
-            background: 'rgba(232, 17, 35, 0.08)',
+            borderColor: 'var(--danger)',
+            background: 'var(--danger-soft)',
             marginBottom: '16px',
             width: '100%',
             minWidth: 0,
@@ -38,8 +38,8 @@ export default function ToolStatusCards({
           }}
           role="alert"
         >
-          <AlertCircle size={28} color="#E81123" style={{ flexShrink: 0 }} />
-          <b style={{ marginTop: '8px', color: '#E81123' }}>Operation failed</b>
+          <AlertCircle size={28} color="var(--danger)" style={{ flexShrink: 0 }} />
+          <b style={{ marginTop: '8px', color: 'var(--danger)' }}>Operation failed</b>
           <p className="lede" style={{ margin: '4px 0 14px', wordBreak: 'break-word', minWidth: 0, maxWidth: '100%' }}>
             {errorMessage}
           </p>
