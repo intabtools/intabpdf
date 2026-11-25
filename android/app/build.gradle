@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+def releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+def releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+def releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+def hasReleaseSigning =
+    releaseKeystorePath != null && !releaseKeystorePath.trim().isEmpty() &&
+    releaseKeystorePassword != null && !releaseKeystorePassword.isEmpty() &&
+    releaseKeyAlias != null && !releaseKeyAlias.trim().isEmpty() &&
+    releaseKeyPassword != null && !releaseKeyPassword.isEmpty()
+
 android {
     namespace = "org.intabtools.intabpdf"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +26,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -56,5 +79,23 @@ tasks.register('checkWebAssets') {
     }
 }
 preBuild.dependsOn checkWebAssets
+
+tasks.register('checkReleaseSigning') {
+    doLast {
+        if (!hasReleaseSigning) {
+            throw new GradleException(
+                "Missing Android release signing configuration. Set ANDROID_KEYSTORE_PATH, " +
+                "ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
+            )
+        }
+        if (!file(releaseKeystorePath).exists()) {
+            throw new GradleException("Android release keystore file was not found at ANDROID_KEYSTORE_PATH.")
+        }
+    }
+}
+
+tasks.matching { it.name == 'assembleRelease' || it.name == 'bundleRelease' || it.name == 'packageRelease' }.configureEach {
+    dependsOn checkReleaseSigning
+}
 
 
