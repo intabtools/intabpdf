@@ -20,6 +20,7 @@ export interface VisiblePageProps {
   matches?: SearchMatch[];
   currentMatchIndex?: number;
   linkService?: PdfLinkService;
+  allowCopying?: boolean;
 }
 
 export interface PageThumbnailProps {

@@ -10,6 +10,9 @@ declare global {
             onOpenPdfError?(callback: (errorData: { name: string; error: string }) => void): () => void;
             onOpenPdfStart?(callback: (startData: { name: string }) => void): () => void;
             openExternalUrl?(url: string): void;
+            copyText?(text: string): Promise<boolean>;
+            setViewerCopyAllowed?(allowed: boolean): void;
+            onContextSelectAll?(callback: () => void): () => void;
         };
         NativeIntent?: {
             hasPendingPdf?(): boolean;

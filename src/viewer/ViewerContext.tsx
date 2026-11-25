@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { getPlatformType, platform, type OpenedFile } from '../platform';
 import type { PageSize, PdfDocument } from './renderPage';
-import { ViewerContext } from './viewerContextDef';
+import { ViewerContext, resolveViewerNavigationTarget } from './viewerContextDef';
 
 const destroyingDocs = new WeakSet<object>();
 
@@ -22,6 +22,8 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
   const [currentFile, setCurrentFile] = useState<OpenedFile | null>(null);
   const [initialHasPending] = useState(() => platform.hasPendingFile?.() ?? false);
   const [isLoading, setIsLoading] = useState(initialHasPending);
+  const location = useLocation();
+  const locationRef = useRef(location);
   const navigate = useNavigate();
   const navigateRef = useRef(navigate);
 
@@ -30,6 +32,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
   const [activeDocFile, setActiveDocFile] = useState<OpenedFile | null>(null);
   const [activeFileName, setActiveFileName] = useState('');
   const [activePageSizes, setActivePageSizes] = useState<PageSize[]>([]);
+  const [savedAllowCopying, setSavedAllowCopying] = useState(true);
   const [savedCurrentPage, setSavedCurrentPage] = useState(1);
   const [savedZoom, setSavedZoom] = useState(100);
   const [savedIsFitToWidth, setSavedIsFitToWidth] = useState(true);
@@ -53,25 +56,43 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
+
+  useEffect(() => {
     navigateRef.current = navigate;
   }, [navigate]);
 
   const coldStartHandledRef = useRef(false);
 
+  const navigateToViewer = useCallback(
+    (nav: (to: string) => void) => {
+      const target = resolveViewerNavigationTarget(
+        locationRef.current.pathname,
+        locationRef.current.search,
+        typeof window !== 'undefined' ? window.location.search : '',
+      );
+      if (target) {
+        nav(target);
+      }
+    },
+    [],
+  );
+
   // On cold start with pending file, immediately navigate to viewer exactly once
   useEffect(() => {
     if (initialHasPending && !coldStartHandledRef.current && getPlatformType() !== 'web') {
       coldStartHandledRef.current = true;
-      navigate('/viewer');
+      navigateToViewer(navigate);
     }
-  }, [initialHasPending, navigate]);
+  }, [initialHasPending, navigate, navigateToViewer]);
 
   // Listen to platform file open events (e.g. Electron file associations, Android intent, drag onto dock)
   useEffect(() => {
     const unsubStart = platform.onFileOpenStart?.(() => {
       setIsLoading(true);
       if (getPlatformType() !== 'web') {
-        navigateRef.current('/viewer');
+        navigateToViewer(navigateRef.current);
       }
     });
     const unsubOpened = platform.onFileOpened((file) => {
@@ -85,17 +106,18 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       setActiveDocFile(null);
       setActiveFileName('');
       setActivePageSizes([]);
+      setSavedAllowCopying(true);
       setSavedCurrentPage(1);
       setIsLoading(true);
       setCurrentFile(file);
       if (getPlatformType() !== 'web') {
-        navigateRef.current('/viewer');
+        navigateToViewer(navigateRef.current);
       }
     });
     const unsubError = platform.onFileOpenError?.(() => {
       setIsLoading(false);
       if (getPlatformType() !== 'web') {
-        navigateRef.current('/viewer');
+        navigateToViewer(navigateRef.current);
       }
     });
     return () => {
@@ -103,7 +125,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       unsubOpened();
       unsubError?.();
     };
-  }, []);
+  }, [navigateToViewer]);
 
   const loadFile = useCallback(
     (file: OpenedFile) => {
@@ -117,18 +139,19 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       setActiveDocFile(null);
       setActiveFileName('');
       setActivePageSizes([]);
+      setSavedAllowCopying(true);
       setSavedCurrentPage(1);
       setIsLoading(true);
       setCurrentFile(file);
       if (getPlatformType() !== 'web') {
-        navigate('/viewer');
+        navigateToViewer(navigate);
       }
     },
-    [navigate]
+    [navigate, navigateToViewer]
   );
 
   const saveViewerDocument = useCallback(
-    (doc: PdfDocument, file: OpenedFile, pageSizes: PageSize[]) => {
+    (doc: PdfDocument, file: OpenedFile, pageSizes: PageSize[], allowCopying = true) => {
       const prev = activePdfDocRef.current;
       if (prev && prev !== doc) {
         activePdfDocRef.current = null;
@@ -141,6 +164,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       setCurrentFile(file);
       setActiveFileName(file.name);
       setActivePageSizes(pageSizes);
+      setSavedAllowCopying(allowCopying);
       setSavedCurrentPage(1);
     },
     []
@@ -173,6 +197,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
     setCurrentFile(null);
     setActiveFileName('');
     setActivePageSizes([]);
+    setSavedAllowCopying(true);
     setSavedCurrentPage(1);
     setSavedZoom(100);
     setSavedIsFitToWidth(true);
@@ -184,7 +209,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
         const file = await platform.pickPdfFile((fileName) => {
           setIsLoading(true);
           if (getPlatformType() !== 'web') {
-            navigate('/viewer');
+            navigateToViewer(navigate);
           }
           onStart?.(fileName);
         });
@@ -200,7 +225,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [loadFile, navigate]
+    [loadFile, navigate, navigateToViewer]
   );
 
   const value = useMemo(
@@ -215,6 +240,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       activeDocFile,
       fileName: activeFileName,
       pageSizes: activePageSizes,
+      allowCopying: savedAllowCopying,
       currentPage: savedCurrentPage,
       zoom: savedZoom,
       isFitToWidth: savedIsFitToWidth,
@@ -231,6 +257,7 @@ export function ViewerProvider({ children }: { children: ReactNode }) {
       activeDocFile,
       activeFileName,
       activePageSizes,
+      savedAllowCopying,
       savedCurrentPage,
       savedZoom,
       savedIsFitToWidth,

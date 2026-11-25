@@ -21,6 +21,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'photo',
     outputName: 'photos.pdf',
     multipleFiles: true,
+    keywords: ['image', 'images', 'photo', 'photos', 'picture', 'pictures', 'jpg', 'jpeg', 'png', 'webp', 'scan', 'convert', 'create', 'pdf'],
     availability: 'available',
     component: () => import('./modules/ImagesToPdfTool'),
     options: [
@@ -38,6 +39,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'text.pdf',
     multipleFiles: false,
+    keywords: ['text', 'txt', 'plain text', 'notes', 'code', 'logs', 'write', 'create', 'convert', 'pdf'],
     availability: 'available',
     component: () => import('./modules/TextToPdfTool'),
     options: [
@@ -58,6 +60,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'merged.pdf',
     multipleFiles: true,
+    keywords: ['merge', 'combine', 'join', 'append', 'concatenate', 'concat', 'bind', 'pdf'],
     availability: 'available',
     component: () => import('./modules/MergeTool'),
     options: [
@@ -76,6 +79,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'split.zip',
     multipleFiles: false,
+    keywords: ['split', 'extract pages', 'separate', 'divide', 'cut', 'range', 'ranges', 'burst', 'pdf'],
     availability: 'available',
     component: () => import('./modules/SplitTool'),
     options: [
@@ -93,6 +97,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'reordered.pdf',
     multipleFiles: false,
+    keywords: ['reorder', 'rearrange', 'sort', 'move pages', 'organize', 'order', 'swap', 'pages', 'pdf'],
     availability: 'available',
     component: () => import('./modules/ReorderTool'),
     options: [
@@ -110,6 +115,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'rotated.pdf',
     multipleFiles: true,
+    keywords: ['rotate', 'turn', 'orientation', 'landscape', 'portrait', 'clockwise', 'anticlockwise', 'angle', 'pages', 'pdf'],
     availability: 'available',
     component: () => import('./modules/RotateTool'),
     options: [
@@ -138,6 +144,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'trimmed.pdf',
     multipleFiles: false,
+    keywords: ['remove', 'delete', 'drop', 'trim', 'cut', 'omit', 'pages', 'pdf'],
     availability: 'available',
     component: () => import('./modules/RemovePagesTool'),
     options: [
@@ -157,6 +164,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'compressed.pdf',
     multipleFiles: true,
+    keywords: ['compress', 'shrink', 'reduce size', 'smaller', 'optimize', 'downsample', 'pdf'],
     availability: 'available',
     component: () => import('./modules/CompressTool'),
     options: [
@@ -175,6 +183,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'protected.pdf',
     multipleFiles: false,
+    keywords: ['protect', 'encrypt', 'password', 'lock', 'security', 'aes', 'rc4', 'permissions', 'pdf'],
     availability: 'available',
     component: () => import('./modules/ProtectTool'),
     options: [
@@ -193,6 +202,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'unlocked.pdf',
     multipleFiles: false,
+    keywords: ['unlock', 'decrypt', 'unprotect', 'remove password', 'open', 'strip password', 'pdf'],
     availability: 'available',
     component: () => import('./modules/UnlockTool'),
     options: [
@@ -212,6 +222,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'signed.pdf',
     multipleFiles: false,
+    keywords: ['sign', 'signature', 'esign', 'autograph', 'draw', 'initials', 'date', 'stamp', 'pdf'],
     availability: 'available',
     component: () => import('./modules/SignTool'),
     options: [
@@ -230,6 +241,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'pages.zip',
     multipleFiles: true,
+    keywords: ['pdf to images', 'export images', 'jpg', 'jpeg', 'png', 'webp', 'picture', 'pictures', 'render', 'rasterize', 'convert', 'pdf'],
     availability: 'available',
     component: () => import('./modules/PdfToImagesTool'),
     options: [],
@@ -245,6 +257,7 @@ export const TOOLS: ToolDefinition[] = [
     noun: 'file',
     outputName: 'text.txt',
     multipleFiles: true,
+    keywords: ['extract', 'extract text', 'copy text', 'txt', 'read', 'transcript', 'export text', 'pdf'],
     availability: 'available',
     component: () => import('./modules/ExtractTextTool'),
     options: [

@@ -7,8 +7,8 @@ import PasswordInput from '../../components/PasswordInput';
 import NoticeBanner from '../../components/NoticeBanner';
 import SegmentedControl from '../../components/SegmentedControl';
 import type { ToolComponentProps } from '../types';
-import type { ProtectPdfOptions } from '../../core/protect';
-import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
+import { isAsciiPassword, type ProtectPdfOptions } from '../../core/protect';
+import { inspectPdfEncryption, type PdfEncryptionInspection } from '../../core/pdfEncryptionStatus';
 import { pdfProcessingService } from '../../core/worker/service';
 
 interface PasswordStrength {
@@ -63,7 +63,7 @@ export default function ProtectTool({
   const [allowModifying, setAllowModifying] = useState(false);
   const [allowAnnotating, setAllowAnnotating] = useState(false);
 
-  const [isDocEncrypted, setIsDocEncrypted] = useState<boolean | null>(null);
+  const [inspection, setInspection] = useState<PdfEncryptionInspection | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const file = stagedFiles[0];
@@ -71,24 +71,25 @@ export default function ProtectTool({
 
   if (file?.id !== prevFileId) {
     setPrevFileId(file?.id);
-    setIsDocEncrypted(null);
+    setInspection(null);
     setValidationError(null);
+    setPassword('');
+    setConfirmPassword('');
+    setAlgorithm('AES-256');
+    setAllowPrinting(!optionsState['block-print']);
+    setAllowCopying(true);
+    setAllowModifying(false);
+    setAllowAnnotating(false);
   }
 
-  // Check if incoming staged document is already encrypted
+  // Check if incoming staged document is already encrypted, unsupported, or corrupt
   useEffect(() => {
     let active = true;
     if (file?.bytes) {
-      void isEncrypted(file.bytes).then(
-        (status) => {
-          if (!active) return;
-          setIsDocEncrypted(status.encrypted);
-        },
-        () => {
-          if (!active) return;
-          setIsDocEncrypted(false);
-        }
-      );
+      void inspectPdfEncryption(file.bytes).then((result) => {
+        if (!active) return;
+        setInspection(result);
+      });
     }
     return () => {
       active = false;
@@ -97,10 +98,12 @@ export default function ProtectTool({
 
   const strength = computePasswordStrength(password);
   const passwordsMatch = confirmPassword.length === 0 || password === confirmPassword;
+  const rc4UnsupportedChars = algorithm === 'RC4' && password.length > 0 && !isAsciiPassword(password);
   const isFormValid =
     password.trim().length > 0 &&
     (confirmPassword.length === 0 || password === confirmPassword) &&
-    isDocEncrypted !== true;
+    !rc4UnsupportedChars &&
+    inspection?.status === 'not-encrypted';
 
   const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
@@ -145,12 +148,11 @@ export default function ProtectTool({
     <>
       {/* Left Column: Password Entry & Security Notice */}
       <div
-        className="card"
+        className="card tp-work"
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
-          minWidth: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -158,14 +160,40 @@ export default function ProtectTool({
           <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Set Document Password</h3>
         </div>
 
-        {/* Already encrypted warning banner */}
-        {isDocEncrypted === true && (
+        {/* Already encrypted / unsupported / corrupt warning banners */}
+        {inspection?.status === 'encrypted' && (
           <NoticeBanner
             variant="danger"
             role="alert"
             icon={<ShieldAlert size={18} />}
           >
             <strong>Document is already protected:</strong> This PDF is already password protected. Unlock it first before applying new protection.
+          </NoticeBanner>
+        )}
+
+        {inspection?.status === 'unsupported' && (
+          <NoticeBanner
+            variant="danger"
+            role="alert"
+            icon={<ShieldAlert size={18} />}
+          >
+            <strong>Unsupported existing encryption:</strong> {inspection.message}. Re-protecting an already encrypted file is not supported.
+          </NoticeBanner>
+        )}
+
+        {inspection?.status === 'corrupt' && (
+          <NoticeBanner
+            variant="danger"
+            role="alert"
+            icon={<ShieldAlert size={18} />}
+          >
+            <strong>Unable to inspect PDF:</strong> {inspection.message}
+          </NoticeBanner>
+        )}
+
+        {rc4UnsupportedChars && (
+          <NoticeBanner variant="warning" role="alert">
+            <strong>RC4-128 supports ASCII passwords only:</strong> Switch to <strong>AES-256 (Modern)</strong> for accented, non-English, or symbol characters so the document can always be unlocked reliably.
           </NoticeBanner>
         )}
 
@@ -341,10 +369,14 @@ export default function ProtectTool({
               onClick={() => setAllowAnnotating(!allowAnnotating)}
             />
           </div>
+
+          <p style={{ margin: '2px 0 0', fontSize: '11.5px', lineHeight: 1.45, color: 'var(--text-muted)' }}>
+            Permission flags (such as disabling copy or print) are enforced by InTabPDF and compliant viewers, but are not DRM and external extraction tools may ignore them. You can still unlock this PDF with your password.
+          </p>
         </div>
 
         {/* Output filename input */}
-        <div style={{ marginTop: '4px', marginBottom: '4px' }}>
+        <div className="opts-filename">
           <OutputFilenameInput
             value={outputBaseName ?? ''}
             onChange={onOutputBaseNameChange ?? (() => {})}

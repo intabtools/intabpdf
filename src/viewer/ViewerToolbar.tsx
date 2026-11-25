@@ -12,6 +12,7 @@ import {
   Minus,
   Plus,
   Search,
+  Share2,
   X,
 } from 'lucide-react';
 import type { PdfDocument } from './renderPage';
@@ -44,6 +45,7 @@ interface ViewerToolbarProps {
   onToggleFitOrZoom: () => void;
   isSearchOpen: boolean;
   onToggleSearch: () => void;
+  onSharePdf?: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   autoHideControls: boolean;
@@ -79,6 +81,7 @@ export default function ViewerToolbar({
   onToggleFitOrZoom,
   isSearchOpen,
   onToggleSearch,
+  onSharePdf,
   isFullscreen,
   onToggleFullscreen,
   autoHideControls,
@@ -227,6 +230,18 @@ export default function ViewerToolbar({
           >
             <Search size={16} strokeWidth={1.8} />
           </button>
+
+          {onSharePdf && (
+            <button
+              type="button"
+              className="ib sm"
+              onClick={onSharePdf}
+              aria-label="Share PDF"
+              title="Share PDF"
+            >
+              <Share2 size={16} strokeWidth={1.8} />
+            </button>
+          )}
 
           <button
             type="button"

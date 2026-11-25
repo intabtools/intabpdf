@@ -5,6 +5,7 @@ import { Check, Copy, Download, Eye, RefreshCw, XCircle } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import NoticeBanner from '../../components/NoticeBanner';
 import { formatBytes } from '../../core/formatBytes';
+import { copyTextToClipboard } from '../../platform/clipboard';
 import type { PlatformType } from '../../platform';
 import type { StagedFile, ToolDefinition } from '../../tools/types';
 
@@ -101,12 +102,10 @@ export default function ToolResultCard({
 
   const handleCopyText = async () => {
     if (!textPreview || wordCount === 0) return;
-    try {
-      await navigator.clipboard.writeText(textPreview);
+    const copied = await copyTextToClipboard(textPreview);
+    if (copied) {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch {
-      // Fallback if clipboard API is not available
     }
   };
 

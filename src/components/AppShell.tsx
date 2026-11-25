@@ -1,8 +1,9 @@
-import { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useShell } from '../hooks/useShell';
+import { useRouteScrollRestoration } from '../hooks/useRouteScrollRestoration';
 import { ViewerContext } from '../viewer/viewerContextDef';
 import { ProcessingContext } from './processingContextDef';
 import PdfLoadingScreen from '../viewer/PdfLoadingScreen';
@@ -174,6 +175,8 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
 
   const isSubPage = location.pathname !== '/';
   const isViewerPage = location.pathname.startsWith('/viewer');
+  const mainScrollRef = useRef<HTMLElement>(null);
+  useRouteScrollRestoration(mainScrollRef, { disabled: isViewerPage });
   const viewer = useContext(ViewerContext);
   const processing = useContext(ProcessingContext);
   const isViewerLoading = viewer?.isLoading ?? false;
@@ -232,6 +235,7 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
           />
         )}
         <main
+          ref={mainScrollRef}
           className={`main ${isViewerPage ? 'flush' : ''}`}
           id="main-content"
           style={isFullScreenOverlay ? { display: 'none' } : undefined}

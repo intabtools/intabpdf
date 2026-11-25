@@ -445,7 +445,7 @@ export default function PdfToImagesTool({
       )}
 
       {/* 5. Custom Output Filename */}
-      <div style={{ marginTop: '10px', marginBottom: '8px', width: '100%' }}>
+      <div className="opts-filename">
         <OutputFilenameInput
           id="pdf-to-images-output-filename"
           value={outputBaseName ?? ''}
@@ -461,11 +461,6 @@ export default function PdfToImagesTool({
         className="cta"
         onClick={handleRun}
         disabled={isProcessing || stagedFiles.length === 0 || (!isMultiFile && effectivePageCount === null) || isInvalid}
-        style={{
-          marginTop: '12px',
-          width: '100%',
-          minHeight: '44px',
-        }}
       >
         <FileImage size={16} />
         <span>

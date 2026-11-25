@@ -1,20 +1,33 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { Check, Code2, Download, Lock } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import DropZone from '../components/DropZone';
 import ToolIcon from '../components/ToolIcon';
 import { useShell } from '../hooks/useShell';
 import { useToast } from '../hooks/useToast';
 import { useViewer } from '../hooks/useViewer';
+import { resolveViewerNavigationTarget } from '../viewer/viewerContextDef';
 import { getPlatformType, openPdfInNewTab } from '../platform';
 import type { OpenedFile } from '../platform';
 import { TOOL_CATEGORIES, getToolsByCategory, isToolImplemented } from '../tools/registry';
 
 export default function HomePage(): ReactNode {
+  const location = useLocation();
   const navigate = useNavigate();
   const { loadFile, setIsLoading } = useViewer();
   const { shell } = useShell();
   const { showToast } = useToast();
+
+  const navigateToViewerRoute = () => {
+    const target = resolveViewerNavigationTarget(
+      location.pathname,
+      location.search,
+      typeof window !== 'undefined' ? window.location.search : '',
+    );
+    if (target) {
+      navigate(target);
+    }
+  };
 
   const handleToolClick = (_e: MouseEvent, toolId: string) => {
     if (!isToolImplemented(toolId)) {
@@ -32,7 +45,7 @@ export default function HomePage(): ReactNode {
         setIsLoading(false);
       } else {
         loadFile(files[0]);
-        navigate('/viewer');
+        navigateToViewerRoute();
       }
     } else {
       setIsLoading(false);
@@ -183,7 +196,7 @@ export default function HomePage(): ReactNode {
         multiple={false}
         onFilesSelectedStart={() => {
           setIsLoading(true);
-          navigate('/viewer');
+          navigateToViewerRoute();
         }}
         onFilesSelected={handleFilesSelected}
       />

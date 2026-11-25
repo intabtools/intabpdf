@@ -15,12 +15,30 @@ export interface ViewerContextType {
   activeDocFile?: OpenedFile | null;
   fileName?: string;
   pageSizes?: PageSize[];
+  allowCopying?: boolean;
   currentPage?: number;
   zoom?: number;
   isFitToWidth?: boolean;
-  saveViewerDocument?: (doc: PdfDocument, file: OpenedFile, pageSizes: PageSize[]) => void;
+  saveViewerDocument?: (
+    doc: PdfDocument,
+    file: OpenedFile,
+    pageSizes: PageSize[],
+    allowCopying?: boolean,
+  ) => void;
   updateReadingState?: (state: { currentPage?: number; zoom?: number; isFitToWidth?: boolean }) => void;
   clearDocumentSession?: () => Promise<void>;
 }
 
 export const ViewerContext = createContext<ViewerContextType | null>(null);
+
+export function resolveViewerNavigationTarget(
+  routerPathname: string,
+  routerSearch: string,
+  windowSearch = '',
+): string | null {
+  if (routerPathname === '/viewer' || routerPathname.startsWith('/viewer/')) {
+    return null;
+  }
+  const search = routerSearch || windowSearch || '';
+  return `/viewer${search}`;
+}

@@ -1,13 +1,13 @@
 // Tool module for removing passwords and unlocking protected PDF documents locally.
 import { useEffect, useId, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
-import { Lock, ShieldCheck, Unlock } from 'lucide-react';
+import { AlertTriangle, Lock, ShieldCheck, Unlock } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import PasswordInput from '../../components/PasswordInput';
 import NoticeBanner from '../../components/NoticeBanner';
 import type { ToolComponentProps } from '../types';
 import type { UnlockPdfOptions } from '../../core/unlock';
-import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
+import { inspectPdfEncryption, type PdfEncryptionInspection } from '../../core/pdfEncryptionStatus';
 import { pdfProcessingService } from '../../core/worker/service';
 
 export default function UnlockTool({
@@ -22,18 +22,14 @@ export default function UnlockTool({
   const passwordInputId = useId();
 
   const [password, setPassword] = useState('');
-  const [isDocEncrypted, setIsDocEncrypted] = useState<boolean | null>(null);
-  const [detectedAlgorithm, setDetectedAlgorithm] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [inspection, setInspection] = useState<PdfEncryptionInspection | null>(null);
 
   const file = stagedFiles[0];
   const [prevFileId, setPrevFileId] = useState<string | undefined>(file?.id);
 
   if (file?.id !== prevFileId) {
     setPrevFileId(file?.id);
-    setIsDocEncrypted(null);
-    setDetectedAlgorithm(null);
-    setErrorMessage(null);
+    setInspection(null);
     setPassword('');
   }
 
@@ -41,18 +37,10 @@ export default function UnlockTool({
   useEffect(() => {
     let active = true;
     if (file?.bytes) {
-      void isEncrypted(file.bytes).then(
-        (status) => {
-          if (!active) return;
-          setIsDocEncrypted(status.encrypted);
-          setDetectedAlgorithm(status.algorithm || null);
-        },
-        () => {
-          if (!active) return;
-          setIsDocEncrypted(false);
-          setDetectedAlgorithm(null);
-        }
-      );
+      void inspectPdfEncryption(file.bytes).then((result) => {
+        if (!active) return;
+        setInspection(result);
+      });
     }
     return () => {
       active = false;
@@ -61,45 +49,38 @@ export default function UnlockTool({
 
   const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
-    setErrorMessage(null);
   };
 
   const handleRun = async () => {
-    if (!file?.bytes || password.length === 0 || isProcessing) return;
+    if (!file?.bytes || inspection?.status !== 'encrypted' || isProcessing) return;
 
     const unlockOptions: UnlockPdfOptions = {
       password,
     };
 
-    try {
-      await onExecute(async (signal) => {
-        return await pdfProcessingService.execute(
-          'unlock',
-          {
-            buffer: file.bytes,
-            options: unlockOptions,
-          },
-          { signal }
-        );
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(msg);
-    }
+    await onExecute(async (signal) => {
+      return await pdfProcessingService.execute(
+        'unlock',
+        {
+          buffer: file.bytes,
+          options: unlockOptions,
+        },
+        { signal }
+      );
+    });
   };
 
-  const isFormValid = password.length > 0 && isDocEncrypted !== false;
+  const isFormValid = inspection?.status === 'encrypted';
 
   return (
     <>
       {/* Left Column: Password Entry & Document Status */}
       <div
-        className="card"
+        className="card tp-work"
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
-          minWidth: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -108,17 +89,17 @@ export default function UnlockTool({
         </div>
 
         {/* Protection detection badge */}
-        {isDocEncrypted === true && (
+        {inspection?.status === 'encrypted' && (
           <NoticeBanner
             variant="info"
             role="status"
             icon={<Lock size={15} style={{ color: 'var(--accent)' }} />}
           >
-            Protected PDF detected {detectedAlgorithm ? `(${detectedAlgorithm})` : ''}. Enter the password to remove encryption.
+            Protected PDF detected {inspection.algorithm ? `(${inspection.algorithm})` : ''}. Enter the password, or leave blank if only copying/printing permissions are restricted.
           </NoticeBanner>
         )}
 
-        {isDocEncrypted === false && (
+        {inspection?.status === 'not-encrypted' && (
           <NoticeBanner
             variant="info"
             role="status"
@@ -128,10 +109,27 @@ export default function UnlockTool({
           </NoticeBanner>
         )}
 
-        {/* Error message banner */}
-        {errorMessage && (
-          <NoticeBanner variant="danger" role="alert">
-            {errorMessage}
+        {inspection?.status === 'unsupported' && (
+          <NoticeBanner
+            variant="danger"
+            role="alert"
+            icon={<AlertTriangle size={16} />}
+          >
+            <div>
+              <strong>Unsupported encryption variant:</strong> {inspection.message}. Client-side unlocking supports RC4 (V=1–2) and AES-256 (V=5).
+            </div>
+          </NoticeBanner>
+        )}
+
+        {inspection?.status === 'corrupt' && (
+          <NoticeBanner
+            variant="danger"
+            role="alert"
+            icon={<AlertTriangle size={16} />}
+          >
+            <div>
+              <strong>Unable to inspect PDF:</strong> {inspection.message}
+            </div>
           </NoticeBanner>
         )}
 
@@ -139,7 +137,6 @@ export default function UnlockTool({
         <PasswordInput
           id={passwordInputId}
           label="Password"
-          required
           value={password}
           onChange={handlePasswordChange}
           placeholder="Enter password to unlock document"
@@ -172,7 +169,7 @@ export default function UnlockTool({
         </div>
 
         {/* Output filename input */}
-        <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+        <div className="opts-filename">
           <OutputFilenameInput
             value={outputBaseName ?? ''}
             onChange={onOutputBaseNameChange ?? (() => {})}

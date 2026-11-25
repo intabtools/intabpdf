@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TOOL_CATEGORIES, getToolsByCategory, isToolImplemented } from '../tools/registry';
 import { useViewer } from '../hooks/useViewer';
 import { useToast } from '../hooks/useToast';
+import { resolveViewerNavigationTarget } from '../viewer/viewerContextDef';
 import Logo from './Logo';
 import ToolIcon from './ToolIcon';
 
@@ -72,7 +73,14 @@ export default function Sidebar({ onCloseDrawer, isCollapsed }: SidebarProps): R
     onCloseDrawer();
     const file = await openPdfPicker();
     if (file) {
-      navigate('/viewer');
+      const target = resolveViewerNavigationTarget(
+        location.pathname,
+        location.search,
+        typeof window !== 'undefined' ? window.location.search : '',
+      );
+      if (target) {
+        navigate(target);
+      }
     }
   };
 

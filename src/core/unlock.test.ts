@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber } from 'pdf-lib';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
 import { protectPdf } from './protect';
 import { unlockPdf } from './unlock';
@@ -97,5 +98,50 @@ describe('unlockPdf', () => {
     await expect(
       unlockPdf(protectedBytes, { password: 'pass' }, controller.signal)
     ).rejects.toThrow('User cancelled unlock');
+  });
+
+  it('unlocks a restricted PDF using user password when protectPdf used a distinct internal owner password', async () => {
+    const rawPdf = await createSimplePdf();
+    const restricted = await protectPdf(rawPdf, {
+      password: 'user-only-secret',
+      allowPrinting: false,
+      allowCopying: false,
+    });
+
+    const unlocked = await unlockPdf(restricted, { password: 'user-only-secret' });
+    const statusAfter = await isEncrypted(unlocked);
+    expect(statusAfter.encrypted).toBe(false);
+  });
+
+  it('unlocks owner-only PDFs that have an empty user password', async () => {
+    const rawPdf = await createSimplePdf();
+    const ownerOnly = await encryptPDF(rawPdf, '', {
+      ownerPassword: 'OwnerSecretPassword',
+      allowCopying: false,
+      allowPrinting: false,
+    });
+
+    const unlocked = await unlockPdf(ownerOnly, { password: '' });
+    expect((await isEncrypted(unlocked)).encrypted).toBe(false);
+    const loaded = await PDFDocument.load(unlocked);
+    expect(loaded.getPageCount()).toBe(1);
+  });
+
+  it('rejects unsupported V=4 encryption variants cleanly', async () => {
+    const doc = await PDFDocument.create();
+    doc.addPage([200, 200]);
+    const encryptDict = doc.context.obj({
+      Filter: PDFName.of('Standard'),
+      V: PDFNumber.of(4),
+      R: PDFNumber.of(4),
+      Length: PDFNumber.of(128),
+      P: PDFNumber.of(-60),
+      O: PDFHexString.of('00'.repeat(32)),
+      U: PDFHexString.of('00'.repeat(32)),
+    }) as PDFDict;
+    doc.context.trailerInfo.Encrypt = doc.context.register(encryptDict);
+    const v4Bytes = await doc.save({ useObjectStreams: false });
+
+    await expect(unlockPdf(v4Bytes, { password: 'any' })).rejects.toThrow(/unsupported encryption/i);
   });
 });

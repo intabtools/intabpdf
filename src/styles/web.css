@@ -1,8 +1,7 @@
 /* Website shell: page-style layout, matching InTabPDF.html concept art */
 
 .app.web {
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   height: 100%;
 }
 
