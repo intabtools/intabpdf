@@ -84,7 +84,7 @@ test.describe('Phase 2 Button Consistency and Mobile Ergonomics', () => {
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(samplePdf);
 
-    const pngBtn = page.getByRole('button', { name: 'PNG (Lossless)', exact: true });
+    const pngBtn = page.getByRole('radio', { name: 'PNG (Lossless)', exact: true });
     await expect(pngBtn).toBeVisible({ timeout: 10000 });
 
     const box = await pngBtn.boundingBox();

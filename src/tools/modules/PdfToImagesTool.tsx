@@ -3,6 +3,7 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, FileImage, Image as ImageIcon, Info, Layers, Sliders } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import SegmentedControl from '../../components/SegmentedControl';
 import { ProcessingContext } from '../../components/processingContextDef';
 import { useToast } from '../../hooks/useToast';
 import { getPdfPageCount } from '../../core/split';
@@ -256,30 +257,19 @@ export default function PdfToImagesTool({
           width: '100%',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span id="pdf-to-images-format-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <ImageIcon size={15} style={{ color: 'var(--accent)' }} />
           Image format
         </span>
-        <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className={`tc ${format === 'png' ? 'active' : ''}`}
-            onClick={() => setFormat('png')}
-            aria-pressed={format === 'png'}
-            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
-          >
-            PNG (Lossless)
-          </button>
-          <button
-            type="button"
-            className={`tc ${format === 'jpeg' ? 'active' : ''}`}
-            onClick={() => setFormat('jpeg')}
-            aria-pressed={format === 'jpeg'}
-            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
-          >
-            JPEG (Smaller file)
-          </button>
-        </div>
+        <SegmentedControl<ImageFormat>
+          ariaLabelledBy="pdf-to-images-format-label"
+          value={format}
+          onChange={setFormat}
+          options={[
+            { value: 'png', label: 'PNG (Lossless)' },
+            { value: 'jpeg', label: 'JPEG (Smaller file)' },
+          ]}
+        />
         <small style={{ color: 'var(--text-muted)', fontSize: '11.5px', marginTop: '-2px' }}>
           {format === 'png'
             ? 'Lossless quality, sharp text, crisp diagrams, and transparent artwork.'
@@ -298,24 +288,19 @@ export default function PdfToImagesTool({
             width: '100%',
           }}
         >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span id="pdf-to-images-quality-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Sliders size={15} style={{ color: 'var(--accent)' }} />
             JPEG quality
           </span>
-          <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
-            {JPEG_QUALITY_PRESETS.map((q) => (
-              <button
-                key={q.quality}
-                type="button"
-                className={`tc ${jpegQuality === q.quality ? 'active' : ''}`}
-                onClick={() => setJpegQuality(q.quality)}
-                aria-pressed={jpegQuality === q.quality}
-                style={{ flex: 1, minHeight: '44px', justifyContent: 'center', fontSize: '12.5px' }}
-              >
-                {q.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<number>
+            ariaLabelledBy="pdf-to-images-quality-label"
+            value={jpegQuality}
+            onChange={setJpegQuality}
+            options={JPEG_QUALITY_PRESETS.map((q) => ({
+              value: q.quality,
+              label: q.label,
+            }))}
+          />
         </div>
       )}
 
@@ -329,24 +314,19 @@ export default function PdfToImagesTool({
           width: '100%',
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span id="pdf-to-images-resolution-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Layers size={15} style={{ color: 'var(--accent)' }} />
           Resolution
         </span>
-        <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
-          {RESOLUTION_PRESETS.map((r) => (
-            <button
-              key={r.scale}
-              type="button"
-              className={`tc ${scale === r.scale ? 'active' : ''}`}
-              onClick={() => setScale(r.scale)}
-              aria-pressed={scale === r.scale}
-              style={{ flex: 1, minHeight: '44px', justifyContent: 'center', fontSize: '12.5px' }}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<ResolutionPreset>
+          ariaLabelledBy="pdf-to-images-resolution-label"
+          value={scale}
+          onChange={setScale}
+          options={RESOLUTION_PRESETS.map((r) => ({
+            value: r.scale,
+            label: r.label,
+          }))}
+        />
         <small style={{ color: 'var(--text-muted)', fontSize: '11.5px', marginTop: '-2px' }}>
           {RESOLUTION_PRESETS.find((r) => r.scale === scale)?.description}. Higher resolution requires more memory.
         </small>
@@ -362,27 +342,19 @@ export default function PdfToImagesTool({
           width: '100%',
         }}
       >
-        <span>Pages to convert</span>
-        <div style={{ display: 'flex', gap: '8px', width: '100%', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className={`tc ${pageSelectionMode === 'all' ? 'active' : ''}`}
-            onClick={() => setPageSelectionMode('all')}
-            aria-pressed={pageSelectionMode === 'all'}
-            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
-          >
-            All pages {effectivePageCount !== null ? `(${effectivePageCount})` : ''}
-          </button>
-          <button
-            type="button"
-            className={`tc ${pageSelectionMode === 'range' ? 'active' : ''}`}
-            onClick={() => setPageSelectionMode('range')}
-            aria-pressed={pageSelectionMode === 'range'}
-            style={{ flex: 1, minHeight: '44px', justifyContent: 'center' }}
-          >
-            Select range
-          </button>
-        </div>
+        <span id="pdf-to-images-pages-label">Pages to convert</span>
+        <SegmentedControl<'all' | 'range'>
+          ariaLabelledBy="pdf-to-images-pages-label"
+          value={pageSelectionMode}
+          onChange={setPageSelectionMode}
+          options={[
+            {
+              value: 'all',
+              label: `All pages ${effectivePageCount !== null ? `(${effectivePageCount})` : ''}`,
+            },
+            { value: 'range', label: 'Select range' },
+          ]}
+        />
 
         {pageSelectionMode === 'range' && (
           <div style={{ width: '100%', marginTop: '4px' }}>

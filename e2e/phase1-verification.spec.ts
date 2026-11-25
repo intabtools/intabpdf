@@ -64,34 +64,34 @@ test.describe('Phase 1 Visual and Functional Verification', () => {
     await fileInput.setInputFiles(samplePdf);
 
     // Wait for options card
-    await page.waitForSelector('.tc');
+    await page.waitForSelector('.segmented-control');
 
     // Check Format buttons (PNG should be active initially)
-    const pngBtn = page.getByRole('button', { name: 'PNG (Lossless)', exact: true });
-    const jpegBtn = page.getByRole('button', { name: 'JPEG (Smaller file)', exact: true });
+    const pngBtn = page.getByRole('radio', { name: 'PNG (Lossless)', exact: true });
+    const jpegBtn = page.getByRole('radio', { name: 'JPEG (Smaller file)', exact: true });
 
-    await expect(pngBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(pngBtn).toHaveAttribute('aria-checked', 'true');
     await expect(pngBtn).toHaveClass(/active/);
-    await expect(jpegBtn).toHaveAttribute('aria-pressed', 'false');
+    await expect(jpegBtn).toHaveAttribute('aria-checked', 'false');
 
     // Click JPEG
     await jpegBtn.click();
-    await expect(jpegBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(jpegBtn).toHaveAttribute('aria-checked', 'true');
     await expect(jpegBtn).toHaveClass(/active/);
-    await expect(pngBtn).toHaveAttribute('aria-pressed', 'false');
+    await expect(pngBtn).toHaveAttribute('aria-checked', 'false');
 
     // Check Resolution buttons (High 2x is default)
-    const highBtn = page.getByRole('button', { name: 'High (2×)', exact: true });
-    const veryHighBtn = page.getByRole('button', { name: 'Very High (3×)', exact: true });
-    await expect(highBtn).toHaveAttribute('aria-pressed', 'true');
+    const highBtn = page.getByRole('radio', { name: 'High (2×)', exact: true });
+    const veryHighBtn = page.getByRole('radio', { name: 'Very High (3×)', exact: true });
+    await expect(highBtn).toHaveAttribute('aria-checked', 'true');
     await expect(highBtn).toHaveClass(/active/);
-    await expect(veryHighBtn).toHaveAttribute('aria-pressed', 'false');
+    await expect(veryHighBtn).toHaveAttribute('aria-checked', 'false');
 
     // Click Very High (3x)
     await veryHighBtn.click();
-    await expect(veryHighBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(veryHighBtn).toHaveAttribute('aria-checked', 'true');
     await expect(veryHighBtn).toHaveClass(/active/);
-    await expect(highBtn).toHaveAttribute('aria-pressed', 'false');
+    await expect(highBtn).toHaveAttribute('aria-checked', 'false');
 
     // Desktop Light Screenshot
     await page.setViewportSize({ width: 1280, height: 800 });

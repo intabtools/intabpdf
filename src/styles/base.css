@@ -1582,6 +1582,123 @@ textarea,
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
+/* SegmentedControl component */
+.segmented-control {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.segmented-control.full-width {
+  width: 100%;
+}
+
+.segmented-control.grid {
+  display: grid;
+}
+
+.segmented-control-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 2px);
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  min-height: 44px;
+  box-sizing: border-box;
+  flex: 1 1 0%;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.segmented-control-item:hover:not(:disabled):not(.active):not([aria-checked="true"]) {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.segmented-control-item.active,
+.segmented-control-item[aria-checked="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.segmented-control-item:disabled,
+.segmented-control-item.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.segmented-control-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+/* Compact size (sm) for dense option panes */
+.segmented-control.sm {
+  padding: 2px;
+  gap: 3px;
+}
+
+.segmented-control.sm .segmented-control-item {
+  padding: 5px 8px;
+  font-size: 11.5px;
+  min-height: 34px;
+  border-radius: calc(var(--radius-sm) - 3px);
+}
+
+/* Expand vertical hit area to 44px (padding box 32px + 6px top + 6px bottom = 44px) without overlapping siblings */
+.segmented-control.sm:not(.grid) .segmented-control-item::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  left: -1px;
+  right: -1px;
+}
+
+/* 2D grid sm: 38px border-box (36px padding box) + 4px top/bottom (3px beyond border) = 44px hit height with 0 overlap across 6px gap */
+.segmented-control.sm.grid {
+  padding: 3px;
+  gap: 6px;
+}
+
+.segmented-control.sm.grid .segmented-control-item {
+  min-height: 38px;
+}
+
+.segmented-control.sm.grid .segmented-control-item::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: -1px;
+  right: -1px;
+}
+
+.segmented-control.sm .segmented-control-item:disabled::before {
+  pointer-events: none;
+}
+
 .busy {
   padding: 34px 20px;
   text-align: center;

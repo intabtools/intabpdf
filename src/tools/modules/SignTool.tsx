@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, MouseEvent as ReactMouseEvent, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import { AlertCircle, Calendar, Check, Edit3, Image, RotateCcw, Type } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import SegmentedControl from '../../components/SegmentedControl';
 import type { ToolComponentProps } from '../types';
 import { getPdfPageCount } from '../../core/split';
 import type { SignaturePosition, SignOptions } from '../../core/sign';
@@ -557,35 +558,22 @@ export default function SignTool({
 
         {/* Position Preset */}
         <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+          <label id="sign-position-label" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Position
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            {(
-              [
-                ['bottom-right', 'Bottom Right'],
-                ['bottom-left', 'Bottom Left'],
-                ['bottom-center', 'Bottom Center'],
-                ['top-right', 'Top Right'],
-              ] as const
-            ).map(([posKey, posLabel]) => (
-              <button
-                key={posKey}
-                type="button"
-                className={`btn btn-secondary ${position === posKey ? 'active' : ''}`}
-                style={{
-                  fontSize: '11px',
-                  padding: '6px',
-                  fontWeight: position === posKey ? 600 : 400,
-                  background: position === posKey ? 'var(--accent)' : undefined,
-                  color: position === posKey ? '#fff' : undefined,
-                }}
-                onClick={() => setPosition(posKey)}
-              >
-                {posLabel}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<SignaturePosition>
+            ariaLabelledBy="sign-position-label"
+            size="sm"
+            columns={2}
+            value={position}
+            onChange={setPosition}
+            options={[
+              { value: 'bottom-right', label: 'Bottom Right' },
+              { value: 'bottom-left', label: 'Bottom Left' },
+              { value: 'bottom-center', label: 'Bottom Center' },
+              { value: 'top-right', label: 'Top Right' },
+            ]}
+          />
         </div>
 
         {/* Add Date Option Switch */}

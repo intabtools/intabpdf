@@ -5,6 +5,7 @@ import { Lock, ShieldCheck, ShieldAlert } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import PasswordInput from '../../components/PasswordInput';
 import NoticeBanner from '../../components/NoticeBanner';
+import SegmentedControl from '../../components/SegmentedControl';
 import type { ToolComponentProps } from '../types';
 import type { ProtectPdfOptions } from '../../core/protect';
 import { isEncrypted } from '@pdfsmaller/pdf-decrypt';
@@ -255,39 +256,19 @@ export default function ProtectTool({
       <div className="card opts">
         {/* Encryption Algorithm Selection */}
         <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+          <label id="protect-algo-label" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Encryption Algorithm
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            <button
-              type="button"
-              className={`btn btn-secondary ${algorithm === 'AES-256' ? 'active' : ''}`}
-              style={{
-                fontSize: '11px',
-                padding: '6px',
-                fontWeight: algorithm === 'AES-256' ? 600 : 400,
-                background: algorithm === 'AES-256' ? 'var(--accent)' : undefined,
-                color: algorithm === 'AES-256' ? '#fff' : undefined,
-              }}
-              onClick={() => setAlgorithm('AES-256')}
-            >
-              AES-256 (Modern)
-            </button>
-            <button
-              type="button"
-              className={`btn btn-secondary ${algorithm === 'RC4' ? 'active' : ''}`}
-              style={{
-                fontSize: '11px',
-                padding: '6px',
-                fontWeight: algorithm === 'RC4' ? 600 : 400,
-                background: algorithm === 'RC4' ? 'var(--accent)' : undefined,
-                color: algorithm === 'RC4' ? '#fff' : undefined,
-              }}
-              onClick={() => setAlgorithm('RC4')}
-            >
-              RC4-128 (Legacy)
-            </button>
-          </div>
+          <SegmentedControl<'AES-256' | 'RC4'>
+            ariaLabelledBy="protect-algo-label"
+            size="sm"
+            value={algorithm}
+            onChange={setAlgorithm}
+            options={[
+              { value: 'AES-256', label: 'AES-256 (Modern)' },
+              { value: 'RC4', label: 'RC4-128 (Legacy)' },
+            ]}
+          />
         </div>
 
         {/* Permissions Switches */}

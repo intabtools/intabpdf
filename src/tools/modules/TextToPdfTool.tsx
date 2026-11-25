@@ -4,6 +4,7 @@ import type { ChangeEvent, DragEvent, ReactNode } from 'react';
 import { AlertCircle, FileText, RotateCcw, Upload } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import NoticeBanner from '../../components/NoticeBanner';
+import SegmentedControl from '../../components/SegmentedControl';
 import type { ToolComponentProps } from '../types';
 import type {
   TextFontFamily,
@@ -345,114 +346,74 @@ export default function TextToPdfTool({
       {/* Right Column: Styling & Page Options */}
       <div className="card opts">
         {/* Page Size */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <label id="text-page-size-label" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Page Size
           </label>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {(['a4', 'letter', 'legal'] as const).map((sz) => (
-              <button
-                key={sz}
-                type="button"
-                className={`btn btn-secondary ${pageSize === sz ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  fontSize: '12px',
-                  padding: '6px',
-                  fontWeight: pageSize === sz ? 600 : 400,
-                  background: pageSize === sz ? 'var(--accent)' : undefined,
-                  color: pageSize === sz ? '#fff' : undefined,
-                }}
-                onClick={() => setPageSize(sz)}
-              >
-                {sz.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<TextPageSize>
+            ariaLabelledBy="text-page-size-label"
+            size="sm"
+            value={pageSize}
+            onChange={setPageSize}
+            options={[
+              { value: 'a4', label: 'A4' },
+              { value: 'letter', label: 'LETTER' },
+              { value: 'legal', label: 'LEGAL' },
+            ]}
+          />
         </div>
 
         {/* Orientation */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <label id="text-orientation-label" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Orientation
           </label>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {(['portrait', 'landscape'] as const).map((o) => (
-              <button
-                key={o}
-                type="button"
-                className={`btn btn-secondary ${orientation === o ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  fontSize: '12px',
-                  padding: '6px',
-                  textTransform: 'capitalize',
-                  fontWeight: orientation === o ? 600 : 400,
-                  background: orientation === o ? 'var(--accent)' : undefined,
-                  color: orientation === o ? '#fff' : undefined,
-                }}
-                onClick={() => setOrientation(o)}
-              >
-                {o}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<TextOrientation>
+            ariaLabelledBy="text-orientation-label"
+            size="sm"
+            value={orientation}
+            onChange={setOrientation}
+            options={[
+              { value: 'portrait', label: 'Portrait' },
+              { value: 'landscape', label: 'Landscape' },
+            ]}
+          />
         </div>
 
         {/* Margins */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <label id="text-margins-label" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Margins
           </label>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {(['compact', 'normal', 'spacious'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                className={`btn btn-secondary ${marginPreset === m ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  fontSize: '12px',
-                  padding: '6px',
-                  textTransform: 'capitalize',
-                  fontWeight: marginPreset === m ? 600 : 400,
-                  background: marginPreset === m ? 'var(--accent)' : undefined,
-                  color: marginPreset === m ? '#fff' : undefined,
-                }}
-                onClick={() => setMarginPreset(m)}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<TextMarginPreset>
+            ariaLabelledBy="text-margins-label"
+            size="sm"
+            value={marginPreset}
+            onChange={setMarginPreset}
+            options={[
+              { value: 'compact', label: 'Compact' },
+              { value: 'normal', label: 'Normal' },
+              { value: 'spacious', label: 'Spacious' },
+            ]}
+          />
         </div>
 
         {/* Font Family */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <label id="text-font-label" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Font
           </label>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {(['helvetica', 'times', 'courier'] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                className={`btn btn-secondary ${fontFamily === f ? 'active' : ''}`}
-                style={{
-                  flex: 1,
-                  fontSize: '12px',
-                  padding: '6px',
-                  textTransform: 'capitalize',
-                  fontWeight: fontFamily === f ? 600 : 400,
-                  background: fontFamily === f ? 'var(--accent)' : undefined,
-                  color: fontFamily === f ? '#fff' : undefined,
-                }}
-                onClick={() => setFontFamily(f)}
-              >
-                {f === 'helvetica' ? 'Sans' : f === 'times' ? 'Serif' : 'Mono'}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<TextFontFamily>
+            ariaLabelledBy="text-font-label"
+            size="sm"
+            value={fontFamily}
+            onChange={setFontFamily}
+            options={[
+              { value: 'helvetica', label: 'Sans' },
+              { value: 'times', label: 'Serif' },
+              { value: 'courier', label: 'Mono' },
+            ]}
+          />
         </div>
 
         {/* Font Size & Line Spacing */}
