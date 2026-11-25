@@ -7,9 +7,17 @@ import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const samplePdf = path.resolve(__dirname, 'fixtures/sample.pdf');
-const SCRATCH_DIR = '/home/ayusman/.gemini/antigravity-cli/brain/e576e3dd-8e30-4701-9d8c-2237462a03fe/scratch';
+const SCRATCH_DIR = path.resolve(
+  process.env.PLAYWRIGHT_SCREENSHOT_DIR ||
+    path.resolve(__dirname, '../test-results/e2e-screenshots')
+);
 
 test.describe('Phase 3: PasswordInput Shared Component Verification', () => {
+  test.beforeAll(() => {
+    if (!fs.existsSync(SCRATCH_DIR)) {
+      fs.mkdirSync(SCRATCH_DIR, { recursive: true });
+    }
+  });
   test('ProtectTool: verifies PasswordInput rendering, strength meter, confirm matching, and mobile touch targets', async ({ page }) => {
     // Desktop Light
     await page.setViewportSize({ width: 1280, height: 800 });

@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'url';
 
@@ -7,8 +8,10 @@ const __dirname = path.dirname(__filename);
 const samplePdf = path.resolve(__dirname, 'fixtures/sample.pdf');
 const samplePng = path.resolve(__dirname, 'fixtures/sample.png');
 const invalidFile = path.resolve(__dirname, 'fixtures/invalid.txt');
-const SCRATCH_DIR =
-  '/home/ayusman/.gemini/antigravity-cli/brain/e576e3dd-8e30-4701-9d8c-2237462a03fe/scratch';
+const SCRATCH_DIR = path.resolve(
+  process.env.PLAYWRIGHT_SCREENSHOT_DIR ||
+    path.resolve(__dirname, '../test-results/e2e-screenshots')
+);
 
 const VIEWPORTS = [
   { name: 'mobile', width: 375, height: 667 },
@@ -89,6 +92,11 @@ async function getContrastRatio(locator: Locator): Promise<number> {
 }
 
 test.describe('Phase 4 Full-Project Visual Consistency & Accessibility Audit', () => {
+  test.beforeAll(() => {
+    if (!fs.existsSync(SCRATCH_DIR)) {
+      fs.mkdirSync(SCRATCH_DIR, { recursive: true });
+    }
+  });
   test('Home and About screens render cleanly without overflow at 375px, 768px, and 1280px in light and dark themes', async ({
     page,
   }) => {

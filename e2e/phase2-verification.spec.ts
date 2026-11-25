@@ -1,13 +1,22 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const samplePdf = path.resolve(__dirname, 'fixtures/sample.pdf');
-const SCRATCH_DIR = '/home/ayusman/.gemini/antigravity-cli/brain/e576e3dd-8e30-4701-9d8c-2237462a03fe/scratch';
+const SCRATCH_DIR = path.resolve(
+  process.env.PLAYWRIGHT_SCREENSHOT_DIR ||
+    path.resolve(__dirname, '../test-results/e2e-screenshots')
+);
 
 test.describe('Phase 2 Button Consistency and Mobile Ergonomics', () => {
+  test.beforeAll(() => {
+    if (!fs.existsSync(SCRATCH_DIR)) {
+      fs.mkdirSync(SCRATCH_DIR, { recursive: true });
+    }
+  });
   test('ReorderTool: Move Earlier and Move Later have >= 44x44px touch areas and correct disabled boundaries', async ({ page }) => {
     await page.goto('/tool/reorder');
     await page.waitForLoadState('networkidle');
