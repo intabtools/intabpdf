@@ -456,81 +456,19 @@ test.describe('Phase 3: PasswordInput Shared Component Verification', () => {
     await page.goto('/');
     await page.waitForSelector('h1, .tc');
 
-    // Mount a StrictMode React harness inside #root using Vite dev server's singleton React & ModalDialog
+    // Mount a StrictMode React harness inside #root via Vite's normal module resolver
     await page.evaluate(async () => {
-      const reactRes = performance
-        .getEntriesByType('resource')
-        .find((r) => r.name.includes('/node_modules/.vite/deps/react.js'));
-      if (!reactRes) throw new Error('Could not resolve Vite React module URL');
-
-      const search = new URL(reactRes.name).search;
-      const ReactMod = await import(reactRes.name);
-      const React = ReactMod.default ?? ReactMod;
-      const ReactDOMMod = await import(`${window.location.origin}/node_modules/.vite/deps/react-dom_client.js${search}`);
-      const ReactDOM = ReactDOMMod.default ?? ReactDOMMod;
-      const { default: ModalDialog } = await import('/src/components/ModalDialog.tsx');
-
-      const host = document.createElement('div');
-      host.id = 'nested-modal-test-host';
-      document.getElementById('root')?.appendChild(host);
-
-      function Harness() {
-        const [openA, setOpenA] = React.useState(false);
-        const [openB, setOpenB] = React.useState(false);
-
-        return React.createElement(
-          React.StrictMode,
-          null,
-          React.createElement(
-            'div',
-            null,
-            React.createElement(
-              'button',
-              { id: 'trigger-open-a', type: 'button', onClick: () => setOpenA(true) },
-              'Open Modal A'
-            ),
-            React.createElement(
-              ModalDialog,
-              {
-                isOpen: openA,
-                onClose: () => setOpenA(false),
-                title: 'Modal A Title',
-                description: 'Modal A Description',
-              },
-              React.createElement(
-                'div',
-                null,
-                React.createElement(
-                  'button',
-                  { id: 'btn-inside-a-open-b', type: 'button', onClick: () => setOpenB(true) },
-                  'Open Nested Modal B'
-                ),
-                React.createElement(
-                  ModalDialog,
-                  {
-                    isOpen: openB,
-                    onClose: () => setOpenB(false),
-                    title: 'Modal B Title',
-                    description: 'Modal B Description',
-                  },
-                  React.createElement(
-                    'button',
-                    { id: 'btn-inside-b-close', type: 'button', onClick: () => setOpenB(false) },
-                    'Done B'
-                  )
-                )
-              )
-            )
-          )
-        );
-      }
-
-      const root = ReactDOM.createRoot(host);
-      root.render(React.createElement(Harness));
-      (window as unknown as { __cleanupModalHarness?: () => void }).__cleanupModalHarness = () => {
-        root.unmount();
-        host.remove();
+      const modUrl = '/e2e/harnesses/mountNestedModalHarness.ts';
+      const { mountNestedModalHarness } = (await import(/* @vite-ignore */ modUrl)) as {
+        mountNestedModalHarness: (parentElement: HTMLElement) => () => void;
       };
+      const rootContainer = document.getElementById('root');
+      if (!rootContainer) {
+        throw new Error('Root element #root not found');
+      }
+      const cleanup = mountNestedModalHarness(rootContainer);
+      (window as unknown as { __cleanupModalHarness?: () => void }).__cleanupModalHarness =
+        cleanup;
     });
 
     const triggerA = page.locator('#trigger-open-a');
