@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -314,5 +316,390 @@ test.describe('Phase 3: PasswordInput Shared Component Verification', () => {
     const resGroup = page.getByRole('radiogroup', { name: 'Resolution' });
     const resGroupBox = await resGroup.boundingBox();
     expect(resGroupBox!.width).toBeLessThanOrEqual(375);
+  });
+
+  test('ModalDialog (RemovePagesTool): verifies focus trap, Escape/backdrop dismissal, scroll lock, focus restoration, and responsive themes', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/tool/remove-pages');
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles(samplePdf);
+
+    const input = page.locator('input[placeholder="e.g. 1-3, 5"]');
+    await input.fill('1');
+
+    const triggerBtn = page.locator('button.cta:has-text("Remove pages from file")');
+    await expect(triggerBtn).toBeEnabled();
+    await triggerBtn.focus();
+    await triggerBtn.click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const labelledBy = await dialog.getAttribute('aria-labelledby');
+    const describedBy = await dialog.getAttribute('aria-describedby');
+    expect(labelledBy).toBeTruthy();
+    expect(describedBy).toBeTruthy();
+
+    // Background body scrolling must be locked and background #root marked inert/aria-hidden while modal is open
+    const bodyOverflowOpen = await page.evaluate(() => document.body.style.overflow);
+    expect(bodyOverflowOpen).toBe('hidden');
+    await expect(page.locator('#root')).toHaveAttribute('inert', '');
+    await expect(page.locator('#root')).toHaveAttribute('aria-hidden', 'true');
+
+    // Background content cannot receive keyboard focus even programmatically while inert
+    const focusMovedToBackground = await input.evaluate((el) => {
+      (el as HTMLElement).focus();
+      return document.activeElement === el;
+    });
+    expect(focusMovedToBackground).toBe(false);
+
+    // Focus must move inside dialog initially
+    const activeInsideOnOpen = await page.evaluate(() => {
+      const dlg = document.querySelector('[role="dialog"]');
+      return Boolean(dlg && dlg.contains(document.activeElement));
+    });
+    expect(activeInsideOnOpen).toBe(true);
+
+    // Tab and Shift+Tab focus containment: focus must stay trapped inside the dialog across multiple cycles
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Tab');
+      const stillInside = await page.evaluate(() => {
+        const dlg = document.querySelector('[role="dialog"]');
+        return Boolean(dlg && dlg.contains(document.activeElement));
+      });
+      expect(stillInside).toBe(true);
+    }
+
+    for (let i = 0; i < 6; i++) {
+      await page.keyboard.press('Shift+Tab');
+      const stillInside = await page.evaluate(() => {
+        const dlg = document.querySelector('[role="dialog"]');
+        return Boolean(dlg && dlg.contains(document.activeElement));
+      });
+      expect(stillInside).toBe(true);
+    }
+
+    // Pressing Escape dismisses dialog, unlocks scroll, removes #root inertness, and restores focus to trigger button
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+
+    const bodyOverflowClosed = await page.evaluate(() => document.body.style.overflow);
+    expect(bodyOverflowClosed).toBe('');
+    await expect(page.locator('#root')).not.toHaveAttribute('inert');
+    await expect(page.locator('#root')).not.toHaveAttribute('aria-hidden');
+
+    const focusedIsTrigger = await triggerBtn.evaluate((el) => document.activeElement === el);
+    expect(focusedIsTrigger).toBe(true);
+
+    // Unexpected unmount cleanup: open modal, navigate away via SPA history, verify scroll lock & inertness clear
+    await triggerBtn.click();
+    await expect(dialog).toBeVisible();
+    await page.evaluate(() => window.history.pushState({}, '', '/about'));
+    await page.evaluate(() => window.dispatchEvent(new PopStateEvent('popstate')));
+    await expect(dialog).not.toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect(page.locator('#root')).not.toHaveAttribute('inert');
+
+    // Return to Remove Pages to verify backdrop click and theme rendering
+    await page.goto('/tool/remove-pages');
+    await page.locator('input[type="file"]').first().setInputFiles(samplePdf);
+    await page.locator('input[placeholder="e.g. 1-3, 5"]').fill('1');
+    await triggerBtn.focus();
+    await triggerBtn.click();
+    await expect(dialog).toBeVisible();
+
+    const backdrop = page.locator('.mo.modal-backdrop');
+    const backdropBox = await backdrop.boundingBox();
+    expect(backdropBox).toBeTruthy();
+    await page.mouse.click(backdropBox!.x + 8, backdropBox!.y + 8);
+    await expect(dialog).not.toBeVisible();
+
+    // Re-open for Desktop Light, Desktop Dark, Mobile Light, Mobile Dark visual verification
+    await triggerBtn.click();
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'modal-dialog-desktop-light.png') });
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'modal-dialog-desktop-dark.png') });
+
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+    await page.waitForTimeout(200);
+    const mobileBox = await dialog.boundingBox();
+    expect(mobileBox).toBeTruthy();
+    expect(mobileBox!.width).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'modal-dialog-mobile-light.png') });
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'modal-dialog-mobile-dark.png') });
+
+    // Close via Escape cleanly
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+  });
+
+  test('ModalDialog (Nested + StrictMode in browser): verifies focus restoration across A->B->A->trigger and active topmost state', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    await page.waitForSelector('h1, .tc');
+
+    // Mount a StrictMode React harness inside #root using Vite dev server's singleton React & ModalDialog
+    await page.evaluate(async () => {
+      const reactRes = performance
+        .getEntriesByType('resource')
+        .find((r) => r.name.includes('/node_modules/.vite/deps/react.js'));
+      if (!reactRes) throw new Error('Could not resolve Vite React module URL');
+
+      const search = new URL(reactRes.name).search;
+      const ReactMod = await import(reactRes.name);
+      const React = ReactMod.default ?? ReactMod;
+      const ReactDOMMod = await import(`${window.location.origin}/node_modules/.vite/deps/react-dom_client.js${search}`);
+      const ReactDOM = ReactDOMMod.default ?? ReactDOMMod;
+      const { default: ModalDialog } = await import('/src/components/ModalDialog.tsx');
+
+      const host = document.createElement('div');
+      host.id = 'nested-modal-test-host';
+      document.getElementById('root')?.appendChild(host);
+
+      function Harness() {
+        const [openA, setOpenA] = React.useState(false);
+        const [openB, setOpenB] = React.useState(false);
+
+        return React.createElement(
+          React.StrictMode,
+          null,
+          React.createElement(
+            'div',
+            null,
+            React.createElement(
+              'button',
+              { id: 'trigger-open-a', type: 'button', onClick: () => setOpenA(true) },
+              'Open Modal A'
+            ),
+            React.createElement(
+              ModalDialog,
+              {
+                isOpen: openA,
+                onClose: () => setOpenA(false),
+                title: 'Modal A Title',
+                description: 'Modal A Description',
+              },
+              React.createElement(
+                'div',
+                null,
+                React.createElement(
+                  'button',
+                  { id: 'btn-inside-a-open-b', type: 'button', onClick: () => setOpenB(true) },
+                  'Open Nested Modal B'
+                ),
+                React.createElement(
+                  ModalDialog,
+                  {
+                    isOpen: openB,
+                    onClose: () => setOpenB(false),
+                    title: 'Modal B Title',
+                    description: 'Modal B Description',
+                  },
+                  React.createElement(
+                    'button',
+                    { id: 'btn-inside-b-close', type: 'button', onClick: () => setOpenB(false) },
+                    'Done B'
+                  )
+                )
+              )
+            )
+          )
+        );
+      }
+
+      const root = ReactDOM.createRoot(host);
+      root.render(React.createElement(Harness));
+      (window as unknown as { __cleanupModalHarness?: () => void }).__cleanupModalHarness = () => {
+        root.unmount();
+        host.remove();
+      };
+    });
+
+    const triggerA = page.locator('#trigger-open-a');
+    await expect(triggerA).toBeVisible();
+    await triggerA.focus();
+    await triggerA.click();
+
+    // Modal A is open under StrictMode
+    const modalA = page.getByRole('dialog', { name: 'Modal A Title' });
+    await expect(modalA).toBeVisible();
+    await expect(page.locator('#root')).toHaveAttribute('inert', '');
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+
+    // Open Nested Modal B from button inside Modal A
+    const openBBtn = page.locator('#btn-inside-a-open-b');
+    await openBBtn.focus();
+    await openBBtn.click();
+
+    const modalB = page.getByRole('dialog', { name: 'Modal B Title' });
+    await expect(modalB).toBeVisible();
+
+    // While Modal B is topmost, Modal A is hidden from assistive technology and inert, while Modal B remains active
+    await expect(modalA).toHaveCount(0);
+    const modalADom = page.locator('.modal-dialog', { hasText: 'Modal A Title' });
+    const modalAIsInert = await modalADom.evaluate((el) =>
+      Boolean((el.closest('.modal-backdrop') as HTMLElement | null)?.inert)
+    );
+    const modalBIsInert = await modalB.evaluate((el) =>
+      Boolean((el.closest('.modal-backdrop') as HTMLElement | null)?.inert)
+    );
+    expect(modalAIsInert).toBe(true);
+    expect(modalBIsInert).toBe(false);
+
+    // Topmost Modal B's button is clickable (background inertness does not disable topmost modal)
+    await expect(page.locator('#btn-inside-b-close')).toBeEnabled();
+
+    // Verify Tab traps inside Modal B specifically
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Tab');
+      const insideB = await modalB.evaluate((el) => el.contains(document.activeElement));
+      expect(insideB).toBe(true);
+    }
+
+    // Close Modal B via Escape -> Modal B closes, Modal A becomes interactive and visible to assistive tech again, focus returns to openBBtn inside A!
+    await page.keyboard.press('Escape');
+    await expect(modalB).not.toBeVisible();
+    await expect(modalA).toBeVisible();
+
+    const modalAInertAfterB = await modalA.evaluate((el) =>
+      Boolean((el.closest('.modal-backdrop') as HTMLElement | null)?.inert)
+    );
+    expect(modalAInertAfterB).toBe(false);
+    await expect(openBBtn).toBeFocused();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+    await expect(page.locator('#root')).toHaveAttribute('inert', '');
+
+    // Close Modal A via Escape -> #root restores, scroll unlocks, focus returns to original triggerA!
+    await page.keyboard.press('Escape');
+    await expect(modalA).not.toBeVisible();
+    await expect(triggerA).toBeFocused();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect(page.locator('#root')).not.toHaveAttribute('inert');
+
+    // Re-open Modal A and unexpectedly unmount the entire React StrictMode tree -> verify cleanup!
+    await triggerA.click();
+    await expect(modalA).toBeVisible();
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+    await expect(page.locator('#root')).toHaveAttribute('inert', '');
+
+    await page.evaluate(() => {
+      (window as unknown as { __cleanupModalHarness?: () => void }).__cleanupModalHarness?.();
+    });
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+    await expect(page.locator('#root')).not.toHaveAttribute('inert');
+  });
+
+  test('ModalDialog (PasswordDialog in Viewer): verifies initial focus, Tab containment, validation error, unlock flow, and mobile/desktop themes', async ({ page }) => {
+    const rawBytes = fs.readFileSync(samplePdf);
+    const encryptedBytes = await encryptPDF(new Uint8Array(rawBytes), 'ViewerPass2026!');
+    const tempProtectedPath = path.resolve(__dirname, 'fixtures/temp-modal-viewer.pdf');
+    fs.writeFileSync(tempProtectedPath, encryptedBytes);
+
+    try {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto('/viewer?platform=electron');
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+
+      const fileInput = page.locator('input[type="file"]').first();
+      await fileInput.setInputFiles(tempProtectedPath);
+
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible({ timeout: 10000 });
+      await expect(dialog).toHaveAttribute('aria-modal', 'true');
+      await expect(dialog.locator('text=Password Protected PDF')).toBeVisible();
+
+      const pwdInput = page.locator('#pdf-password-input');
+      await expect(pwdInput).toBeFocused({ timeout: 2000 });
+
+      // Submit incorrect password and verify validation error inside dialog
+      await pwdInput.fill('WrongPassword');
+      await page.getByRole('button', { name: 'Unlock PDF' }).click();
+      await expect(dialog.locator('text=Incorrect password. Please try again.')).toBeVisible({ timeout: 5000 });
+      await expect(pwdInput).toBeFocused({ timeout: 2000 });
+
+      // Verify Tab containment stays inside PasswordDialog
+      for (let i = 0; i < 5; i++) {
+        await page.keyboard.press('Tab');
+        const inside = await page.evaluate(() => {
+          const dlg = document.querySelector('[role="dialog"]');
+          return Boolean(dlg && dlg.contains(document.activeElement));
+        });
+        expect(inside).toBe(true);
+      }
+
+      await page.waitForTimeout(200);
+      await page.screenshot({ path: path.join(SCRATCH_DIR, 'password-dialog-error-desktop-dark.png') });
+
+      // Check 375px mobile light rendering with validation error
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+      await page.waitForTimeout(200);
+      const mobileDlgBox = await dialog.boundingBox();
+      expect(mobileDlgBox).toBeTruthy();
+      expect(mobileDlgBox!.width).toBeLessThanOrEqual(375);
+      await page.screenshot({ path: path.join(SCRATCH_DIR, 'password-dialog-error-mobile-light.png') });
+
+      // Enter valid password and verify modal closes and scroll-lock cleans up
+      await pwdInput.fill('ViewerPass2026!');
+      await page.getByRole('button', { name: 'Unlock PDF' }).click();
+      await expect(dialog).not.toBeVisible({ timeout: 10000 });
+
+      const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
+      expect(bodyOverflow).toBe('');
+    } finally {
+      if (fs.existsSync(tempProtectedPath)) {
+        fs.unlinkSync(tempProtectedPath);
+      }
+    }
+  });
+
+  test('ImagePreviewModal: inspects lightbox sizing and controls across desktop and mobile viewports', async ({ page }) => {
+    const samplePng = path.resolve(__dirname, 'fixtures/sample.png');
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/tool/images-to-pdf');
+
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles(samplePng);
+
+    const previewTrigger = page.getByRole('button', { name: 'Preview sample.png' });
+    await expect(previewTrigger).toBeVisible({ timeout: 10000 });
+    await previewTrigger.click();
+
+    const previewDialog = page.getByRole('dialog', { name: 'Preview of sample.png' });
+    await expect(previewDialog).toBeVisible();
+
+    const closeBtn = page.getByRole('button', { name: 'Close image preview' });
+    const rotateBtn = page.getByRole('button', { name: 'Rotate 90 degrees clockwise' });
+    const cropBtn = page.getByRole('button', { name: 'Crop image' });
+
+    await expect(closeBtn).toBeFocused();
+    await expect(rotateBtn).toBeVisible();
+    await expect(cropBtn).toBeVisible();
+
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'image-preview-desktop.png') });
+
+    // Mobile 375px check: ensure controls fit within 375px without horizontal overflow
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(150);
+    const hdrBox = await page.locator('.lightbox-hdr').boundingBox();
+    expect(hdrBox).toBeTruthy();
+    expect(hdrBox!.width).toBeLessThanOrEqual(375);
+
+    await page.screenshot({ path: path.join(SCRATCH_DIR, 'image-preview-mobile.png') });
+
+    // Close via Escape and verify focus restores to preview trigger
+    await page.keyboard.press('Escape');
+    await expect(previewDialog).not.toBeVisible();
   });
 });

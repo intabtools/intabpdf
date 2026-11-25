@@ -1699,6 +1699,113 @@ textarea,
   pointer-events: none;
 }
 
+/* ModalDialog shared component */
+.mo.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.dlg.modal-dialog {
+  width: min(var(--modal-max-width, 440px), 100%);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 22px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  box-shadow: var(--shadow-lg);
+}
+
+.dlg.modal-dialog:focus {
+  outline: none;
+}
+
+.modal-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.modal-dialog-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.modal-dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-dialog-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.modal-close-btn {
+  position: relative;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin: -4px -4px -4px 0;
+}
+
+.modal-close-btn::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+}
+
+.modal-close-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.modal-close-btn:disabled::before {
+  pointer-events: none;
+}
+
+.modal-dialog-description {
+  margin: 0 0 16px 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 519.98px) {
+  .mo.modal-backdrop {
+    padding: 16px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  .dlg.modal-dialog {
+    padding: 18px;
+    max-height: calc(100vh - 32px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 32px - env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .busy {
   padding: 34px 20px;
   text-align: center;
