@@ -24,6 +24,23 @@ describe('SignTool Component', () => {
     );
 
     expect(html).toContain('Create Signature');
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-label="Signature creation modes"');
+    expect(html).toContain('role="tab"');
+    expect(html).toContain('aria-controls="sign-panel-draw"');
+    expect(html).toContain('aria-controls="sign-panel-type"');
+    expect(html).toContain('aria-controls="sign-panel-upload"');
+    expect(html).toContain('id="sign-panel-draw"');
+    expect(html).toContain('id="sign-panel-type"');
+    expect(html).toContain('id="sign-panel-upload"');
+    expect(html).toContain('aria-labelledby="sign-tab-draw"');
+    expect(html).toContain('aria-labelledby="sign-tab-type"');
+    expect(html).toContain('aria-labelledby="sign-tab-upload"');
+    expect(html).toContain('role="tabpanel"');
+    expect(html).toMatch(/id="sign-panel-type"[^>]*hidden=""/);
+    expect(html).toMatch(/id="sign-panel-upload"[^>]*hidden=""/);
+    expect(html).toContain('for="sign-page-select"');
+    expect(html).toContain('id="sign-page-select"');
     expect(html).toContain('Draw');
     expect(html).toContain('Type');
     expect(html).toContain('Upload');
@@ -45,6 +62,7 @@ describe('SignTool Component', () => {
       />
     );
 
+    expect(html).toContain('notice-banner-info');
     expect(html).toContain('Visual Signature Stamp:');
     expect(html).toContain('not a cryptographic PKI digital certificate');
   });

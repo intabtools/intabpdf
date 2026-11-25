@@ -187,12 +187,12 @@ export default function StagedFileList({
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <small>{formatBytes(file.size)}</small>
                 {Boolean(imageEdits?.[file.id]?.rotation && imageEdits[file.id]!.rotation !== 0) && (
-                  <small style={{ color: 'var(--primary, #3b82f6)', fontWeight: 500 }}>
+                  <small style={{ color: 'var(--accent)', fontWeight: 500 }}>
                     {imageEdits?.[file.id]?.rotation}°
                   </small>
                 )}
                 {Boolean(imageEdits?.[file.id]?.crop) && (
-                  <small style={{ color: 'var(--primary, #3b82f6)', fontWeight: 500 }}>
+                  <small style={{ color: 'var(--accent)', fontWeight: 500 }}>
                     cropped
                   </small>
                 )}

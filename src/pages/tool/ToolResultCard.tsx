@@ -1,7 +1,7 @@
 // Result card displayed when a PDF tool completes execution, with stats, download, and viewing options.
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Check, Copy, Download, Eye, Info, RefreshCw, XCircle } from 'lucide-react';
+import { Check, Copy, Download, Eye, RefreshCw, XCircle } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import NoticeBanner from '../../components/NoticeBanner';
 import { formatBytes } from '../../core/formatBytes';
@@ -299,46 +299,22 @@ export default function ToolResultCard({
       {isTextOutput && (
         <div style={{ marginTop: '12px', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           {wordCount === 0 && (
-            <div
-              role="status"
-              style={{
-                marginBottom: '10px',
-                padding: '10px 12px',
-                borderRadius: 'var(--radius-sm)',
-                background: extraState.hasImages
-                  ? 'rgba(216, 59, 1, 0.08)'
-                  : 'var(--surface-2)',
-                border: extraState.hasImages
-                  ? '1px solid rgba(216, 59, 1, 0.3)'
-                  : '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '13px',
-                lineHeight: 1.5,
-              }}
+            <NoticeBanner
+              variant={extraState.hasImages ? 'warning' : 'info'}
+              role={null}
+              title={
+                extraState.hasImages
+                  ? 'Image-based PDF (OCR required)'
+                  : 'No text found in document'
+              }
+              style={{ marginBottom: '10px' }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontWeight: 600,
-                  color: extraState.hasImages ? 'var(--info)' : 'var(--text)',
-                  marginBottom: '4px',
-                }}
-              >
-                <Info size={15} style={{ flexShrink: 0 }} />
-                <span>
-                  {extraState.hasImages
-                    ? 'Image-based PDF (OCR required)'
-                    : 'No text found in document'}
-                </span>
-              </div>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
                 {extraState.hasImages
                   ? 'This PDF appears to contain scanned images rather than selectable text. Optical Character Recognition (OCR) is required to extract text from image-based PDFs, which is not currently supported in InTabPDF.'
                   : 'This document does not contain any selectable text characters or font streams (e.g. blank pages or vector-only artwork).'}
               </p>
-            </div>
+            </NoticeBanner>
           )}
 
           <div
@@ -444,14 +420,9 @@ export default function ToolResultCard({
         {!isZipOutput && !isTextOutput && outputExtension !== '.png' && outputExtension !== '.jpg' && outputExtension !== '.jpeg' && (
           <button
             type="button"
-            className="cta"
+            className="btn btn-secondary"
             onClick={onViewPdf}
-            style={{
-              background: 'var(--surface-2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              minHeight: '44px',
-            }}
+            style={{ minHeight: '44px' }}
           >
             <Eye size={16} style={{ flexShrink: 0 }} />
             <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.25 }}>
@@ -462,14 +433,9 @@ export default function ToolResultCard({
 
         <button
           type="button"
-          className="cta"
+          className="btn btn-secondary"
           onClick={onStartOver}
-          style={{
-            background: 'var(--surface-2)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
-            minHeight: '44px',
-          }}
+          style={{ minHeight: '44px' }}
         >
           <RefreshCw size={15} style={{ flexShrink: 0 }} />
           <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.25 }}>Change settings</span>
@@ -477,12 +443,13 @@ export default function ToolResultCard({
 
         <button
           type="button"
-          className="cta"
+          className="btn btn-secondary"
           onClick={onClearFiles || onStartOver}
           style={{
-            background: 'transparent',
-            color: 'var(--text-muted)',
             minHeight: '44px',
+            background: 'transparent',
+            borderColor: 'transparent',
+            color: 'var(--text-muted)',
           }}
         >
           <XCircle size={15} style={{ flexShrink: 0 }} />

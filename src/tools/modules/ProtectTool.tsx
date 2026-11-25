@@ -29,15 +29,15 @@ function computePasswordStrength(pwd: string): PasswordStrength {
   if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
 
   if (score <= 1) {
-    return { score: 1, label: 'Weak', color: '#e53e3e' };
+    return { score: 1, label: 'Weak', color: 'var(--danger)' };
   }
   if (score <= 3) {
-    return { score: 2, label: 'Moderate', color: '#dd6b20' };
+    return { score: 2, label: 'Moderate', color: 'var(--warning)' };
   }
   if (score === 4) {
-    return { score: 3, label: 'Strong', color: '#3182ce' };
+    return { score: 3, label: 'Strong', color: 'var(--accent)' };
   }
-  return { score: 4, label: 'Very strong', color: '#38a169' };
+  return { score: 4, label: 'Very strong', color: 'var(--success)' };
 }
 
 export default function ProtectTool({

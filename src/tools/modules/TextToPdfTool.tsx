@@ -269,6 +269,7 @@ export default function TextToPdfTool({
 
         {/* Textarea Editor with explicit user-select: text */}
         <textarea
+          aria-label="Text content to convert to PDF"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onDragOver={(e) => {
@@ -310,7 +311,7 @@ export default function TextToPdfTool({
             justifyContent: 'space-between',
             alignItems: 'center',
             fontSize: '12px',
-            color: isOverLimit ? 'var(--error, #e53e3e)' : 'var(--text-muted)',
+            color: isOverLimit ? 'var(--danger)' : 'var(--text-muted)',
           }}
         >
           <span>
@@ -419,14 +420,16 @@ export default function TextToPdfTool({
         {/* Font Size & Line Spacing */}
         <div style={{ display: 'flex', gap: '10px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <label htmlFor="text-font-size" style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Size (pt)
             </label>
             <select
+              id="text-font-size"
               value={fontSize}
               onChange={(e) => setFontSize(Number(e.target.value))}
               style={{
                 width: '100%',
+                minHeight: '38px',
                 padding: '6px 8px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border)',
@@ -444,14 +447,16 @@ export default function TextToPdfTool({
           </div>
 
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+            <label htmlFor="text-line-spacing" style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
               Spacing
             </label>
             <select
+              id="text-line-spacing"
               value={lineSpacing}
               onChange={(e) => setLineSpacing(Number(e.target.value))}
               style={{
                 width: '100%',
+                minHeight: '38px',
                 padding: '6px 8px',
                 borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border)',

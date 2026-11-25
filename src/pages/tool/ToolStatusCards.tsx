@@ -47,7 +47,7 @@ export default function ToolStatusCards({
             type="button"
             className="cta"
             onClick={onClearError}
-            style={{ background: 'var(--text)' }}
+            style={{ background: 'var(--text)', color: 'var(--background)' }}
           >
             <RotateCcw size={16} style={{ flexShrink: 0 }} />
             <span style={{ minWidth: 0, textAlign: 'center' }}>Try again</span>

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, MouseEvent as ReactMouseEvent, ReactNode, TouchEvent as ReactTouchEvent } from 'react';
 import { AlertCircle, Calendar, Check, Edit3, Image, RotateCcw, Type } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import SegmentedControl from '../../components/SegmentedControl';
 import type { ToolComponentProps } from '../types';
 import { getPdfPageCount } from '../../core/split';
@@ -33,6 +34,11 @@ export default function SignTool({
   const [addDate, setAddDate] = useState<boolean>(() => optionsState['add-date'] ?? true);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const tabRefs = useRef<Record<SignatureMode, HTMLButtonElement | null>>({
+    draw: null,
+    type: null,
+    upload: null,
+  });
   const file = stagedFiles[0];
   const [prevFileId, setPrevFileId] = useState<string | undefined>(file?.id);
 
@@ -278,60 +284,80 @@ export default function SignTool({
           minWidth: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Edit3 size={18} style={{ color: 'var(--accent)' }} />
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>Create Signature</h3>
           </div>
 
           {/* Mode Selector Tabs */}
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div
+            role="tablist"
+            aria-label="Signature creation modes"
+            style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}
+            onKeyDown={(e) => {
+              const modes: SignatureMode[] = ['draw', 'type', 'upload'];
+              const idx = modes.indexOf(mode);
+              let nextMode: SignatureMode | null = null;
+              if (e.key === 'ArrowRight') {
+                nextMode = modes[(idx + 1) % modes.length];
+              } else if (e.key === 'ArrowLeft') {
+                nextMode = modes[(idx - 1 + modes.length) % modes.length];
+              } else if (e.key === 'Home') {
+                nextMode = modes[0];
+              } else if (e.key === 'End') {
+                nextMode = modes[modes.length - 1];
+              }
+              if (nextMode) {
+                e.preventDefault();
+                setMode(nextMode);
+                tabRefs.current[nextMode]?.focus();
+              }
+            }}
+          >
             <button
-              type="button"
-              className={`btn btn-secondary ${mode === 'draw' ? 'active' : ''}`}
-              style={{
-                fontSize: '12px',
-                padding: '4px 8px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: mode === 'draw' ? 'var(--accent)' : undefined,
-                color: mode === 'draw' ? '#fff' : undefined,
+              ref={(el) => {
+                tabRefs.current.draw = el;
               }}
+              id="sign-tab-draw"
+              type="button"
+              role="tab"
+              aria-selected={mode === 'draw'}
+              aria-controls="sign-panel-draw"
+              tabIndex={mode === 'draw' ? 0 : -1}
+              className={`btn btn-secondary sm ${mode === 'draw' ? 'active' : ''}`}
               onClick={() => setMode('draw')}
             >
               <Edit3 size={12} />
               Draw
             </button>
             <button
-              type="button"
-              className={`btn btn-secondary ${mode === 'type' ? 'active' : ''}`}
-              style={{
-                fontSize: '12px',
-                padding: '4px 8px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: mode === 'type' ? 'var(--accent)' : undefined,
-                color: mode === 'type' ? '#fff' : undefined,
+              ref={(el) => {
+                tabRefs.current.type = el;
               }}
+              id="sign-tab-type"
+              type="button"
+              role="tab"
+              aria-selected={mode === 'type'}
+              aria-controls="sign-panel-type"
+              tabIndex={mode === 'type' ? 0 : -1}
+              className={`btn btn-secondary sm ${mode === 'type' ? 'active' : ''}`}
               onClick={() => setMode('type')}
             >
               <Type size={12} />
               Type
             </button>
             <button
-              type="button"
-              className={`btn btn-secondary ${mode === 'upload' ? 'active' : ''}`}
-              style={{
-                fontSize: '12px',
-                padding: '4px 8px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: mode === 'upload' ? 'var(--accent)' : undefined,
-                color: mode === 'upload' ? '#fff' : undefined,
+              ref={(el) => {
+                tabRefs.current.upload = el;
               }}
+              id="sign-tab-upload"
+              type="button"
+              role="tab"
+              aria-selected={mode === 'upload'}
+              aria-controls="sign-panel-upload"
+              tabIndex={mode === 'upload' ? 0 : -1}
+              className={`btn btn-secondary sm ${mode === 'upload' ? 'active' : ''}`}
               onClick={() => setMode('upload')}
             >
               <Image size={12} />
@@ -341,8 +367,13 @@ export default function SignTool({
         </div>
 
         {/* Draw Mode: Canvas Pad */}
-        {mode === 'draw' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div
+          id="sign-panel-draw"
+          role="tabpanel"
+          aria-labelledby="sign-tab-draw"
+          hidden={mode !== 'draw'}
+          style={{ display: mode === 'draw' ? 'flex' : 'none', flexDirection: 'column', gap: '8px' }}
+        >
             <div
               style={{
                 position: 'relative',
@@ -402,17 +433,22 @@ export default function SignTool({
                 Clear
               </button>
             </div>
-          </div>
-        )}
+        </div>
 
         {/* Type Mode: Custom Cursive Generator */}
-        {mode === 'type' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div
+          id="sign-panel-type"
+          role="tabpanel"
+          aria-labelledby="sign-tab-type"
+          hidden={mode !== 'type'}
+          style={{ display: mode === 'type' ? 'flex' : 'none', flexDirection: 'column', gap: '10px' }}
+        >
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+              <label htmlFor="sign-typed-name" style={{ fontSize: '12px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
                 Your Name
               </label>
               <input
+                id="sign-typed-name"
                 type="text"
                 value={typedName}
                 onChange={(e) => setTypedName(e.target.value)}
@@ -448,23 +484,25 @@ export default function SignTool({
             >
               {typedName.trim() || 'Signature Preview'}
             </div>
-          </div>
-        )}
+        </div>
 
         {/* Upload Mode: Image File Picker */}
-        {mode === 'upload' && (
-          <div
-            style={{
-              borderRadius: 'var(--radius-md)',
-              border: '2px dashed var(--border)',
-              padding: '24px',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
+        <div
+          id="sign-panel-upload"
+          role="tabpanel"
+          aria-labelledby="sign-tab-upload"
+          hidden={mode !== 'upload'}
+          style={{
+            borderRadius: 'var(--radius-md)',
+            border: '2px dashed var(--border)',
+            padding: '24px',
+            textAlign: 'center',
+            display: mode === 'upload' ? 'flex' : 'none',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
@@ -500,43 +538,33 @@ export default function SignTool({
                 Image loaded ({uploadedImageBytes.length} bytes)
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* Visual Signature Notice */}
-        <div
-          style={{
-            padding: '10px 12px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border)',
-            fontSize: '12px',
-            lineHeight: 1.5,
-            color: 'var(--text-muted)',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'flex-start',
-          }}
+        <NoticeBanner
+          variant="info"
+          icon={<AlertCircle size={15} style={{ color: 'var(--accent)' }} />}
         >
-          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: '2px', color: 'var(--accent)' }} />
           <div>
             <strong>Visual Signature Stamp:</strong> This adds a visual image stamp to your PDF page. It is not a cryptographic PKI digital certificate.
           </div>
-        </div>
+        </NoticeBanner>
       </div>
 
       {/* Right Column: Placement Options & Action */}
       <div className="card opts">
         {/* Target Page Selector */}
-        <div>
-          <label style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+        <div style={{ marginBottom: '10px' }}>
+          <label htmlFor="sign-page-select" style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Sign Page
           </label>
           <select
+            id="sign-page-select"
             value={targetPage}
             onChange={(e) => setTargetPage(e.target.value)}
             style={{
               width: '100%',
+              minHeight: '38px',
               padding: '6px 8px',
               borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border)',
