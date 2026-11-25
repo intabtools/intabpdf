@@ -27,57 +27,58 @@ Still confused? Put it inside your own tool folder and ask in your PR. We can mo
 
 ```
 intabpdf/
-├── public/              Static files served as they are (_headers, _redirects, sitemap.xml, favicon.svg)
+├── public/              Static files served as they are (_headers, _redirects, sitemap.xml, robots.txt, favicon.svg, icons.svg, sample.pdf)
 ├── src/
-│   ├── core/            PDF logic (bytes in, bytes out)
+│   ├── core/            Pure PDF, text, and ZIP logic (bytes in, bytes out)
 │   │   ├── worker/      Centralized PDF worker service and worker thread
-│   │   ├── merge.ts, split.ts, rotate.ts, remove-pages.ts, compress.ts...
+│   │   ├── merge.ts, split.ts, reorder.ts, rotate.ts, remove-pages.ts, compress.ts, protect.ts, unlock.ts, sign.ts, images-to-pdf.ts, text-to-pdf.ts, extract-text.ts, zip.ts
 │   │   └── index.ts     Core operations export
-│   ├── platform/        Per-platform adapters (web, electron, android)
+│   ├── platform/        Per-platform adapters (web, electron, android, androidSave)
 │   ├── tools/           Tools domain
-│   │   ├── modules/     Tool UI components (MergeTool.tsx, SplitTool.tsx, etc.)
+│   │   ├── modules/     Tool UI modules and tool-specific helper subfolders (`compress/`, `imagesToPdf/`, `pdfToImages/`, `split/`)
 │   │   ├── registry.ts  Tool discovery and queries
 │   │   ├── toolDefinitions.ts Authoritative tool metadata and options
+│   │   ├── batchOperation.ts Multi-file batch ZIP runner with progress updates
 │   │   ├── filename.ts  Output filename sanitization
-│   │   └── types.ts     ToolDefinition and component prop types
+│   │   └── types.ts     ToolDefinition, WorkerRequest, WorkerResponse, and component prop types
 │   ├── viewer/          Embedded PDF viewer screen (Electron and Android)
-│   ├── pages/           Screens (HomePage, AboutPage, ToolPage)
-│   ├── components/      Shared UI (DropZone, ShellContainer, etc.)
-│   ├── hooks/           Shared React hooks (useShell, etc.)
-│   ├── config/          Screen and routing configuration (screens.ts)
+│   ├── pages/           Screens (HomePage, AboutPage, ToolPage, and `tool/` subcomponents)
+│   ├── components/      Shared UI (DropZone, ShellContainer, ModalDialog, SegmentedControl, NoticeBanner, PasswordInput, etc.)
+│   ├── hooks/           Shared React hooks (useShell, useProcessing, useToast, useViewer)
+│   ├── config/          Screen configuration (`screens.ts`) and release version constant (`version.ts`)
 │   ├── styles/          Global CSS and theme variables (tokens.css, base.css, web.css)
-│   ├── assets/          Images and icons imported by code
+│   ├── assets/          Reserved static asset directory (currently empty)
 │   ├── App.tsx          Root application component
 │   └── main.tsx         Browser entry point
 ├── electron/            Desktop app shell (main.cjs and preload.cjs)
-├── android/             Android app shell (Capacitor project with Gradle guard)
-├── e2e/                 Playwright end-to-end test suites and fixtures
+├── android/             Android app shell (Capacitor project with Gradle guards)
+├── e2e/                 Playwright end-to-end test suites, fixtures, and harnesses
 ├── scripts/             Build and verification scripts (cap.cjs, test-csp-runtime.mjs)
-├── .github/workflows/   Continuous Integration workflows (ci.yml)
+├── .github/workflows/   GitHub Actions workflows (ci.yml, release.yml)
 └── docs/                These documents
 ```
 
-> **Note:** Heavy PDF operations run in background threads via the centralized service in `src/core/worker/` with zero-copy transferable buffers and automatic fallback. Tools are implemented as independent UI modules in `src/tools/modules/` and registered in `src/tools/toolDefinitions.ts`.
+> **Note:** Heavy PDF manipulation runs in background threads via `src/core/worker/` with zero-copy transferable buffers and automatic fallback. Tools are implemented as independent UI modules in `src/tools/modules/` (with PDF.js canvas rasterization for `pdf-to-images` in `src/tools/modules/pdfToImages/`) and registered in `src/tools/toolDefinitions.ts`.
 
 ## Folder by folder
 
 ### `src/core/`
 
-- **Purpose:** All pure PDF byte operations (merge, split, rotate, remove-pages, compress, images-to-pdf, extract-text).
+- **Purpose:** Pure PDF, text extraction, and ZIP byte operations (`merge`, `split`, `reorder`, `rotate`, `remove-pages`, `compress`, `protect`, `unlock`, `sign`, `images-to-pdf`, `text-to-pdf`, `extract-text`, `zip`).
 - **Keep here:** Pure functions (bytes in, bytes out), worker dispatch service in `worker/`, and unit tests.
 - **Avoid:** React, `document` or `window`, Electron or Capacitor imports, file paths, UI text.
 
 ### `src/platform/`
 
 - **Purpose:** Standardized interface for platform differences: picking files, saving files, sharing, and OS-level file opening.
-- **Keep here:** The interface, adapters for Web, Electron bridge (`window.intab`), and Capacitor Android (`window.NativeIntent`).
+- **Keep here:** The interface, adapters for Web, Electron bridge (`window.intab`), and Capacitor Android (`window.NativeIntent`, `androidSave.ts`).
 - **Avoid:** PDF manipulation logic, tool-specific code, UI styling.
 
 ### `src/tools/`
 
-- **Purpose:** Everything for PDF tool options and presentation.
-- **Keep here:** Tool UI modules in `src/tools/modules/<ToolName>.tsx` (e.g. `MergeTool.tsx`, `RotateTool.tsx`, `PdfToImagesTool.tsx`, `ExtractTextTool.tsx`), `toolDefinitions.ts` (metadata), `registry.ts` (discovery queries), `filename.ts`, and `types.ts`.
-- **Avoid:** PDF byte manipulation logic (it belongs in `core`), direct imports between tools, platform checks.
+- **Purpose:** Everything for PDF tool options, presentation, and tool-specific DOM/canvas helpers.
+- **Keep here:** Tool UI modules in `src/tools/modules/<ToolName>.tsx`, tool-specific helper directories (`compress/`, `imagesToPdf/`, `pdfToImages/`, `split/`), `toolDefinitions.ts` (metadata), `registry.ts` (discovery queries), `batchOperation.ts`, `filename.ts`, and `types.ts`.
+- **Avoid:** Pure `src/core/` PDF byte manipulation logic (keep it in `core`), direct imports between tools, platform checks.
 
 ### `src/viewer/`
 
@@ -87,7 +88,7 @@ intabpdf/
 
 ### `src/components/`
 
-- **Purpose:** UI used across tools and pages (drop zone, app shells, navigation bars, buttons).
+- **Purpose:** UI used across tools and pages (drop zone, app shells, navigation bars, buttons, `ModalDialog`, `SegmentedControl`, `NoticeBanner`, `PasswordInput`).
 - **Keep here:** Reusable, accessible React components that receive data via props.
 - **Avoid:** Tool-specific execution logic, direct platform API calls.
 

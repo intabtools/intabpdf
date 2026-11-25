@@ -41,14 +41,14 @@ export async function compressPdf(
 }
 ```
 
-Export the function from [src/core/index.ts](file:///home/ayusman/Desktop/intabpdf/src/core/index.ts):
+Export the function from [src/core/index.ts](../src/core/index.ts):
 ```typescript
 export * from './compress';
 ```
 
 ### Step 2: Write Unit Tests
 
-Add unit tests in [src/core/pdf.test.ts](file:///home/ayusman/Desktop/intabpdf/src/core/pdf.test.ts) using `vitest`:
+Add unit tests in [src/core/pdf.test.ts](../src/core/pdf.test.ts) using `vitest`:
 ```typescript
 describe('compressPdf', () => {
   it('compresses a PDF document and produces valid output', async () => {
@@ -63,7 +63,7 @@ describe('compressPdf', () => {
 ### Step 3: Add to the Web Worker and Processing Service
 
 If your tool performs heavy document manipulation using `pdf-lib`:
-1. Update [src/core/worker/service.ts](file:///home/ayusman/Desktop/intabpdf/src/core/worker/service.ts):
+1. Update [src/core/worker/service.ts](../src/core/worker/service.ts):
    - Add the operation key to `PdfOperation`:
      ```typescript
      export type PdfOperation = 'merge' | 'rotate' | 'remove-pages' | 'split' | 'images-to-pdf' | 'compress';
@@ -76,7 +76,7 @@ If your tool performs heavy document manipulation using `pdf-lib`:
      }
      ```
    - Add the operation to `executeOnMainThread()` in `service.ts`.
-2. Update [src/core/worker/pdfWorker.ts](file:///home/ayusman/Desktop/intabpdf/src/core/worker/pdfWorker.ts) in the worker message handler `switch` block.
+2. Update [src/core/worker/pdfWorker.ts](../src/core/worker/pdfWorker.ts) in the worker message handler `switch` block.
 
 *(Note: Tools that render or parse pages using `pdfjs-dist`, such as `pdf-to-images` and `extract-text`, invoke PDF.js methods directly on typed byte arrays; PDF.js internally manages its own background Web Worker thread `pdf.worker.min.mjs`.)*
 
@@ -142,7 +142,7 @@ export default function CompressTool({
 
 ### Step 5: Register the Tool in `src/tools/toolDefinitions.ts`
 
-Find or declare your tool definition in [src/tools/toolDefinitions.ts](file:///home/ayusman/Desktop/intabpdf/src/tools/toolDefinitions.ts) (which is re-exported by `src/tools/registry.ts`):
+Find or declare your tool definition in [src/tools/toolDefinitions.ts](../src/tools/toolDefinitions.ts) (which is re-exported by `src/tools/registry.ts`):
 ```typescript
 {
   id: 'compress',
@@ -162,7 +162,7 @@ Find or declare your tool definition in [src/tools/toolDefinitions.ts](file:///h
 }
 ```
 
-Once registered in `src/tools/toolDefinitions.ts`, the tool is immediately recognized throughout the application. The application shell and [src/pages/ToolPage.tsx](file:///home/ayusman/Desktop/intabpdf/src/pages/ToolPage.tsx) resolve the lazy component wrapper automatically via [`getToolComponent(tool)`](file:///home/ayusman/Desktop/intabpdf/src/tools/registry.ts) without requiring edits to routing definitions or navigation bars.
+Once registered in `src/tools/toolDefinitions.ts`, the tool is immediately recognized throughout the application. The application shell and [src/pages/ToolPage.tsx](../src/pages/ToolPage.tsx) resolve the lazy component wrapper automatically via [`getToolComponent(tool)`](../src/tools/registry.ts) without requiring edits to routing definitions or navigation bars.
 
 ---
 

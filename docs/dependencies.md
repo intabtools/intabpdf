@@ -34,9 +34,10 @@ Please check the current licence and how active the project is before choosing. 
 
 | Library | Typical use | Note |
 |---|---|---|
-| `pdf-lib` | Create, merge, split, edit pages | Pure JavaScript, popular for client-side work. Check how actively it is maintained |
-| `pdfjs-dist` | Draw pages on canvas, extract text | Mozilla PDF.js. Used by the viewer. Bundle its worker file locally, so nothing loads from a CDN |
-| MuPDF (WASM builds) | Fast rendering and compression | Has been AGPL in the past, so check carefully |
+| `pdf-lib` | Create, merge, split, reorder, sign, edit pages | Pure JavaScript, client-side PDF manipulation |
+| `pdfjs-dist` | Draw pages on canvas, extract text, viewer rendering | Mozilla PDF.js with bundled local worker so nothing loads from a CDN |
+| `@pdfsmaller/pdf-encrypt` / `@pdfsmaller/pdf-decrypt` | Password-protect and unlock PDFs | Pure JS PDF encryption and decryption libraries bundled locally |
+| MuPDF (WASM builds) | Fast rendering and compression | Has been AGPL in the past, so check license compatibility carefully |
 
 ## Desktop tooling
 
@@ -46,7 +47,7 @@ Please check the current licence and how active the project is before choosing. 
 
 `@capacitor/core`, `@capacitor/android` and `@capacitor/cli` are used for the Android app. Check every Capacitor plugin like any other library, and read its source for network code. Do not add plugins that talk to a server (push notifications, analytics, Firebase, crash reporting) without a new entry in the [decisions log](decisions.md). Keep Capacitor and the Android build setup updated.
 
-> **Node.js Engine Note:** `@capacitor/cli` v7 declares a Node.js `>=22.0.0` engine in its `package.json`. InTabPDF wraps Capacitor invocations with `scripts/cap.cjs` (`npm run cap`), allowing developers on Node 20 LTS to synchronize assets and execute commands safely without semver errors.
+> **Node.js Engine Note:** `@capacitor/cli` v8 declares a Node.js `>=22.0.0` engine in its `package.json`. InTabPDF wraps Capacitor invocations with `scripts/cap.cjs` (`npm run cap`), allowing developers on Node 20 LTS to synchronize assets and execute commands safely without semver errors.
 
 ## Testing tooling
 

@@ -165,17 +165,21 @@ Before releasing:
 - [ ] CSP is still strict (no new allowed outside domains in `public/_headers`)
 - [ ] `npm audit` has no serious open issues
 - [ ] Tried in Chrome, Firefox and Safari if possible
-- [ ] Desktop packages built with `npm run dist`, `npm run dist:win`, and `npm run dist:linux` (Note: macOS packaging deferred pending app icons and code signing)
+- [ ] Desktop packages tested locally (`npm run dist`, `npm run dist:win`, `npm run dist:linux`) or verified via `.github/workflows/release.yml` (Linux: `.AppImage`, `.deb`, `.rpm`, `.tar.gz`; Windows: `.exe`, `.zip`; macOS packaging deferred pending app icons and code signing)
+- [ ] Windows note verified: `package-windows` runs with `CSC_IDENTITY_AUTO_DISCOVERY: 'false'`, so Windows `.exe` and `.zip` installers are not Authenticode code-signed and rely on `SHA256SUMS.txt` and `SHA256SUMS.txt.asc`
 - [ ] Installed on Windows and Linux, and a PDF opened through the operating system (check the file association after install)
 - [ ] Android: Web assets synchronized via `npm run sync:android`, verified via Gradle `checkWebAssets` during `npm run android:build`
-- [ ] Android: APK built, signed with the release key and installed on a real phone (a low-end one if possible)
+- [ ] Android: APK release signing verified (`checkReleaseSigning` in `android/app/build.gradle`) and checked on a real device (a low-end one if possible); note that `.github/workflows/release.yml` builds and signs the production APK after a GitHub Release is published, verifying the pinned production certificate SHA-256 fingerprint via `apksigner` (for pre-release device testing, build locally with the release keystore or use a GitHub pre-release)
 - [ ] Android: a PDF opened from the file manager opens in InTab PDF
+- [ ] Android: `versionName` matches the release version and `versionCode` is a positive integer strictly greater than the previous `vX.Y.Z` tag in `android/app/build.gradle`
 - [ ] Android: no new permissions in the manifest compared with the last release
+- [ ] Required GitHub Actions release secrets configured in repository settings (do not commit values): `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`
 - [ ] Web: Cloudflare Pages deployment built successfully (`npm run build`, output `dist`)
 - [ ] Web: SPA rewrites verified (`/* /index.html 200` in `_redirects`) and `/robots.txt`, `/sitemap.xml`, `/about` load cleanly
 - [ ] Changelog written in simple words
-- [ ] Version bumped with a `release:` commit and tagged
+- [ ] Version bumped in `package.json`, `android/app/build.gradle`, and `src/config/version.ts` (plus `package-lock.json` if dependencies changed) with a `release:` commit and tagged `vX.Y.Z`
 - [ ] Docs updated
+- [ ] GitHub Release published from `vX.Y.Z`, triggering `.github/workflows/release.yml` (`release: types: [published]`) to build the 7 Linux, Windows, and Android installers, generate and check `SHA256SUMS.txt`, detach-sign and verify `SHA256SUMS.txt.asc`, and upload all 9 assets to the release
 
 ## Security and privacy reports
 

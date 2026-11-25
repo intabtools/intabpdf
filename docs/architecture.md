@@ -33,9 +33,8 @@ flowchart TD
 
 2. **Screen and Tool Registry (`src/tools/registry.ts`, `src/tools/toolDefinitions.ts`)**
    - Authoritative registry of all 13 PDF tools across 4 categories (`Create`, `Organize`, `Shrink and secure`, `Sign and convert`).
-   - 8 tools are fully implemented: `merge`, `rotate`, `remove-pages`, `split`, `images-to-pdf`, `compress`, `pdf-to-images`, and `extract-text`.
-   - 5 tools are planned and marked `coming-soon`: `text-to-pdf`, `reorder`, `protect`, `unlock`, and `sign`.
-   - Encapsulates tool metadata, icon names, action verbs, input file types, default options, and availability (`'available' | 'coming-soon'`).
+   - All 13 tools are fully implemented (`availability: 'available'`): `images-to-pdf`, `text-to-pdf`, `merge`, `split`, `reorder`, `rotate`, `remove-pages`, `compress`, `protect`, `unlock`, `sign`, `pdf-to-images`, and `extract-text`.
+   - Encapsulates tool metadata, icon names, action verbs, input file types, multi-file support, default options, and availability (`'available' | 'coming-soon'`).
    - Exposes lazy module references (`component?: () => import(...)`) for on-demand loading.
    - Enforces validation via `validateRegistry()` with runtime assertions for ID uniqueness and availability consistency.
 
@@ -50,14 +49,14 @@ flowchart TD
    - Supports temporary full-screen mode via `showAppLayout === false`, automatically unmounting headers, sidebars, and navigation rails while retaining Escape / Android back button dismissal.
 
 5. **Dynamic Tool Modules (`src/tools/modules/`)**
-   - Independent options panels and action runners for each tool (e.g., `MergeTool.tsx`, `RotateTool.tsx`, `RemovePagesTool.tsx`, `PdfToImagesTool.tsx`, `ExtractTextTool.tsx`).
+   - Independent options panels and action runners for each tool (for example, `MergeTool.tsx`, `SplitTool.tsx`, `CompressTool.tsx`, `ProtectTool.tsx`, `SignTool.tsx`, and `ExtractTextTool.tsx`).
    - Code-split into isolated chunks; neither the UI nor their PDF dependencies (`pdf-lib`) are bundled into the initial startup payload.
 
 6. **Centralized Web Worker Processing Service (`src/core/worker/`)**
    - Dispatches heavy PDF processing tasks off the main JavaScript UI thread via a centralized singleton `pdfProcessingService` (`src/core/worker/service.ts`).
    - Dedicated Web Worker thread (`src/core/worker/pdfWorker.ts`) executes `pdf-lib` document manipulations.
    - Zero-copy data transfer utilizing transferable `ArrayBuffer` objects with defensive buffer isolation.
-   - Built-in operation-specific timeout guards (60-second default).
+   - Operation-specific timeout guards (`60s` for `rotate`, `remove-pages`, `text-to-pdf`, `reorder`, `sign`, `protect`, `unlock`; `120s` for `merge` and `split`; `180s` for `compress` and `images-to-pdf`, or a custom `timeoutMs`).
    - Automatic graceful fallback to main-thread execution if Web Workers are unavailable, disabled, or encounter fatal startup errors.
    - Tools leveraging Mozilla PDF.js (`pdf-to-images` and `extract-text`) utilize `pdfjs-dist` and its dedicated worker (`pdf.worker.min.mjs`) rather than `pdf-lib`.
 
@@ -80,21 +79,26 @@ Heavy libraries such as `pdf-lib` (~420 KB) and `pdfjs-dist` (~440 KB + 1.2 MB w
 
 | Bundle Chunk | Content | Loaded When |
 |---|---|---|
-| `index-<hash>.js` (~295 KB) | App Shell, React runtime, Router, Navigation icons | Initial page load |
-| `HomePage-<hash>.js` (~4.6 KB) | Tool discovery grid, categories, search | Home route (`/`) |
-| `ViewerPage-<hash>.js` (~443 KB) | PDF.js canvas renderer, zoom, page thumbnails | Viewer route (`/viewer`) |
-| `pdf.worker.min-<hash>.mjs` (~1.2 MB) | PDF.js parsing web worker | Viewer initialization |
-| `ToolPage-<hash>.js` (~7.5 KB) | File staging area, drag-and-drop, common tool cards | Tool route (`/tool/:toolId`) |
-| `MergeTool-<hash>.js` (~1.1 KB) | Merge options & execution handler | Active tool is `merge` |
-| `RotateTool-<hash>.js` (~1.1 KB) | Rotation degree picker & handler | Active tool is `rotate` |
-| `RemovePagesTool-<hash>.js` (~1.8 KB) | Page range selector & validator | Active tool is `remove-pages` |
-| `SplitTool-<hash>.js` (~1.5 KB) | Split mode & range selection | Active tool is `split` |
-| `ImagesToPdfTool-<hash>.js` (~2.5 KB) | Image reorder, preview lightbox, page setup | Active tool is `images-to-pdf` |
-| `CompressTool-<hash>.js` (~2.2 KB) | Target size input & presets | Active tool is `compress` |
-| `PdfToImagesTool-<hash>.js` (~3.4 KB) | Image format, DPI, quality & ZIP export | Active tool is `pdf-to-images` |
-| `ExtractTextTool-<hash>.js` (~2.1 KB) | Multi-page text preview & TXT download | Active tool is `extract-text` |
-| `core-<hash>.js` (~423 KB) | `pdf-lib` manipulation engine | Any tool executes or loads core |
-| `pdfWorker-<hash>.js` (~426 KB) | Background worker executing operations | Dispatched tool operation |
+| `index-<hash>.js` | App Shell, React runtime, Router, Navigation icons | Initial page load |
+| `HomePage-<hash>.js` | Tool discovery grid, categories, search | Home route (`/`) |
+| `ViewerPage-<hash>.js` | PDF.js canvas renderer, zoom, page thumbnails | Viewer route (`/viewer` on Desktop/Android) |
+| `pdf.worker.min-<hash>.mjs` | PDF.js parsing web worker | Viewer / PDF.js initialization |
+| `ToolPage-<hash>.js` | File staging area, drag-and-drop, common tool cards | Tool route (`/tool/:toolId`) |
+| `ImagesToPdfTool-<hash>.js` | Image reorder, preview lightbox, page setup | Active tool is `images-to-pdf` |
+| `TextToPdfTool-<hash>.js` | Text input/file options & PDF creation | Active tool is `text-to-pdf` |
+| `MergeTool-<hash>.js` | Merge options & execution handler | Active tool is `merge` |
+| `SplitTool-<hash>.js` | Split mode & range selection | Active tool is `split` |
+| `ReorderTool-<hash>.js` | Page order input & reordering handler | Active tool is `reorder` |
+| `RotateTool-<hash>.js` | Rotation degree picker & handler | Active tool is `rotate` |
+| `RemovePagesTool-<hash>.js` | Page range selector & validator | Active tool is `remove-pages` |
+| `CompressTool-<hash>.js` | Target size input & presets | Active tool is `compress` |
+| `ProtectTool-<hash>.js` | Password & permissions encryption options | Active tool is `protect` |
+| `UnlockTool-<hash>.js` | Password decryption options | Active tool is `unlock` |
+| `SignTool-<hash>.js` | Draw / Type / Upload visual signature options | Active tool is `sign` |
+| `PdfToImagesTool-<hash>.js` | Image format, DPI, quality & ZIP export | Active tool is `pdf-to-images` |
+| `ExtractTextTool-<hash>.js` | Multi-page text preview & TXT download | Active tool is `extract-text` |
+| `core-<hash>.js` | `pdf-lib` manipulation engine | Any tool executes or loads core |
+| `pdfWorker-<hash>.js` | Background worker executing operations | Dispatched tool operation |
 
 ---
 
@@ -126,9 +130,9 @@ sequenceDiagram
 
 ### Worker Memory Management & Error Recovery
 - **Defensive Buffer Isolation:** When transferring `ArrayBuffer`s to the worker thread via `postMessage`, the service slices the buffers so only the transferred slice is detached. The caller's original `Uint8Array` in the main thread remains intact and non-neutered, ensuring the user can retry or adjust options, and allowing seamless fallback to main thread.
-- **Runaway Process Termination on Timeout:** If an operation exceeds the 60-second timeout, the request promise is rejected, pending listeners are cleared, and `terminateWorker()` kills the runaway worker thread to prevent CPU starvation and queue blockage.
-- **Worker Initialization & Script Failures:** If `new Worker()` throws or the worker script triggers `worker.onerror`, `service.ts` marks `isWorkerSupported = false`, terminates the failed worker, and routes all current and subsequent requests to `executeOnMainThread`.
-- **Worker Limitations & Transparent State:** Worker execution vs. main-thread fallback is transparent to the UI layer; both present the same `status === 'busy'` / `isProcessing` state. Individual worker operations currently execute to completion without fine-grained progress percentages or per-task cooperative cancel tokens; job cancellation is performed at the worker lifecycle level via `terminateWorker()`.
+- **Runaway Process Termination on Timeout and Cancellation:** Each active request creates a dedicated Web Worker (`new Worker(...)`) that is terminated after completion, failure, timeout, or cancellation. When an operation exceeds its configured timeout (60s for `rotate`, `remove-pages`, `text-to-pdf`, `reorder`, `sign`, `protect`, `unlock`; 120s for `merge` and `split`; 180s for `compress` and `images-to-pdf`; or a custom `timeoutMs`) or is aborted via `ExecuteOptions.signal`, the request settles with `TimeoutError`/`AbortError`, queued requests are removed if still queued, active Web Workers are terminated immediately via `terminateAndDetachWorker()`, and main-thread fallbacks receive the abort signal cooperatively. Calling `terminateWorker()` manually terminates only the active dispatched worker without rejecting pending or queued requests.
+- **Worker Initialization & Script Failures:** If `new Worker()` throws, `worker.onerror` fires, or `onmessageerror` occurs, `service.ts` increments `consecutiveSpawnFailures`; once `consecutiveSpawnFailures >= 3`, it marks `isWorkerSupported = false` and routes subsequent requests to `executeOnMainThread`. Task execution errors inside a worker reject directly without falling back to the main thread.
+- **Worker Limitations & Transparent State:** Worker execution vs. main-thread fallback is transparent to the UI layer; both present the same `status === 'busy'` / `isProcessing` state. Operations dispatched through `pdfProcessingService` do not emit per-step progress percentages, whereas `PdfToImagesTool` and multi-file batch operations (`executeBatchOperation`) report per-page and per-file progress via `ProcessingContext.updateMessage`.
 
 ---
 
@@ -149,15 +153,15 @@ To provide a native-quality feel across target operating systems, InTabPDF uses 
 - **Local Execution:** PDFs are loaded into browser memory buffers. No remote API endpoints or analytics trackers exist.
 - **Content Security Policy (CSP):** Delivered via Cloudflare Pages HTTP response headers in `public/_headers`:
   ```http
-  Content-Security-Policy: default-src 'self' blob:; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';
   ```
   - `'wasm-unsafe-eval'` is required to allow WebAssembly compilation for PDF.js fast-path rendering.
   - `'unsafe-inline'` in `style-src` is required for dynamic canvas positioning and UI component styling.
-  - `connect-src 'self'` prevents outbound network exfiltration while allowing local same-origin asset fetching.
+  - `connect-src 'self' blob:` allows same-origin fetches and local `blob:` URL reads while blocking external network endpoints.
   - `object-src 'none'` prevents plugin embedding exploits.
-- **Permissions-Policy:** Enforces `camera=(), microphone=(), geolocation=(), payment=()`, locking down device sensors in the browser. (Note: The planned Android document scanner will request platform-native permissions on mobile without weakening web policy).
+- **Permissions-Policy:** Enforces `camera=(), microphone=(), geolocation=()`, disabling those browser device APIs.
 - **Zero Third-Party CDNs:** Fonts, icons, and PDF worker scripts are compiled into local production assets.
-- **Verification Status:** Production CSP was verified locally with zero violations and clean runtime console logs via `scripts/test-csp-runtime.mjs`. Live verification on Cloudflare's edge will occur upon production deployment.
+- **Verification:** Production CSP can be verified locally against `dist/` and `public/_headers` via `scripts/test-csp-runtime.mjs`. (Note: in the viewer selection menu, the explicitly user-initiated **Search the web** button opens Google Search in the user's browser with up to 200 characters of selected text; no document data is sent automatically.)
 
 ---
 
@@ -200,4 +204,4 @@ In the desktop application (`platform === 'electron'`), communication between th
   - `onOpenPdf(callback: (file: OpenedFile) => void): () => void`: Subscribes to OS file open events. Backlogs events if the renderer is still initializing; notifies the main process via `renderer-ready`.
   - `onOpenPdfError(callback: (errorData: { name: string; error: string }) => void): () => void`: Receives notification if an OS-opened file cannot be read.
   - `onOpenPdfStart(callback: (startData: { name: string }) => void): () => void`: Receives notice when reading a large file from disk commences.
-  - `openExternalUrl(url: string): void`: Requests the main process to open an external HTTP/HTTPS link in the user's default OS browser (sanitizing protocol to `http:`/`https:` only).
+  - `openExternalUrl(url: string): void`: Requests the main process to open an allowed external URL in the user's default OS browser. `electron/main.cjs` restricts this strictly to `https:` URLs targeting the canonical repository (`https://github.com/intabtools/intabpdf` and subpaths) or Google Search (`https://www.google.com/search` and `https://google.com/search`).

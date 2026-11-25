@@ -11,7 +11,7 @@ All platforms run the same compiled code from `dist/` with zero remote dependenc
 
 ## 1. Platform Detection & Document Attributes
 
-Platform detection is centralized in [src/platform/index.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/index.ts) using `getPlatformType()`:
+Platform detection is centralized in [src/platform/index.ts](../src/platform/index.ts) using `getPlatformType()`:
 
 ```typescript
 export type PlatformType = 'web' | 'electron' | 'android';
@@ -51,7 +51,7 @@ export function getPlatformType(): PlatformType {
 
 ### Document Attributes
 
-[src/components/ShellContainer.tsx](file:///home/ayusman/Desktop/intabpdf/src/components/ShellContainer.tsx) synchronizes attributes on `<div id="root">`:
+[src/components/ShellContainer.tsx](../src/components/ShellContainer.tsx) synchronizes attributes on `<div id="root">`:
 - `data-platform`: `"web"` | `"electron"` | `"android"`
 - `data-shell`: `"web"` | `"app"`
 
@@ -61,7 +61,7 @@ This enables CSS selectors like `[data-platform="android"] .sbg` or `[data-shell
 
 ## 2. Platform-Specific Scrollbar Presentation
 
-InTabPDF implements native-feeling scrolling across all platforms via [src/styles/base.css](file:///home/ayusman/Desktop/intabpdf/src/styles/base.css), [src/styles/web.css](file:///home/ayusman/Desktop/intabpdf/src/styles/web.css), and [src/viewer/viewer.css](file:///home/ayusman/Desktop/intabpdf/src/viewer/viewer.css):
+InTabPDF implements native-feeling scrolling across all platforms via [src/styles/base.css](../src/styles/base.css), [src/styles/web.css](../src/styles/web.css), and [src/viewer/viewer.css](../src/viewer/viewer.css):
 
 ### Android / Mobile (`data-platform="android"`)
 - Persistent scrollbars are completely hidden (`scrollbar-width: none; ::-webkit-scrollbar { display: none }`).
@@ -91,7 +91,7 @@ On mobile (`android`), the navigation drawer follows specific geometry matching 
 
 ## 4. Fullscreen and Distraction-Free Modes
 
-In the embedded PDF viewer ([src/viewer/ViewerPage.tsx](file:///home/ayusman/Desktop/intabpdf/src/viewer/ViewerPage.tsx)), full-screen reading is separated into two dedicated capabilities:
+In the embedded PDF viewer ([src/viewer/ViewerPage.tsx](../src/viewer/ViewerPage.tsx)), full-screen reading is separated into two dedicated capabilities:
 
 1. **Window Fullscreen (`Maximize2` / `Minimize2` button, `F` key):**
    - Invokes standard DOM `document.documentElement.requestFullscreen()` / `exitFullscreen()`.
@@ -109,7 +109,7 @@ In the embedded PDF viewer ([src/viewer/ViewerPage.tsx](file:///home/ayusman/Des
 To best fit the constraints and strengths of each environment, InTabPDF uses tailored viewing mechanisms:
 
 ### Web Browser
-- Instead of running a duplicate PDF.js rendering instance within the browser, the web platform routes viewing directly to a new browser tab via `openPdfInNewTab` ([src/platform/webPdf.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/webPdf.ts)).
+- Instead of running a duplicate PDF.js rendering instance within the browser, the web platform routes viewing directly to a new browser tab via `openPdfInNewTab` ([src/platform/webPdf.ts](../src/platform/webPdf.ts)).
 - Generates a local Blob URL appended with `#filename=${encodeURIComponent(fileName)}` so the browser's native PDF engine receives the file name.
 - Automatically tracks and revokes Blob URLs after 10 minutes or upon tab `beforeunload` to prevent memory leaks.
 - Handles popup blocking gracefully with toast notifications and direct download fallbacks.
@@ -133,18 +133,18 @@ To best fit the constraints and strengths of each environment, InTabPDF uses tai
 
 ## 6. File Saving & Sharing Strategies
 
-File saving across platforms is coordinated through `platform.saveFile()` in [src/platform/index.ts](file:///home/ayusman/Desktop/intabpdf/src/platform/index.ts):
+File saving across platforms is coordinated through `platform.saveFile()` in [src/platform/index.ts](../src/platform/index.ts):
 
 ### Android Mobile (Capacitor)
 - **Chunked Base64 Encoding:** High-resolution or multi-page PDFs can reach tens of megabytes. To prevent memory bottlenecks and call-stack limits, byte streams are encoded using 32 KB chunked buffers (`uint8ArrayToBase64`).
-- **Direct Documents Persistence:** Files are written directly to `Directory.Documents` via the Capacitor Filesystem plugin.
-- **System Share Sheet Integration:** The file is mirrored to `Directory.Cache`, allowing Android's FileProvider to pass a content URI to `@capacitor/share`. Users can immediately save to Google Drive, send via email, or open in another viewer.
-- **Fail-Safe Fallback:** If native file system or sharing operations encounter restrictions, the adapter automatically falls back to an HTML5 anchor download.
+- **Direct Documents Persistence (`src/platform/androidSave.ts`):** Checks for existing filename collisions in `Directory.Documents` (prompting Replace, Rename, or Cancel) and writes files directly to `Directory.Documents` via `@capacitor/filesystem`.
+- **System Share Sheet Integration:** Mirrors the saved file to `Directory.Cache` so Android's FileProvider can pass a content URI to `@capacitor/share`. Users can immediately save to external storage, send via email, or open in another viewer; cache-mirroring or Share sheet errors are logged without aborting the Documents save.
+- **Error Handling:** Native `Directory.Documents` write errors or missing conflict-dialog handlers are thrown to the caller rather than falling back to an HTML5 anchor download.
 
 ### Web Browser & Electron Desktop
 - Generates an in-memory `Blob` matching the file's MIME type.
 - Creates an invisible DOM `<a>` tag with the `download` attribute set to the sanitized filename.
-- Programmatically triggers the download and schedules `URL.revokeObjectURL()` cleanup after 5 seconds to prevent browser memory leaks.
+- Programmatically triggers the download and schedules `URL.revokeObjectURL()` cleanup after 1 second (`1000` ms) to prevent browser memory leaks.
 
 ---
 
@@ -181,7 +181,7 @@ npm run test:e2e
 
 ### Android Asset Synchronization & Engine Guard
 - **Pre-Packaging Verification:** The Android build enforces asset freshness via a custom Gradle task `checkWebAssets` in `android/app/build.gradle`. If `android/app/src/main/assets/public/index.html` is missing or out-of-sync, the Gradle task immediately fails compilation, directing developers to run `npm run sync:android`.
-- **Node.js Compatibility:** Capacitor CLI v7 expects Node >= 22. InTabPDF provides `scripts/cap.cjs` to allow developers on Node 20 LTS to build and synchronize assets without false-positive engine errors.
+- **Node.js Compatibility:** `@capacitor/cli` v8 declares a Node >= 22 engine requirement. InTabPDF provides `scripts/cap.cjs` (`npm run cap`) to allow developers on Node 20 LTS to build and synchronize assets without false-positive engine errors.
 
 ---
 
@@ -201,17 +201,17 @@ The web edition of InTabPDF is deployed as a static client-side application via 
 
 ### HTTP Headers & Content Security Policy (CSP)
 
-Cloudflare Pages enforces security headers via [public/_headers](file:///home/ayusman/Desktop/intabpdf/public/_headers):
+Cloudflare Pages enforces security headers via [public/_headers](../public/_headers):
 - `Content-Security-Policy`: Restricts scripts to `'self'` and `'wasm-unsafe-eval'`; styles to `'self' 'unsafe-inline'`; workers to `'self' blob:`; and explicitly disables plugins (`object-src 'none'`) and frame embedding (`frame-ancestors 'none'`).
-- `Permissions-Policy`: Restricts browser hardware access (`camera=(), microphone=(), geolocation=(), payment=()`).
+- `Permissions-Policy`: Restricts browser hardware access (`camera=(), microphone=(), geolocation=()`).
 - `X-Frame-Options: DENY`
 - `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Referrer-Policy: no-referrer`
 
 ### SPA Routing & Redirects
 
 Because InTabPDF uses HTML5 History API (`BrowserRouter`) on the web platform, direct browser visits or crawler requests to deep URLs (e.g. `/tool/merge` or `/about`) must serve `index.html`.
-The static rewrite rule is managed via [public/_redirects](file:///home/ayusman/Desktop/intabpdf/public/_redirects):
+The static rewrite rule is managed via [public/_redirects](../public/_redirects):
 
 ```
 /* /index.html 200
@@ -227,8 +227,8 @@ Vite automatically copies this file to `dist/_redirects` during `npm run build`.
    Custom domains (e.g. `https://intabpdf.com`) can be configured at any time under **Cloudflare Pages Dashboard → Project Settings → Custom Domains**. Cloudflare manages SSL/TLS certificates and global CDN edge routing automatically.
 3. **Production URL & Sitemap Updates:**
    Once the canonical production domain is assigned:
-   - Update the base URL `<loc>` entries in [public/sitemap.xml](file:///home/ayusman/Desktop/intabpdf/public/sitemap.xml).
-   - Uncomment the `Sitemap:` reference in [public/robots.txt](file:///home/ayusman/Desktop/intabpdf/public/robots.txt).
+   - Update the base URL `<loc>` entries in [public/sitemap.xml](../public/sitemap.xml).
+   - Uncomment the `Sitemap:` reference in [public/robots.txt](../public/robots.txt).
    - Add `<link rel="canonical" href="https://<your-domain>/" />` to `index.html`.
 
 ### Deployment Verification & Troubleshooting
@@ -243,17 +243,13 @@ Vite automatically copies this file to `dist/_redirects` during `npm run build`.
   - *Node Version Warning:* Ensure `NODE_VERSION: 20` is configured in Cloudflare Pages environment variables.
   - *Missing Assets / 404 on Refresh:* Ensure `public/_redirects` is in place with `/* /index.html 200`.
 
-### Implemented Tools vs. Coming Soon Status
+### Available Tools in 2.0.0
 
-The web production deployment includes 8 fully implemented, client-side tools and 5 tools marked "Coming soon":
+All 13 client-side PDF tools are available across Web, Desktop (Electron), and Android:
 
-| Implemented (Live) | Coming Soon (Guarded & Redirects to Home) |
+| Category | Tools |
 |---|---|
-| **Merge** (`/tool/merge`) | **Text to PDF** (`/tool/text-to-pdf`) |
-| **Split** (`/tool/split`) | **Reorder pages** (`/tool/reorder`) |
-| **Compress** (`/tool/compress`) | **Protect** (`/tool/protect`) |
-| **Rotate pages** (`/tool/rotate`) | **Unlock** (`/tool/unlock`) |
-| **Remove pages** (`/tool/remove-pages`) | **Sign** (`/tool/sign`) |
-| **Images to PDF** (`/tool/images-to-pdf`) | |
-| **PDF to images** (`/tool/pdf-to-images`) | |
-| **Extract text** (`/tool/extract-text`) | |
+| **Create** | **Images to PDF** (`/tool/images-to-pdf`), **Text to PDF** (`/tool/text-to-pdf`) |
+| **Organize** | **Merge** (`/tool/merge`), **Split** (`/tool/split`), **Reorder pages** (`/tool/reorder`), **Rotate pages** (`/tool/rotate`), **Remove pages** (`/tool/remove-pages`) |
+| **Shrink and secure** | **Compress** (`/tool/compress`), **Protect** (`/tool/protect`), **Unlock** (`/tool/unlock`) |
+| **Sign and convert** | **Sign** (`/tool/sign`), **PDF to images** (`/tool/pdf-to-images`), **Extract text** (`/tool/extract-text`) |
