@@ -1,6 +1,7 @@
 // Sequential batch PDF compression engine with individual failure isolation and dynamic progress reporting.
-import { createZip, pdfProcessingService } from '../../../core';
-import type { CompressionPreset, ZipEntry } from '../../../core';
+import type { CompressionPreset } from '../../../core/compress';
+import { pdfProcessingService } from '../../../core/worker/service';
+import { createZip, type ZipEntry } from '../../../core/zip';
 import { getCleanBaseName } from '../../filename';
 import type { StagedFile } from '../../types';
 import type { CompressionMode } from './compressConfig';

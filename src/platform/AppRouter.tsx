@@ -9,6 +9,11 @@ interface AppRouterProps {
 export default function AppRouter({ children }: AppRouterProps) {
   // Ensure the desktop and native mobile builds use HashRouter for file/protocol routing resilience
   const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
-  const Router = import.meta.env.MODE === 'desktop' || isNative ? HashRouter : BrowserRouter;
+  const Router =
+    import.meta.env.MODE === 'desktop' ||
+    import.meta.env.MODE === 'android' ||
+    isNative
+      ? HashRouter
+      : BrowserRouter;
   return <Router>{children}</Router>;
 }

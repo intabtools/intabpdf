@@ -235,6 +235,19 @@
   background: var(--accent-soft);
 }
 
+.tc.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.tc:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .tc b {
   display: block;
   font-weight: 600;

@@ -224,7 +224,7 @@ describe('Responsive Validation and Sizing Audit', () => {
     expect(expandedHtml).toContain('Collapse sidebar');
   });
 
-  it('renders Sidebar with full tool labeling and Coming Soon badges', () => {
+  it('renders Sidebar with full tool labeling across all available tools', () => {
     const html = renderToString(
       <MemoryRouter initialEntries={['/']}>
         <ToastProvider>
@@ -234,8 +234,9 @@ describe('Responsive Validation and Sizing Audit', () => {
         </ToastProvider>
       </MemoryRouter>
     );
-    expect(html).toContain('Soon');
     expect(html).toContain('Images to PDF');
     expect(html).toContain('Protect');
+    expect(html).toContain('Unlock');
+    expect(html).toContain('Sign');
   });
 });

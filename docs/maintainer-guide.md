@@ -56,7 +56,7 @@ Look at the most important things first. If privacy or structure has a problem, 
 
 | Rule | Detail |
 |---|---|
-| Checks pass | Lint, build and tests (once CI is set up) |
+| Checks pass | All 4 GitHub Actions checks pass in `.github/workflows/ci.yml`: `lint` (ESLint), `unit-tests` (Vitest), `build` (web and desktop builds), and `e2e` (Playwright workflows) |
 | Approvals | 1 approval is enough. For changes to `core/`, `platform/`, `electron/`, `android/`, `registry.ts`, build config, CI or libraries, please try to get a second maintainer to look, if one is available |
 | Merge type | Squash merge. The final commit message follows `area: description` |
 | Your own PR | Please get another person to review it, except for tiny typo fixes |
@@ -158,22 +158,28 @@ Use [semantic versioning](https://semver.org): `MAJOR.MINOR.PATCH`.
 
 Before releasing:
 
-- [ ] Checks pass on `main`
+- [ ] All CI checks pass on `main` (`.github/workflows/ci.yml`)
+- [ ] Unit tests (`npm test`) and E2E browser tests (`npm run test:e2e`) pass with zero errors
 - [ ] Every tool tried by hand with a normal, a big and a bad file
 - [ ] Network tab check: process a file and confirm **zero** requests are made with user data
-- [ ] CSP is still strict (no new allowed outside domains)
+- [ ] CSP is still strict (no new allowed outside domains in `public/_headers`)
 - [ ] `npm audit` has no serious open issues
 - [ ] Tried in Chrome, Firefox and Safari if possible
-- [ ] Desktop packages built with `npm run dist` and `npm run dist:win`
+- [ ] Desktop packages tested locally (`npm run dist`, `npm run dist:win`, `npm run dist:linux`) or verified via `.github/workflows/release.yml` (Linux: `.AppImage`, `.deb`, `.rpm`, `.tar.gz`; Windows: `.exe`, `.zip`; macOS packaging deferred pending app icons and code signing)
+- [ ] Windows note verified: `package-windows` runs with `CSC_IDENTITY_AUTO_DISCOVERY: 'false'`, so Windows `.exe` and `.zip` installers are not Authenticode code-signed and rely on `SHA256SUMS.txt` and `SHA256SUMS.txt.asc`
 - [ ] Installed on Windows and Linux, and a PDF opened through the operating system (check the file association after install)
-- [ ] Android: APK built, signed with the release key and installed on a real phone (a low-end one if possible)
+- [ ] Android: Web assets synchronized via `npm run sync:android`, verified via Gradle `checkWebAssets` during `npm run android:build`
+- [ ] Android: APK release signing verified (`checkReleaseSigning` in `android/app/build.gradle`) and checked on a real device (a low-end one if possible); note that `.github/workflows/release.yml` builds and signs the production APK after a GitHub Release is published, verifying the pinned production certificate SHA-256 fingerprint via `apksigner` (for pre-release device testing, build locally with the release keystore or use a GitHub pre-release)
 - [ ] Android: a PDF opened from the file manager opens in InTab PDF
+- [ ] Android: `versionName` matches the release version and `versionCode` is a positive integer strictly greater than the previous `vX.Y.Z` tag in `android/app/build.gradle`
 - [ ] Android: no new permissions in the manifest compared with the last release
+- [ ] Required GitHub Actions release secrets configured in repository settings (do not commit values): `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`
 - [ ] Web: Cloudflare Pages deployment built successfully (`npm run build`, output `dist`)
 - [ ] Web: SPA rewrites verified (`/* /index.html 200` in `_redirects`) and `/robots.txt`, `/sitemap.xml`, `/about` load cleanly
 - [ ] Changelog written in simple words
-- [ ] Version bumped with a `release:` commit and tagged
+- [ ] Version bumped in `package.json`, `android/app/build.gradle`, and `src/config/version.ts` (plus `package-lock.json` if dependencies changed) with a `release:` commit and tagged `vX.Y.Z`
 - [ ] Docs updated
+- [ ] GitHub Release published from `vX.Y.Z`, triggering `.github/workflows/release.yml` (`release: types: [published]`) to build the 7 Linux, Windows, and Android installers, generate and check `SHA256SUMS.txt`, detach-sign and verify `SHA256SUMS.txt.asc`, and upload all 9 assets to the release
 
 ## Security and privacy reports
 

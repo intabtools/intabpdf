@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+def releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+def releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+def releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+def releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+def hasReleaseSigning =
+    releaseKeystorePath != null && !releaseKeystorePath.trim().isEmpty() &&
+    releaseKeystorePassword != null && !releaseKeystorePassword.isEmpty() &&
+    releaseKeyAlias != null && !releaseKeyAlias.trim().isEmpty() &&
+    releaseKeyPassword != null && !releaseKeyPassword.isEmpty()
+
 android {
     namespace = "org.intabtools.intabpdf"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +17,8 @@ android {
         applicationId "org.intabtools.intabpdf"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.1.2"
+        versionCode 4
+        versionName "2.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +26,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -43,4 +66,36 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+tasks.register('checkWebAssets') {
+    doLast {
+        def indexFile = file('src/main/assets/public/index.html')
+        if (!indexFile.exists()) {
+            throw new GradleException(
+                "Missing web assets in src/main/assets/public/index.html. " +
+                "Please run 'npm run sync:android' before building the Android project."
+            )
+        }
+    }
+}
+preBuild.dependsOn checkWebAssets
+
+tasks.register('checkReleaseSigning') {
+    doLast {
+        if (!hasReleaseSigning) {
+            throw new GradleException(
+                "Missing Android release signing configuration. Set ANDROID_KEYSTORE_PATH, " +
+                "ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
+            )
+        }
+        if (!file(releaseKeystorePath).exists()) {
+            throw new GradleException("Android release keystore file was not found at ANDROID_KEYSTORE_PATH.")
+        }
+    }
+}
+
+tasks.matching { it.name == 'assembleRelease' || it.name == 'bundleRelease' || it.name == 'packageRelease' }.configureEach {
+    dependsOn checkReleaseSigning
+}
+
 

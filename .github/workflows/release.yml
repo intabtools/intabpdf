@@ -1,0 +1,479 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  package-linux:
+    name: Package Linux Installers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag, versionName, and versionCode
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Release tag '$TAG' must follow vX.Y.Z format."
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PKG_VERSION" != "$VERSION" ]]; then
+            echo "::error::package.json version '$PKG_VERSION' does not match tag version '$VERSION'."
+            exit 1
+          fi
+          GRADLE_VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*/\1/p' android/app/build.gradle | head -n1)"
+          if [[ "$GRADLE_VERSION_NAME" != "$VERSION" ]]; then
+            echo "::error::android/app/build.gradle versionName '$GRADLE_VERSION_NAME' does not match tag version '$VERSION'."
+            exit 1
+          fi
+          CURRENT_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' android/app/build.gradle | head -n1)"
+          if [[ -z "$CURRENT_CODE" || "$CURRENT_CODE" -lt 1 ]]; then
+            echo "::error::android/app/build.gradle versionCode must be a positive integer."
+            exit 1
+          fi
+          PREV_ANDROID_TAG=""
+          while IFS= read -r candidate_tag; do
+            [[ -z "$candidate_tag" ]] && continue
+            if git cat-file -e "${candidate_tag}:android/app/build.gradle" 2>/dev/null; then
+              PREV_ANDROID_TAG="$candidate_tag"
+              break
+            fi
+          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | awk -v cur="$TAG" 'found { print } $0 == cur { found=1 }')
+          if [[ -n "$PREV_ANDROID_TAG" ]]; then
+            PREV_CODE="$(git show "${PREV_ANDROID_TAG}:android/app/build.gradle" | sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' | head -n1)"
+            if [[ -z "$PREV_CODE" ]]; then
+              echo "::error::Could not parse previous Android versionCode from tag $PREV_ANDROID_TAG."
+              exit 1
+            fi
+            if [[ "$CURRENT_CODE" -le "$PREV_CODE" ]]; then
+              echo "::error::Android versionCode ($CURRENT_CODE) must be greater than previous tag $PREV_ANDROID_TAG versionCode ($PREV_CODE)."
+              exit 1
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install RPM packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm xz-utils
+
+      - name: Build Desktop Application
+        run: npm run build:desktop
+
+      - name: Package Linux Targets
+        run: npx electron-builder --linux --publish never
+
+      - name: Verify Linux Installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          for ext in AppImage deb rpm tar.gz; do
+            file="release/installers/intabpdf-${VERSION}.${ext}"
+            if [[ ! -s "$file" ]]; then
+              echo "::error::Expected Linux installer is missing or empty: $file"
+              exit 1
+            fi
+          done
+
+      - name: Upload Linux Installers Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: |
+            release/installers/intabpdf-${{ steps.version.outputs.version }}.AppImage
+            release/installers/intabpdf-${{ steps.version.outputs.version }}.deb
+            release/installers/intabpdf-${{ steps.version.outputs.version }}.rpm
+            release/installers/intabpdf-${{ steps.version.outputs.version }}.tar.gz
+          if-no-files-found: error
+
+  package-windows:
+    name: Package Windows Installers
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag, versionName, and versionCode
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Release tag '$TAG' must follow vX.Y.Z format."
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PKG_VERSION" != "$VERSION" ]]; then
+            echo "::error::package.json version '$PKG_VERSION' does not match tag version '$VERSION'."
+            exit 1
+          fi
+          GRADLE_VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*/\1/p' android/app/build.gradle | head -n1)"
+          if [[ "$GRADLE_VERSION_NAME" != "$VERSION" ]]; then
+            echo "::error::android/app/build.gradle versionName '$GRADLE_VERSION_NAME' does not match tag version '$VERSION'."
+            exit 1
+          fi
+          CURRENT_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' android/app/build.gradle | head -n1)"
+          if [[ -z "$CURRENT_CODE" || "$CURRENT_CODE" -lt 1 ]]; then
+            echo "::error::android/app/build.gradle versionCode must be a positive integer."
+            exit 1
+          fi
+          PREV_ANDROID_TAG=""
+          while IFS= read -r candidate_tag; do
+            [[ -z "$candidate_tag" ]] && continue
+            if git cat-file -e "${candidate_tag}:android/app/build.gradle" 2>/dev/null; then
+              PREV_ANDROID_TAG="$candidate_tag"
+              break
+            fi
+          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | awk -v cur="$TAG" 'found { print } $0 == cur { found=1 }')
+          if [[ -n "$PREV_ANDROID_TAG" ]]; then
+            PREV_CODE="$(git show "${PREV_ANDROID_TAG}:android/app/build.gradle" | sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' | head -n1)"
+            if [[ -z "$PREV_CODE" ]]; then
+              echo "::error::Could not parse previous Android versionCode from tag $PREV_ANDROID_TAG."
+              exit 1
+            fi
+            if [[ "$CURRENT_CODE" -le "$PREV_CODE" ]]; then
+              echo "::error::Android versionCode ($CURRENT_CODE) must be greater than previous tag $PREV_ANDROID_TAG versionCode ($PREV_CODE)."
+              exit 1
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Desktop Application
+        run: npm run build:desktop
+
+      - name: Package Windows Targets
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win --publish never
+
+      - name: Verify Windows Installers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.version.outputs.version }}'
+          foreach ($ext in @('exe', 'zip')) {
+            $file = "release/installers/intabpdf-$version.$ext"
+            if (-not (Test-Path $file) -or ((Get-Item $file).Length -le 0)) {
+              Write-Error "Expected Windows artifact is missing or empty: $file"
+              exit 1
+            }
+          }
+
+      - name: Upload Windows Installers Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            release/installers/intabpdf-${{ steps.version.outputs.version }}.exe
+            release/installers/intabpdf-${{ steps.version.outputs.version }}.zip
+          if-no-files-found: error
+
+  package-android:
+    name: Package Signed Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag, versionName, and versionCode
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Release tag '$TAG' must follow vX.Y.Z format."
+            exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PKG_VERSION" != "$VERSION" ]]; then
+            echo "::error::package.json version '$PKG_VERSION' does not match tag version '$VERSION'."
+            exit 1
+          fi
+          GRADLE_VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]+"([^"]+)".*/\1/p' android/app/build.gradle | head -n1)"
+          if [[ "$GRADLE_VERSION_NAME" != "$VERSION" ]]; then
+            echo "::error::android/app/build.gradle versionName '$GRADLE_VERSION_NAME' does not match tag version '$VERSION'."
+            exit 1
+          fi
+          CURRENT_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' android/app/build.gradle | head -n1)"
+          if [[ -z "$CURRENT_CODE" || "$CURRENT_CODE" -lt 1 ]]; then
+            echo "::error::android/app/build.gradle versionCode must be a positive integer."
+            exit 1
+          fi
+          PREV_ANDROID_TAG=""
+          while IFS= read -r candidate_tag; do
+            [[ -z "$candidate_tag" ]] && continue
+            if git cat-file -e "${candidate_tag}:android/app/build.gradle" 2>/dev/null; then
+              PREV_ANDROID_TAG="$candidate_tag"
+              break
+            fi
+          done < <(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | awk -v cur="$TAG" 'found { print } $0 == cur { found=1 }')
+          if [[ -n "$PREV_ANDROID_TAG" ]]; then
+            PREV_CODE="$(git show "${PREV_ANDROID_TAG}:android/app/build.gradle" | sed -nE 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*/\1/p' | head -n1)"
+            if [[ -z "$PREV_CODE" ]]; then
+              echo "::error::Could not parse previous Android versionCode from tag $PREV_ANDROID_TAG."
+              exit 1
+            fi
+            if [[ "$CURRENT_CODE" -le "$PREV_CODE" ]]; then
+              echo "::error::Android versionCode ($CURRENT_CODE) must be greater than previous tag $PREV_ANDROID_TAG versionCode ($PREV_CODE)."
+              exit 1
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Ensure Android SDK 36 Platform & Build-Tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$SDKMANAGER" ]]; then
+            echo "::error::Android sdkmanager not found on runner."
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Android Web Assets and Sync Capacitor
+        run: npm run sync:android
+
+      - name: Decode Android Release Keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for var in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!var:-}" ]]; then
+              echo "::error::Required Android signing secret '$var' is missing or empty."
+              exit 1
+            fi
+          done
+          KEYSTORE_FILE="${RUNNER_TEMP}/release-keystore.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          if [[ ! -s "$KEYSTORE_FILE" ]]; then
+            echo "::error::Decoded Android keystore file is empty."
+            exit 1
+          fi
+
+      - name: Build Signed Release APK
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Clean Up Temporary Keystore
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${RUNNER_TEMP}/release-keystore.jks"
+
+      - name: Verify APK Signature and Production Certificate Fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          RAW_APK="android/app/build/outputs/apk/release/app-release.apk"
+          UNSIGNED_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          if [[ -f "$UNSIGNED_APK" ]]; then
+            echo "::error::Refusing unsigned APK output: $UNSIGNED_APK"
+            exit 1
+          fi
+          if [[ ! -s "$RAW_APK" ]]; then
+            echo "::error::Signed release APK is missing or empty: $RAW_APK"
+            exit 1
+          fi
+
+          mkdir -p "${RUNNER_TEMP}/android-release"
+          FINAL_APK="${RUNNER_TEMP}/android-release/intabpdf-${VERSION}.apk"
+          cp "$RAW_APK" "$FINAL_APK"
+
+          APKSIGNER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools/36.0.0/apksigner"
+          if [[ ! -x "$APKSIGNER" ]]; then
+            APKSIGNER="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -maxdepth 2 -name apksigner | sort -V | tail -n1)"
+          fi
+          if [[ ! -x "$APKSIGNER" ]]; then
+            echo "::error::apksigner executable not found in Android SDK."
+            exit 1
+          fi
+
+          VERIFY_OUT="$("$APKSIGNER" verify --verbose --print-certs "$FINAL_APK")"
+          echo "$VERIFY_OUT"
+          ACTUAL_SHA256="$(printf '%s\n' "$VERIFY_OUT" | sed -nE 's/.*certificate SHA-256 digest:[[:space:]]*([0-9a-fA-F:]+).*/\1/p' | head -n1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          EXPECTED_SHA256="c83dafca58599a0b9f9dffdb7be7449e5dae2cd2e3af7fd91dc48f6475ae64b7"
+          if [[ -z "$ACTUAL_SHA256" || "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
+            echo "::error::APK signing certificate fingerprint mismatch. Expected $EXPECTED_SHA256, got '$ACTUAL_SHA256'."
+            exit 1
+          fi
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: ${{ runner.temp }}/android-release/intabpdf-${{ steps.version.outputs.version }}.apk
+          if-no-files-found: error
+
+  publish-release:
+    name: Generate Checksums, GPG Sign, and Attach Assets
+    needs: [package-linux, package-windows, package-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate release tag version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::Release tag '$TAG' must follow vX.Y.Z format."
+            exit 1
+          fi
+          echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+
+      - name: Download All Package Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/release-assets
+          merge-multiple: true
+
+      - name: Validate Expected Release Binaries and Generate SHA256SUMS.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          cd "${RUNNER_TEMP}/release-assets"
+          EXPECTED=(
+            "intabpdf-${VERSION}.apk"
+            "intabpdf-${VERSION}.AppImage"
+            "intabpdf-${VERSION}.deb"
+            "intabpdf-${VERSION}.exe"
+            "intabpdf-${VERSION}.rpm"
+            "intabpdf-${VERSION}.tar.gz"
+            "intabpdf-${VERSION}.zip"
+          )
+          for file in "${EXPECTED[@]}"; do
+            if [[ ! -s "$file" ]]; then
+              echo "::error::Missing or empty expected release artifact: $file"
+              exit 1
+            fi
+          done
+          LC_ALL=C sha256sum "${EXPECTED[@]}" > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Import GPG Key, Sign SHA256SUMS.txt, and Verify Signature
+        shell: bash
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GPG_PRIVATE_KEY:-}" || -z "${GPG_PASSPHRASE:-}" ]]; then
+            echo "::error::GPG_PRIVATE_KEY and GPG_PASSPHRASE secrets must both be set."
+            exit 1
+          fi
+          export GNUPGHOME="${RUNNER_TEMP}/gnupg"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          cd "${RUNNER_TEMP}/release-assets"
+          printf '%s' "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --armor --detach-sign --output SHA256SUMS.txt.asc SHA256SUMS.txt
+          gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
+
+      - name: Upload Assets to Existing GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          cd "${RUNNER_TEMP}/release-assets"
+          gh release upload "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber \
+            "intabpdf-${VERSION}.apk" \
+            "intabpdf-${VERSION}.AppImage" \
+            "intabpdf-${VERSION}.deb" \
+            "intabpdf-${VERSION}.exe" \
+            "intabpdf-${VERSION}.rpm" \
+            "intabpdf-${VERSION}.tar.gz" \
+            "intabpdf-${VERSION}.zip" \
+            "SHA256SUMS.txt" \
+            "SHA256SUMS.txt.asc"
+
+      - name: Clean Up Temporary Release Assets and GPG Home
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "${RUNNER_TEMP}/gnupg" "${RUNNER_TEMP}/release-assets"

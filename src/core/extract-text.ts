@@ -1,5 +1,4 @@
 // Pure core operation for extracting text content from PDF documents using PDF.js infrastructure.
-import { destroyPdf, loadPdf } from '../viewer/renderPage';
 import { analyzePdfDocument } from './document-analysis';
 
 export interface ExtractTextOptions {
@@ -88,6 +87,11 @@ export async function extractTextFromPdf(
   if (!pdfBytes || pdfBytes.byteLength === 0) {
     throw new Error('No PDF file provided for text extraction.');
   }
+  if (signal?.aborted) {
+    throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
+  }
+
+  const { destroyPdf, loadPdf } = await import('../viewer/renderPage');
   if (signal?.aborted) {
     throw signal.reason || new DOMException('Operation was aborted.', 'AbortError');
   }

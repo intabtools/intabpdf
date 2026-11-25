@@ -1,6 +1,6 @@
 // Configuration, presets, and metadata for PDF compression modes and targets.
 import { Gauge, Sparkles, Zap } from 'lucide-react';
-import type { CompressionPreset } from '../../../core';
+import type { CompressionPreset } from '../../../core/compress';
 
 export type CompressionMode = 'recommended' | 'smaller' | 'high-quality' | 'target';
 

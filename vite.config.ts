@@ -7,7 +7,7 @@ export default defineConfig(({ command, mode }) => {
   const isBuild = command === 'build';
   return {
     plugins: [react(), tailwindcss()],
-    base: mode === 'desktop' ? './' : '/',
+    base: mode === 'desktop' || mode === 'android' ? './' : '/',
     define: isBuild
       ? {
           'import.meta.env.DEV': 'false',

@@ -1,7 +1,7 @@
 // Sub-component for custom page range input and live validation feedback in SplitTool.
 import type { ReactNode } from 'react';
 import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
-import type { PageRange } from '../../../core';
+import type { PageRange } from '../../../core/split';
 
 export interface SplitRangeInputProps {
   rangeInput: string;
@@ -53,7 +53,7 @@ export default function SplitRangeInput({
           minWidth: 0,
           padding: '8px 12px',
           borderRadius: 'var(--radius-sm)',
-          border: `1px solid ${rangeValidation.error ? '#E81123' : 'var(--border)'}`,
+          border: `1px solid ${rangeValidation.error ? 'var(--danger)' : 'var(--border)'}`,
           background: 'var(--surface-2)',
           color: 'var(--text)',
           fontFamily: 'var(--font-mono)',
@@ -68,7 +68,7 @@ export default function SplitRangeInput({
             display: 'flex',
             gap: '6px',
             alignItems: 'flex-start',
-            color: '#E81123',
+            color: 'var(--danger)',
             fontSize: '12px',
             lineHeight: '1.4',
             width: '100%',

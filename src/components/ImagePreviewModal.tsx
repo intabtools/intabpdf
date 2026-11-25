@@ -172,7 +172,7 @@ function CropDrawer({
           className="cta"
           onClick={handleApply}
           style={{
-            background: 'var(--primary, #3b82f6)',
+            background: 'var(--button)',
             color: '#fff',
             fontSize: '12px',
             padding: '6px 14px',
@@ -365,7 +365,7 @@ export default function ImagePreviewModal({
         <div className="lightbox-title">
           <span className="badge-page">Page {currentIndex + 1} of {files.length}</span>
           <b title={currentFile.name}>{currentFile.name}</b>
-          <small style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px' }}>
+          <small style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', whiteSpace: 'nowrap', flexShrink: 0 }}>
             ({formatBytes(currentFile.size)})
           </small>
           {rotation !== 0 && (
@@ -421,7 +421,7 @@ export default function ImagePreviewModal({
               aria-label="Crop image"
               title="Crop image (C)"
               style={{
-                color: isCropping ? 'var(--primary, #3b82f6)' : '#ffffff',
+                color: isCropping ? 'var(--accent)' : '#ffffff',
                 background: isCropping ? 'rgba(255, 255, 255, 0.15)' : undefined,
                 width: '38px',
                 height: '38px',

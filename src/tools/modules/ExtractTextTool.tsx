@@ -5,7 +5,7 @@ import { FileText } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
 import { ProcessingContext } from '../../components/processingContextDef';
 import type { ToolComponentProps } from '../types';
-import { extractTextFromPdf } from '../../core';
+import { extractTextFromPdf } from '../../core/extract-text';
 import { executeBatchOperation } from '../batchOperation';
 import { getCleanBaseName } from '../filename';
 

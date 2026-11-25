@@ -3,15 +3,16 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileImage, Info } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import SegmentedControl from '../../components/SegmentedControl';
 import type { ToolComponentProps } from '../types';
-import { pdfProcessingService } from '../../core';
 import type {
   ImageFit,
   MarginPreset,
   PageBackground,
   PageOrientation,
   PageSize,
-} from '../../core';
+} from '../../core/images-to-pdf';
+import { pdfProcessingService } from '../../core/worker/service';
 import type { DocumentFilter, NormalizedRect, ProcessImageOptions } from './imagesToPdf/imageFilters';
 
 export default function ImagesToPdfTool({
@@ -240,51 +241,20 @@ export default function ImagesToPdfTool({
           gap: '8px',
         }}
       >
-        <span>
+        <span id="images-page-size-label">
           Page size & layout
           <small>Document paper dimensions</small>
         </span>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '8px',
-            width: '100%',
-          }}
-        >
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setPageSize('a4')}
-            style={{
-              background: pageSize === 'a4' ? 'var(--text)' : 'var(--surface-2)',
-              color: pageSize === 'a4' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '8px 12px',
-              fontSize: '13px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            A4 paper (Standard)
-          </button>
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setPageSize('fit')}
-            style={{
-              background: pageSize === 'fit' ? 'var(--text)' : 'var(--surface-2)',
-              color: pageSize === 'fit' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '8px 12px',
-              fontSize: '13px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            Fit to photo (Natural)
-          </button>
-        </div>
+        <SegmentedControl<PageSize>
+          ariaLabelledBy="images-page-size-label"
+          size="sm"
+          value={pageSize}
+          onChange={setPageSize}
+          options={[
+            { value: 'a4', label: 'A4 paper (Standard)' },
+            { value: 'fit', label: 'Fit to photo (Natural)' },
+          ]}
+        />
       </div>
 
       {/* Orientation Selector (for A4) */}
@@ -298,41 +268,21 @@ export default function ImagesToPdfTool({
             marginTop: '6px',
           }}
         >
-          <span>
+          <span id="images-orientation-label">
             Orientation
             <small>Uniform orientation for all A4 pages</small>
           </span>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gap: '8px',
-              width: '100%',
-            }}
-          >
-            {(['portrait', 'landscape', 'auto'] as const).map((ori) => (
-              <button
-                key={ori}
-                type="button"
-                className="cta"
-                onClick={() => setOrientation(ori)}
-                style={{
-                  background:
-                    orientation === ori ? 'var(--text)' : 'var(--surface-2)',
-                  color:
-                    orientation === ori ? 'var(--background)' : 'var(--text)',
-                  border: '1px solid var(--border)',
-                  padding: '6px 10px',
-                  fontSize: '12px',
-                  textTransform: 'capitalize',
-                  fontWeight: 500,
-                  justifyContent: 'center',
-                }}
-              >
-                {ori === 'auto' ? `Auto (${resolvedAutoOrientation})` : ori}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl<PageOrientation>
+            ariaLabelledBy="images-orientation-label"
+            size="sm"
+            value={orientation}
+            onChange={setOrientation}
+            options={[
+              { value: 'portrait', label: 'Portrait' },
+              { value: 'landscape', label: 'Landscape' },
+              { value: 'auto', label: `Auto (${resolvedAutoOrientation})` },
+            ]}
+          />
         </div>
       )}
 
@@ -346,51 +296,20 @@ export default function ImagesToPdfTool({
           marginTop: '6px',
         }}
       >
-        <span>
+        <span id="images-fit-label">
           Image fit
           <small>How images scale to the page boundaries</small>
         </span>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '8px',
-            width: '100%',
-          }}
-        >
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setImageFit('contain')}
-            style={{
-              background: imageFit === 'contain' ? 'var(--text)' : 'var(--surface-2)',
-              color: imageFit === 'contain' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '6px 10px',
-              fontSize: '12px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            Contain (Full photo)
-          </button>
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setImageFit('cover')}
-            style={{
-              background: imageFit === 'cover' ? 'var(--text)' : 'var(--surface-2)',
-              color: imageFit === 'cover' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '6px 10px',
-              fontSize: '12px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            Cover (Fill page)
-          </button>
-        </div>
+        <SegmentedControl<ImageFit>
+          ariaLabelledBy="images-fit-label"
+          size="sm"
+          value={imageFit}
+          onChange={setImageFit}
+          options={[
+            { value: 'contain', label: 'Contain (Full photo)' },
+            { value: 'cover', label: 'Cover (Fill page)' },
+          ]}
+        />
       </div>
 
       {/* Page Background (active in Contain mode) */}
@@ -404,59 +323,20 @@ export default function ImagesToPdfTool({
             marginTop: '6px',
           }}
         >
-          <span>
+          <span id="images-bg-label">
             Page background
             <small>Color for margins and unused space</small>
           </span>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '8px',
-              width: '100%',
-            }}
-          >
-            <button
-              type="button"
-              className="cta"
-              onClick={() => setBackgroundColor('white')}
-              style={{
-                background:
-                  backgroundColor === 'white' ? 'var(--text)' : 'var(--surface-2)',
-                color:
-                  backgroundColor === 'white'
-                    ? 'var(--background)'
-                    : 'var(--text)',
-                border: '1px solid var(--border)',
-                padding: '6px 10px',
-                fontSize: '12px',
-                fontWeight: 500,
-                justifyContent: 'center',
-              }}
-            >
-              White
-            </button>
-            <button
-              type="button"
-              className="cta"
-              onClick={() => setBackgroundColor('black')}
-              style={{
-                background:
-                  backgroundColor === 'black' ? 'var(--text)' : 'var(--surface-2)',
-                color:
-                  backgroundColor === 'black'
-                    ? 'var(--background)'
-                    : 'var(--text)',
-                border: '1px solid var(--border)',
-                padding: '6px 10px',
-                fontSize: '12px',
-                fontWeight: 500,
-                justifyContent: 'center',
-              }}
-            >
-              Black
-            </button>
-          </div>
+          <SegmentedControl<PageBackground>
+            ariaLabelledBy="images-bg-label"
+            size="sm"
+            value={backgroundColor}
+            onChange={setBackgroundColor}
+            options={[
+              { value: 'white', label: 'White' },
+              { value: 'black', label: 'Black' },
+            ]}
+          />
         </div>
       )}
 
@@ -470,39 +350,21 @@ export default function ImagesToPdfTool({
           marginTop: '6px',
         }}
       >
-        <span>
+        <span id="images-margins-label">
           Page margins
           <small>Padding around each photo</small>
         </span>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '8px',
-            width: '100%',
-          }}
-        >
-          {(['none', 'small', 'standard'] as const).map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className="cta"
-              onClick={() => setMargin(preset)}
-              style={{
-                background: margin === preset ? 'var(--text)' : 'var(--surface-2)',
-                color: margin === preset ? 'var(--background)' : 'var(--text)',
-                border: '1px solid var(--border)',
-                padding: '6px 10px',
-                fontSize: '12px',
-                textTransform: 'capitalize',
-                fontWeight: 500,
-                justifyContent: 'center',
-              }}
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<MarginPreset>
+          ariaLabelledBy="images-margins-label"
+          size="sm"
+          value={margin}
+          onChange={setMargin}
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'small', label: 'Small' },
+            { value: 'standard', label: 'Standard' },
+          ]}
+        />
       </div>
 
       {/* Document Filters */}
@@ -515,71 +377,21 @@ export default function ImagesToPdfTool({
           marginTop: '6px',
         }}
       >
-        <span>
+        <span id="images-filter-label">
           Document filter
           <small>Enhance readability for notes, receipts, and scans</small>
         </span>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '8px',
-            width: '100%',
-          }}
-        >
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setFilter('none')}
-            style={{
-              background: filter === 'none' ? 'var(--text)' : 'var(--surface-2)',
-              color: filter === 'none' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '6px 8px',
-              fontSize: '12px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            Original color
-          </button>
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setFilter('grayscale')}
-            style={{
-              background:
-                filter === 'grayscale' ? 'var(--text)' : 'var(--surface-2)',
-              color:
-                filter === 'grayscale' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '6px 8px',
-              fontSize: '12px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            Grayscale
-          </button>
-          <button
-            type="button"
-            className="cta"
-            onClick={() => setFilter('clean-bw')}
-            style={{
-              background:
-                filter === 'clean-bw' ? 'var(--text)' : 'var(--surface-2)',
-              color:
-                filter === 'clean-bw' ? 'var(--background)' : 'var(--text)',
-              border: '1px solid var(--border)',
-              padding: '6px 8px',
-              fontSize: '12px',
-              fontWeight: 500,
-              justifyContent: 'center',
-            }}
-          >
-            Clean B&W
-          </button>
-        </div>
+        <SegmentedControl<DocumentFilter>
+          ariaLabelledBy="images-filter-label"
+          size="sm"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'none', label: 'Original color' },
+            { value: 'grayscale', label: 'Grayscale' },
+            { value: 'clean-bw', label: 'Clean B&W' },
+          ]}
+        />
       </div>
 
       {/* Page Numbers Switch */}

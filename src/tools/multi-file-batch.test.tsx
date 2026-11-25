@@ -306,14 +306,40 @@ describe('Phase 1: Multi-File Batch Integrity & Disconnected Options', () => {
       expect(rejected).toBe(0);
     });
 
-    it('validateFileSelectionCount accepts multiple files when multiple=true', () => {
-      let rejected = 0;
-      const isAccepted = validateFileSelectionCount(5, true, (count) => {
-        rejected = count;
-      });
 
-      expect(isAccepted).toBe(true);
-      expect(rejected).toBe(0);
+
+    it('enforces single-file handling on Protect, Unlock, Sign, Reorder, Remove Pages, and Split', () => {
+      const singleFileToolIds = ['protect', 'unlock', 'sign', 'reorder', 'remove-pages', 'split'];
+      singleFileToolIds.forEach((id) => {
+        const tool = getToolById(id)!;
+        expect(tool).toBeDefined();
+        expect(tool.multipleFiles).toBe(false);
+
+        // Verify DropZone for single file rejects multiple files
+        let rejectionCount = 0;
+        const accepted = validateFileSelectionCount(2, tool.multipleFiles, (count) => {
+          rejectionCount = count;
+        });
+        expect(accepted).toBe(false);
+        expect(rejectionCount).toBe(2);
+      });
+    });
+
+    it('enforces multi-file capability on Merge, Images to PDF, Compress, Rotate, PDF to Images, and Extract Text', () => {
+      const multiFileToolIds = ['merge', 'images-to-pdf', 'compress', 'rotate', 'pdf-to-images', 'extract-text'];
+      multiFileToolIds.forEach((id) => {
+        const tool = getToolById(id)!;
+        expect(tool).toBeDefined();
+        expect(tool.multipleFiles).toBe(true);
+
+        // Verify DropZone accepts multiple files
+        let rejectionCount = 0;
+        const accepted = validateFileSelectionCount(3, tool.multipleFiles, (count) => {
+          rejectionCount = count;
+        });
+        expect(accepted).toBe(true);
+        expect(rejectionCount).toBe(0);
+      });
     });
 
     it('Split tool definition does not expose the disconnected "Keep bookmarks" option', () => {

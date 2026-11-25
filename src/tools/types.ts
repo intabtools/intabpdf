@@ -58,6 +58,7 @@ export interface ToolDefinition {
   actionVerb: string;
   noun: string;
   outputName: string;
+  multipleFiles: boolean;
   options: ToolOption[];
   availability: ToolAvailability;
   /**

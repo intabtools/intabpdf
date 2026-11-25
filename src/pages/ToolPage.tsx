@@ -29,6 +29,7 @@ import { useFileReorder } from './tool/useFileReorder';
 function getOperationMessage(toolId: string, count = 1): string {
   switch (toolId) {
     case 'images-to-pdf':
+    case 'text-to-pdf':
       return 'Creating PDF…';
     case 'compress':
       return count > 1 ? `Compressing ${count} PDFs…` : 'Compressing PDF…';
@@ -60,7 +61,8 @@ export default function ToolPage(): ReactNode {
 
   const tool = getToolById(toolId || '');
   const isImplemented = tool ? isToolImplemented(tool.id) : false;
-  const isSingleFileTool = tool?.id === 'remove-pages' || tool?.id === 'split';
+  const isSingleFileTool = tool ? !tool.multipleFiles : false;
+  const isDirectInputTool = tool?.id === 'text-to-pdf';
 
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [optionsState, setOptionsState] = useState<Record<string, boolean>>(() => {
@@ -344,7 +346,7 @@ export default function ToolPage(): ReactNode {
         />
       )}
 
-      {status === 'idle' && stagedFiles.length === 0 && (
+      {status === 'idle' && stagedFiles.length === 0 && !isDirectInputTool && (
         <DropZone
           title={tool.name}
           subtitle={tool.description}
@@ -358,43 +360,45 @@ export default function ToolPage(): ReactNode {
         />
       )}
 
-      {status !== 'done' && stagedFiles.length > 0 && (
+      {status !== 'done' && (stagedFiles.length > 0 || isDirectInputTool) && (
         <div className="tp">
-          <div style={{ minWidth: 0, maxWidth: '100%', width: '100%' }}>
-            <StagedFileList
-              toolId={tool.id}
-              stagedFiles={stagedFiles}
-              draggedIndex={draggedIndex}
-              dragOver={dragOver}
-              imageEdits={imageEdits}
-              onRotateFile={tool.fileType === 'img' ? handleRotateImage : undefined}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
-              onTouchStartGrip={handleTouchStartGrip}
-              onTouchMoveGrip={handleTouchMoveGrip}
-              onTouchEndGrip={handleTouchEndGrip}
-              onGripKeyDown={handleGripKeyDown}
-              onPreviewImage={setPreviewIndex}
-              onMoveFile={handleMoveFile}
-              onRemoveFile={handleRemoveFile}
-            />
-
-            {!isSingleFileTool && (
-              <DropZone
-                title="Add more files"
-                subtitle="Choose additional files"
-                ctaText="Add"
-                multiple={true}
-                accept={acceptTypes}
-                onFilesSelectedStart={handleFilesSelectedStart}
-                onFilesSelected={handleFilesAdded}
-                className="add"
+          {stagedFiles.length > 0 && !isDirectInputTool && (
+            <div style={{ minWidth: 0, maxWidth: '100%', width: '100%' }}>
+              <StagedFileList
+                toolId={tool.id}
+                stagedFiles={stagedFiles}
+                draggedIndex={draggedIndex}
+                dragOver={dragOver}
+                imageEdits={imageEdits}
+                onRotateFile={tool.fileType === 'img' ? handleRotateImage : undefined}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                onTouchStartGrip={handleTouchStartGrip}
+                onTouchMoveGrip={handleTouchMoveGrip}
+                onTouchEndGrip={handleTouchEndGrip}
+                onGripKeyDown={handleGripKeyDown}
+                onPreviewImage={setPreviewIndex}
+                onMoveFile={handleMoveFile}
+                onRemoveFile={handleRemoveFile}
               />
-            )}
-          </div>
+
+              {!isSingleFileTool && (
+                <DropZone
+                  title="Add more files"
+                  subtitle="Choose additional files"
+                  ctaText="Add"
+                  multiple={true}
+                  accept={acceptTypes}
+                  onFilesSelectedStart={handleFilesSelectedStart}
+                  onFilesSelected={handleFilesAdded}
+                  className="add"
+                />
+              )}
+            </div>
+          )}
 
           <Suspense fallback={<div className="card opts"><div className="spin" /></div>}>
             {ToolComponent &&

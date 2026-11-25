@@ -50,7 +50,8 @@ export interface ToolDefinition {
   actionVerb: string;
   noun: string;
   outputName: string;
-  options: ToolOptionDefinition[];
+  multipleFiles: boolean;
+  options: ToolOption[];
   availability: ToolAvailability;
   /** Lazy loader returning the tool module component */
   component?: () => Promise<{ default: ComponentType<ToolComponentProps> }>;
@@ -66,7 +67,7 @@ export interface ToolComponentProps {
   optionsState: Record<string, boolean>;
   onOptionsChange: (options: Record<string, boolean>) => void;
   /** Executes the async PDF runner via pdfProcessingService */
-  onExecute: (runner: () => Promise<Uint8Array>) => Promise<void>;
+  onExecute: (runner: (signal: AbortSignal) => Promise<Uint8Array>) => Promise<void>;
   isProcessing: boolean;
   extraState?: Record<string, unknown>;
   onExtraStateChange?: (key: string, value: unknown) => void;
@@ -96,56 +97,58 @@ Dispatches compute-intensive PDF operations to a dedicated Web Worker with zero-
 
 ### Types & Payloads
 ```typescript
-export type PdfOperation = 'merge' | 'rotate' | 'remove-pages' | 'split' | 'images-to-pdf' | 'compress';
+export type PdfOperation =
+  | 'merge'
+  | 'rotate'
+  | 'remove-pages'
+  | 'split'
+  | 'images-to-pdf'
+  | 'compress'
+  | 'text-to-pdf'
+  | 'reorder'
+  | 'sign'
+  | 'protect'
+  | 'unlock';
 
 export interface OperationPayloads {
-  merge: {
-    buffers: Uint8Array[];
-  };
-  rotate: {
-    buffer: Uint8Array;
-    options?: {
-      clockwise?: boolean;
-      allPages?: boolean;
-      pageIndices?: number[];
-    };
-  };
-  'remove-pages': {
-    buffer: Uint8Array;
-    pageIndices: number[];
-  };
-  split: {
-    buffer: Uint8Array;
-    ranges: PageRange[];
-    splitOptions?: SplitOptions;
-  };
-  'images-to-pdf': {
-    images: InputImage[];
-    options?: ImagesToPdfOptions;
-  };
-  compress: {
-    buffer: Uint8Array;
-    options?: CompressOptions;
-  };
+  merge: { buffers: Uint8Array[]; options?: MergeOptions };
+  rotate: { buffer: Uint8Array; options?: RotateOptions };
+  'remove-pages': { buffer: Uint8Array; pageIndices: number[] };
+  split: { buffer: Uint8Array; ranges: PageRange[]; splitOptions?: SplitOptions };
+  'images-to-pdf': { images: InputImage[]; options?: ImagesToPdfOptions };
+  compress: { buffer: Uint8Array; options?: CompressOptions };
+  'text-to-pdf': { text: string; options?: TextToPdfOptions };
+  reorder: { buffer: Uint8Array; pageOrder: number[]; options?: ReorderOptions };
+  sign: { buffer: Uint8Array; signatureBytes: Uint8Array; options?: SignOptions };
+  protect: { buffer: Uint8Array; options: ProtectPdfOptions };
+  unlock: { buffer: Uint8Array; options: UnlockPdfOptions };
+}
+
+export interface ExecuteOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
 }
 ```
 
 ### `pdfProcessingService` Singleton
 ```typescript
 class PdfProcessingService {
+  /** Returns default timeout (60s, 120s, or 180s depending on operation) */
+  public getDefaultTimeout(op: PdfOperation): number;
+
   /**
    * Executes a PDF operation asynchronously.
    * Transfers ArrayBuffers for zero-copy memory dispatch.
    * Falls back to main-thread processing if Worker is unsupported or fails.
-   * Rejects if operation exceeds timeoutMs (default 60,000ms).
+   * Rejects if aborted via signal or if operation exceeds timeoutMs.
    */
   public execute<T extends PdfOperation>(
     operation: T,
     payload: OperationPayloads[T],
-    timeoutMs?: number
+    optionsOrTimeout?: ExecuteOptions | number
   ): Promise<Uint8Array>;
 
-  /** Terminates the active worker thread and rejects pending requests */
+  /** Detaches and terminates the active dispatched worker thread without independently rejecting pending or queued requests */
   public terminateWorker(): void;
 }
 
@@ -153,36 +156,30 @@ export const pdfProcessingService: PdfProcessingService;
 ```
 
 > [!IMPORTANT]
-> **Worker Limitations:** Individual worker operations currently run atomically to completion without per-task progress percentages or mid-operation cooperative cancellation tokens. Cancellation is performed at the worker lifecycle level via `terminateWorker()`.
+> **Cancellation & Progress:** Passing `signal` in `ExecuteOptions` cancels queued requests, active Web Worker tasks (immediately terminating the dispatched worker and settling with `AbortError`), and cooperative main-thread fallbacks. Calling `terminateWorker()` directly only terminates the active dispatched worker thread. `pdfProcessingService` does not emit per-step progress percentages; `PdfToImagesTool` and multi-file batch operations (`executeBatchOperation`) report per-page and per-file progress via `ProcessingContext.updateMessage`.
 
 ---
 
 ## 4. Shell Context (`src/components/shellContextDef.ts`, `src/hooks/useShell.ts`)
 
-Controls application chrome layout, mobile drawer state, search command palette, and full-screen reading mode.
+Controls shell presentation mode and distraction-free layout visibility.
 
 ```typescript
-export interface ShellContextValue {
-  shell: 'web' | 'app';
-  platform: 'web' | 'electron' | 'android';
-  theme: 'light' | 'dark';
-  setTheme: (theme: 'light' | 'dark') => void;
-  drawerOpen: boolean;
-  toggleDrawer: () => void;
-  closeDrawer: () => void;
-  commandPaletteOpen: boolean;
-  openCommandPalette: () => void;
-  closeCommandPalette: () => void;
+export type ShellMode = 'web' | 'app';
+
+export interface ShellContextType {
+  shell: ShellMode;
+  setShell: (mode: ShellMode) => void;
   showAppLayout: boolean;
-  setShowAppLayout: (show: boolean) => void;
+  setShowAppLayout: (show: boolean | ((prev: boolean) => boolean)) => void;
 }
 
-export function useShell(): ShellContextValue;
+export function useShell(): ShellContextType;
 ```
 
 ---
 
-## 5. Platform Adapters (`src/platform/types.ts`)
+## 5. Platform Adapters (`src/platform/types.ts`, `src/platform/electron.ts`)
 
 Standard interface across Web, Electron desktop, and Capacitor Android.
 
@@ -192,10 +189,44 @@ export interface OpenedFile {
   bytes: Uint8Array;
 }
 
+export interface SaveFileResult {
+  saved: boolean;
+  fileName?: string;
+}
+
 export interface PlatformAdapter {
-  pickPdfFile(): Promise<OpenedFile | null>;
+  hasPendingFile?(): boolean;
+  clearPendingFile?(): void;
+  pickPdfFile(onStart?: (fileName: string) => void): Promise<OpenedFile | null>;
   onFileOpened(handler: (file: OpenedFile) => void): () => void;
-  saveFile?(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<void>;
+  onFileOpenStart?(handler: (fileName: string) => void): () => void;
+  onFileOpenError?(handler: (error: string) => void): () => void;
+  saveFile?(bytes: Uint8Array, fileName: string, mimeType?: string): Promise<SaveFileResult | void>;
+}
+```
+
+### Desktop & Mobile Bridge Extensions (`window.intab`, `window.NativeIntent`)
+
+```typescript
+declare global {
+  interface Window {
+    /** Electron preload IPC bridge */
+    intab?: {
+      hasPendingPdf?(): boolean;
+      clearPendingPdf?(): void;
+      onOpenPdf(callback: (file: OpenedFile) => void): () => void;
+      onOpenPdfError?(callback: (errorData: { name: string; error: string }) => void): () => void;
+      onOpenPdfStart?(callback: (startData: { name: string }) => void): () => void;
+      openExternalUrl?(url: string): void;
+    };
+    /** Android Capacitor native intent bridge */
+    NativeIntent?: {
+      hasPendingPdf?(): boolean;
+      getPendingPdf?(): string;
+      clearPendingPdf?(): void;
+      resolveNativePdf?(uri: string): string;
+    };
+  }
 }
 ```
 
@@ -215,20 +246,21 @@ export function getDefaultOutputBaseName(
 
 export function getOutputExtension(
   toolId: string,
-  outputName?: string
-): '.pdf' | '.zip';
+  outputName?: string,
+  stagedCount?: number
+): '.pdf' | '.zip' | '.txt' | string;
 
 export function sanitizeOutputFileName(
   input: string,
   fallbackBaseName: string,
-  extension?: '.pdf' | '.zip'
+  extension?: '.pdf' | '.zip' | '.txt' | string
 ): string;
 ```
 
 ### Sanitization & Safety Guarantees
-- Automatically strips duplicate `.pdf` or `.zip` extensions typed by users.
+- Automatically strips duplicate `.pdf`, `.zip`, or `.txt` extensions typed by users.
 - Replaces filesystem-illegal characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, control chars) with `-`.
 - Collapses consecutive dashes and removes leading/trailing dots or dashes.
 - Appends `-file` to Windows reserved names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
-- Locks output extension to the correct format (`.pdf` or `.zip`).
+- Locks output extension to the correct format (`.pdf`, `.zip`, `.txt`, or single-page image extension).
 - Falls back safely to default operation base names if user input is empty or invalid.

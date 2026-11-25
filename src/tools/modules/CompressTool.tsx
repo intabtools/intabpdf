@@ -3,11 +3,13 @@ import { useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FileDown, Gauge, Info, Sparkles, Target, Zap } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import { ProcessingContext } from '../../components/processingContextDef';
 import type { ToolComponentProps } from '../types';
-import { analyzePdfDocument, pdfProcessingService } from '../../core';
-import type { CompressionPreset } from '../../core';
+import type { CompressionPreset } from '../../core/compress';
+import { analyzePdfDocument } from '../../core/document-analysis';
 import { formatBytes } from '../../core/formatBytes';
+import { pdfProcessingService } from '../../core/worker/service';
 import {
   PRESET_CARDS,
   type CompressionMode,
@@ -216,29 +218,16 @@ export default function CompressTool({
       </div>
 
       {showSignatureWarning && (
-        <div
+        <NoticeBanner
+          variant="warning"
           role="alert"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'rgba(216, 59, 1, 0.08)',
-            border: '1px solid rgba(216, 59, 1, 0.3)',
-            color: 'var(--accent, #d83b01)',
-            fontSize: '12px',
-            marginBottom: '10px',
-            minWidth: 0,
-            maxWidth: '100%',
-            boxSizing: 'border-box',
-          }}
+          icon={<Info size={16} />}
+          style={{ marginBottom: '10px' }}
         >
-          <Info size={16} style={{ flexShrink: 0 }} />
-          <span style={{ minWidth: 0, wordBreak: 'break-word' }}>
+          <span>
             <strong>Notice:</strong> This document contains digital signatures. Compressing or modifying it will invalidate cryptographic signature seals.
           </span>
-        </div>
+        </NoticeBanner>
       )}
 
       {/* Preset & Mode Selection */}

@@ -27,110 +27,126 @@ Still confused? Put it inside your own tool folder and ask in your PR. We can mo
 
 ```
 intabpdf/
-├── public/              Static files served as they are
+├── public/              Static files served as they are (_headers, _redirects, sitemap.xml, robots.txt, favicon.svg, icons.svg, sample.pdf)
 ├── src/
-│   ├── core/            PDF logic (bytes in, bytes out)
-│   ├── platform/        Per-platform adapter
-│   ├── tools/           One folder per tool
-│   │   ├── merge/       (example, added with the first tool)
-│   │   ├── split/       (example)
-│   │   ├── registry.ts  The one list of tools
-│   │   └── types.ts     ToolDefinition and worker message types
-│   ├── viewer/          The PDF viewer screen (not a tool)
-│   ├── pages/           Screens that are not tools (Home, Donate, About)
-│   ├── components/      Shared UI
-│   ├── hooks/           Shared React hooks (later)
-│   ├── styles/          Global CSS and theme variables (tokens.css, base.css)
-│   ├── assets/          Images and fonts imported by code
-│   ├── App.tsx          Router
-│   └── main.tsx         Entry point
-├── electron/            Desktop app shell (main process and preload)
-├── android/             Android app shell (Capacitor)
+│   ├── core/            Pure PDF, text, and ZIP logic (bytes in, bytes out)
+│   │   ├── worker/      Centralized PDF worker service and worker thread
+│   │   ├── merge.ts, split.ts, reorder.ts, rotate.ts, remove-pages.ts, compress.ts, protect.ts, unlock.ts, sign.ts, images-to-pdf.ts, text-to-pdf.ts, extract-text.ts, zip.ts
+│   │   └── index.ts     Core operations export
+│   ├── platform/        Per-platform adapters (web, electron, android, androidSave)
+│   ├── tools/           Tools domain
+│   │   ├── modules/     Tool UI modules and tool-specific helper subfolders (`compress/`, `imagesToPdf/`, `pdfToImages/`, `split/`)
+│   │   ├── registry.ts  Tool discovery and queries
+│   │   ├── toolDefinitions.ts Authoritative tool metadata and options
+│   │   ├── batchOperation.ts Multi-file batch ZIP runner with progress updates
+│   │   ├── filename.ts  Output filename sanitization
+│   │   └── types.ts     ToolDefinition, WorkerRequest, WorkerResponse, and component prop types
+│   ├── viewer/          Embedded PDF viewer screen (Electron and Android)
+│   ├── pages/           Screens (HomePage, AboutPage, ToolPage, and `tool/` subcomponents)
+│   ├── components/      Shared UI (DropZone, ShellContainer, ModalDialog, SegmentedControl, NoticeBanner, PasswordInput, etc.)
+│   ├── hooks/           Shared React hooks (useShell, useProcessing, useToast, useViewer)
+│   ├── config/          Screen configuration (`screens.ts`) and release version constant (`version.ts`)
+│   ├── styles/          Global CSS and theme variables (tokens.css, base.css, web.css)
+│   ├── assets/          Reserved static asset directory (currently empty)
+│   ├── App.tsx          Root application component
+│   └── main.tsx         Browser entry point
+├── electron/            Desktop app shell (main.cjs and preload.cjs)
+├── android/             Android app shell (Capacitor project with Gradle guards)
+├── e2e/                 Playwright end-to-end test suites, fixtures, and harnesses
+├── scripts/             Build and verification scripts (cap.cjs, test-csp-runtime.mjs)
+├── .github/workflows/   GitHub Actions workflows (ci.yml, release.yml)
 └── docs/                These documents
 ```
 
-> **Note:** `core/`, `platform/`, `components/`, `pages/`, `assets/` and `styles/` already exist in the repo. `viewer/` is added with the first release (the PDF viewer). `tools/` and `hooks/` are added with the first tool. The old `src/workers/` folder is **not** part of the plan: each tool keeps its own worker inside its tool folder (see [Architecture](architecture.md#web-workers)). Starter files from the Vite template, like `src/App.css`, are removed when the first tool is built.
+> **Note:** Heavy PDF manipulation runs in background threads via `src/core/worker/` with zero-copy transferable buffers and automatic fallback. Tools are implemented as independent UI modules in `src/tools/modules/` (with PDF.js canvas rasterization for `pdf-to-images` in `src/tools/modules/pdfToImages/`) and registered in `src/tools/toolDefinitions.ts`.
 
 ## Folder by folder
 
 ### `src/core/`
 
-- **Purpose:** All PDF logic, like merge, split, rotate and compress.
-- **Keep here:** Pure functions (bytes in, bytes out), their types, small helpers, tests and tiny test PDFs.
+- **Purpose:** Pure PDF, text extraction, and ZIP byte operations (`merge`, `split`, `reorder`, `rotate`, `remove-pages`, `compress`, `protect`, `unlock`, `sign`, `images-to-pdf`, `text-to-pdf`, `extract-text`, `zip`).
+- **Keep here:** Pure functions (bytes in, bytes out), worker dispatch service in `worker/`, and unit tests.
 - **Avoid:** React, `document` or `window`, Electron or Capacitor imports, file paths, UI text.
 
 ### `src/platform/`
 
-- **Purpose:** One interface for things that differ per platform: pick files, save files, share.
-- **Keep here:** The interface, one version each for web, Electron and Capacitor, and the code that detects where the app runs.
-- **Avoid:** PDF logic, tool-specific code, UI.
+- **Purpose:** Standardized interface for platform differences: picking files, saving files, sharing, and OS-level file opening.
+- **Keep here:** The interface, adapters for Web, Electron bridge (`window.intab`), and Capacitor Android (`window.NativeIntent`, `androidSave.ts`).
+- **Avoid:** PDF manipulation logic, tool-specific code, UI styling.
 
 ### `src/tools/`
 
-- **Purpose:** Everything for PDF tools, organized to keep tools modular and independent.
-- **Keep here:** Tool UI modules in `src/tools/modules/<ToolName>.tsx` (e.g. `MergeTool.tsx`, `RotateTool.tsx`), `registry.ts` (the central list of tools), `types.ts` (shared tool definitions and component props), and utility modules like `filename.ts` and `reorder.ts`.
-- **Avoid:** PDF byte manipulation logic (it goes to `core`), imports from another tool, platform checks.
+- **Purpose:** Everything for PDF tool options, presentation, and tool-specific DOM/canvas helpers.
+- **Keep here:** Tool UI modules in `src/tools/modules/<ToolName>.tsx`, tool-specific helper directories (`compress/`, `imagesToPdf/`, `pdfToImages/`, `split/`), `toolDefinitions.ts` (metadata), `registry.ts` (discovery queries), `batchOperation.ts`, `filename.ts`, and `types.ts`.
+- **Avoid:** Pure `src/core/` PDF byte manipulation logic (keep it in `core`), direct imports between tools, platform checks.
 
 ### `src/viewer/`
 
-- **Purpose:** The PDF viewer screen: open one PDF, look at it, move between pages, zoom. It is a screen, not a tool, so it is not in the registry (see [decision 014](decisions.md)).
-- **Keep here:** `ViewerPage.tsx`, the plain code that draws pages with `pdfjs-dist` (for example `renderPage.ts`), and small components used only by the viewer.
-- **Avoid:** PDF editing logic (it goes to `core`), imports from a tool, platform checks. Drawing pages needs a canvas, so this code cannot live in `core`. Keep it in plain `.ts` files and out of the React component.
+- **Purpose:** The embedded PDF viewer screen for desktop and Android: open PDF, render pages, navigate, zoom, search text.
+- **Keep here:** `ViewerPage.tsx`, canvas rendering helpers (`renderPage.ts`), and viewer-only UI components.
+- **Avoid:** PDF editing logic, tool imports.
 
 ### `src/components/`
 
-- **Purpose:** UI used by two or more tools, like the drop zone, layout, buttons and progress bar.
-- **Keep here:** Small, reusable, accessible components that get everything through props.
-- **Avoid:** Anything that knows about one specific tool, PDF logic, direct platform calls.
+- **Purpose:** UI used across tools and pages (drop zone, app shells, navigation bars, buttons, `ModalDialog`, `SegmentedControl`, `NoticeBanner`, `PasswordInput`).
+- **Keep here:** Reusable, accessible React components that receive data via props.
+- **Avoid:** Tool-specific execution logic, direct platform API calls.
 
 ### `src/pages/`
 
-- **Purpose:** Screens that are part of the app but are **not** PDF tools: the home grid, donate, about, privacy page and the "not found" page.
-- **Keep here:** One file per screen, like `HomePage.tsx`. A page may use `components/` and read the tool list from `tools/registry.ts`.
-- **Avoid:** PDF logic, tool pages (those live in `tools/<name>/`), platform checks.
+- **Purpose:** Top-level route pages: `HomePage.tsx`, `AboutPage.tsx`, and `ToolPage.tsx`.
+- **Keep here:** Screen-level composition and layout wiring.
+- **Avoid:** Direct PDF byte manipulation.
 
 ### `src/hooks/`
 
-- **Purpose:** Shared React hooks, like `useWorker` or `useFilePicker`.
-- **Keep here:** Hooks that two or more tools use.
-- **Avoid:** PDF logic. Hooks for only one tool stay inside that tool's folder.
+- **Purpose:** Shared React hooks (such as `useShell`).
+- **Keep here:** Hooks used by multiple components.
 
 ### `src/styles/`
 
-- **Purpose:** Global CSS and theme variables (colours, spacing, dark mode).
-- **Avoid:** Styles meant for only one component. Keep those next to the component.
+- **Purpose:** Global CSS stylesheets and CSS variables (`tokens.css`, `base.css`, `web.css`).
+- **Avoid:** One-off component styles.
 
 ### `src/assets/`
 
-- **Purpose:** Images, icons and fonts that your code imports, so Vite can bundle them.
-- **Keep here:** Small files only. Fonts must be local files, never links to Google Fonts or a CDN.
-- **Avoid:** Files that are not used anywhere. Delete leftover template files like `react.svg`.
+- **Purpose:** Static assets bundled by Vite (SVGs, local fonts).
+- **Avoid:** Large unused binary files.
 
 ### `public/`
 
-- **Purpose:** Files copied as they are: favicon, app icons, `manifest`. Files here are not processed by Vite and are not imported in code.
-- **Good to remember:** Keep files small, and no third-party scripts or remote links.
+- **Purpose:** Static assets served directly: `favicon.svg`, `robots.txt`, `sitemap.xml`, and Cloudflare configuration files (`_headers` for CSP and `_redirects` for SPA rewrites).
 
 ### `electron/` and `android/`
 
-- **Purpose:** The desktop and Android apps that wrap the web build.
-- **Keep here:** Only config, window setup, opening and saving files, and the icons. In `electron/`: `main.cjs` and `preload.cjs`. In `android/`: the Capacitor project.
-- **Avoid:** PDF logic. It stays in TypeScript. Never commit signing keys, keystores or built installers.
+- **Purpose:** Native application shells.
+- **Keep here:** In `electron/`: `main.cjs` and `preload.cjs`. In `android/`: Capacitor configuration and Gradle project.
+- **Avoid:** PDF logic. It stays in TypeScript. Never commit signing keys, keystores, or built binaries.
+
+### `e2e/`
+
+- **Purpose:** Playwright end-to-end browser test suites (`startup-and-navigation.spec.ts`, `pdf-workflows.spec.ts`, `invalid-input.spec.ts`) and test fixtures.
+
+### `scripts/`
+
+- **Purpose:** Developer and CI utility scripts (`cap.cjs` for Capacitor CLI Node 20 LTS compatibility, `test-csp-runtime.mjs` for local CSP verification).
 
 ### Root files
 
 | File | Purpose |
 |---|---|
-| `index.html` | The single page the app loads into. Keep it free of remote scripts and fonts. |
-| `package.json` | Scripts and libraries. Please give a reason in your PR for every new library. |
-| `package-lock.json` | Exact library versions. Commit it, and do not edit it by hand. |
-| `vite.config.ts` | Build settings. Keep `base` relative so it works in the native apps. |
-| `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json` | TypeScript settings (app code and build tooling). Keep `strict` on. |
-| `eslint.config.js` | Lint rules. |
-| `LICENSE` | Project licence. Libraries we use must be compatible with it. |
-| `README.md` | The front page of the project. |
-| `SECURITY.md` | How to report a security or privacy problem privately. |
-| `capacitor.config.ts` | Capacitor settings: app id, app name and the web build folder. |
+| `index.html` | Application HTML entry point. Free of remote CDNs or trackers. |
+| `package.json` | Project scripts, dependencies, and Electron packaging configuration. |
+| `package-lock.json` | Exact pinned dependency tree. |
+| `vite.config.ts` | Vite configuration with dynamic chunking and relative base path. |
+| `vitest.config.ts` | Vitest unit test configuration (strictly excludes E2E specs). |
+| `playwright.config.ts` | Playwright E2E browser test configuration. |
+| `tsconfig.json` | Root TypeScript project references configuration. |
+| `eslint.config.js` | ESLint rules and flat configuration. |
+| `capacitor.config.ts` | Capacitor settings: app ID, app name, and web asset folder. |
+| `README.md` | Front-page documentation and quick start. |
+| `SECURITY.md` | Vulnerability reporting and security policy. |
+| `LICENSE` | MIT Open Source license. |
 
 ## Where do types go?
 
@@ -159,9 +175,10 @@ Use `type` for simple shapes and `interface` for things that other code implemen
 |---|---|---|
 | React component file | PascalCase | `DropZone.tsx` |
 | Other TypeScript file | camelCase | `mergePdfs.ts` |
-| Tool folder | lowercase, hyphen if needed | `merge`, `split`, `pdf-to-image` |
+| Tool UI module in `modules/` | PascalCase ending in `Tool` | `MergeTool.tsx`, `ExtractTextTool.tsx` |
 | Page file in `pages/` | PascalCase ending in `Page` | `HomePage.tsx` |
 | Other folders | lowercase | `core`, `components` |
-| Worker file | `<tool>.worker.ts` | `merge.worker.ts` |
-| Test file | same name plus `.test.ts` | `merge.test.ts` |
+| Worker file | `pdfWorker.ts` (centralized) | `src/core/worker/pdfWorker.ts` |
+| Unit / integration test file | same name plus `.test.ts` / `.test.tsx` | `merge.test.ts`, `registry.test.ts` |
+| End-to-end test spec | kebab-case ending in `.spec.ts` | `e2e/pdf-workflows.spec.ts` |
 | Types | PascalCase | `ToolDefinition` |

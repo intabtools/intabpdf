@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import ToolMissingState from './ToolMissingState';
-import { getToolById } from '../../tools/registry';
 import { resolveDestination } from '../../config/screens';
 
 describe('Priority 5: Coming Soon Navigation & Placeholder', () => {
@@ -18,16 +17,28 @@ describe('Priority 5: Coming Soon Navigation & Placeholder', () => {
   });
 
   it('renders intended coming soon placeholder card with tool icon, name and back CTA', () => {
-    const protectTool = getToolById('protect')!;
-    expect(protectTool).toBeDefined();
+    const mockTool = {
+      id: 'placeholder',
+      name: 'Future Tool',
+      description: 'A future feature',
+      category: 'Organize' as const,
+      icon: 'lock',
+      fileType: 'pdf' as const,
+      actionVerb: 'Process',
+      noun: 'file',
+      outputName: 'future.pdf',
+      availability: 'coming-soon' as const,
+      multipleFiles: false,
+      options: [],
+    };
 
     const html = renderToString(
       <MemoryRouter>
-        <ToolMissingState tool={protectTool} onNavigateHome={() => {}} />
+        <ToolMissingState tool={mockTool} onNavigateHome={() => {}} />
       </MemoryRouter>
     );
 
-    expect(html).toContain('Protect');
+    expect(html).toContain('Future Tool');
     expect(html).toContain('This tool is coming soon.');
     expect(html).toContain('Back to All Tools');
     expect(html).toContain('card busy');

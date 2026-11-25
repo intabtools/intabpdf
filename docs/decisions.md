@@ -153,3 +153,15 @@ Context: The viewer is a screen, not a tool: it makes no output file and is not 
 Decision: The viewer gets its own folder, `src/viewer/`, with its page, the plain code that talks to `pdfjs-dist`, and viewer-only components. Its route is added in `App.tsx` directly, not from the registry. The PDF.js worker is bundled locally. The viewer does not import tools, and tools do not import the viewer. If a tool later needs page previews, we move the shared drawing code to `components/` or `hooks/`, the lowest folder both can import from.
 
 Consequences: One place to look for everything about the viewer. It is the one folder where PDF-related code may use the canvas. Rule 4 still holds: drawing code stays in plain `.ts` files, not inside React components. Reviewers need to watch this by hand for now (see decision 007).
+
+## 015: Centralized PDF processing service
+Status: accepted (replaces the worker-per-tool model of 008)
+Context: Creating separate Web Worker scripts per tool led to duplicated worker lifecycles, larger bundle overhead, and fragmented timeout and fallback mechanisms.
+Decision: Unify heavy document manipulation into a centralized singleton service (`src/core/worker/service.ts`) and a shared background worker (`src/core/worker/pdfWorker.ts`). The service manages FIFO task queuing, zero-copy transferable buffers with defensive slicing, universal 60-second timeouts, and automatic main-thread fallback. Tools requiring Mozilla PDF.js (`pdf-to-images`, `extract-text`) use `pdfjs-dist` and its dedicated worker.
+Consequences: Simpler tool implementations, zero code duplication in worker lifecycle management, reliable timeout and termination handling.
+
+## 016: Multi-tier CI and Playwright end-to-end verification
+Status: accepted
+Context: Relying solely on unit tests left multi-step browser user workflows, file downloads, CSP restrictions, and invalid-input handling unverified in automated checks.
+Decision: Introduce `@playwright/test` for Chromium-based end-to-end testing alongside Vitest, and configure GitHub Actions (`.github/workflows/ci.yml`) to enforce 4 separate status checks: lint, unit-tests, build, and e2e.
+Consequences: Deterministic validation of actual generated PDF, ZIP, and TXT files. High test confidence prior to merging. E2E specs are isolated from Vitest via explicit configuration.

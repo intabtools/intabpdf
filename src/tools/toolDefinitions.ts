@@ -20,6 +20,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Create a PDF from',
     noun: 'photo',
     outputName: 'photos.pdf',
+    multipleFiles: true,
     availability: 'available',
     component: () => import('./modules/ImagesToPdfTool'),
     options: [
@@ -36,7 +37,9 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Create a PDF from',
     noun: 'file',
     outputName: 'text.pdf',
-    availability: 'coming-soon',
+    multipleFiles: false,
+    availability: 'available',
+    component: () => import('./modules/TextToPdfTool'),
     options: [
       { id: 'page-nums', label: 'Add page numbers', description: 'Bottom centre of every page', defaultValue: true },
       { id: 'mono', label: 'Monospace font', description: 'Good for code and logs', defaultValue: false },
@@ -54,6 +57,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Merge',
     noun: 'file',
     outputName: 'merged.pdf',
+    multipleFiles: true,
     availability: 'available',
     component: () => import('./modules/MergeTool'),
     options: [
@@ -71,6 +75,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Split',
     noun: 'file',
     outputName: 'split.zip',
+    multipleFiles: false,
     availability: 'available',
     component: () => import('./modules/SplitTool'),
     options: [
@@ -87,7 +92,9 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Reorder',
     noun: 'file',
     outputName: 'reordered.pdf',
-    availability: 'coming-soon',
+    multipleFiles: false,
+    availability: 'available',
+    component: () => import('./modules/ReorderTool'),
     options: [
       { id: 'thumbs', label: 'Show thumbnails', description: 'See every page before you move it', defaultValue: true },
     ],
@@ -102,6 +109,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Rotate',
     noun: 'file',
     outputName: 'rotated.pdf',
+    multipleFiles: true,
     availability: 'available',
     component: () => import('./modules/RotateTool'),
     options: [
@@ -129,6 +137,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Remove pages from',
     noun: 'file',
     outputName: 'trimmed.pdf',
+    multipleFiles: false,
     availability: 'available',
     component: () => import('./modules/RemovePagesTool'),
     options: [
@@ -147,6 +156,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Compress',
     noun: 'file',
     outputName: 'compressed.pdf',
+    multipleFiles: true,
     availability: 'available',
     component: () => import('./modules/CompressTool'),
     options: [
@@ -164,7 +174,9 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Protect',
     noun: 'file',
     outputName: 'protected.pdf',
-    availability: 'coming-soon',
+    multipleFiles: false,
+    availability: 'available',
+    component: () => import('./modules/ProtectTool'),
     options: [
       { id: 'pwd-open', label: 'Ask for a password to open', description: 'You choose the password next', defaultValue: true },
       { id: 'block-print', label: 'Block printing', description: 'Reading stays allowed', defaultValue: false },
@@ -180,7 +192,9 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Unlock',
     noun: 'file',
     outputName: 'unlocked.pdf',
-    availability: 'coming-soon',
+    multipleFiles: false,
+    availability: 'available',
+    component: () => import('./modules/UnlockTool'),
     options: [
       { id: 'know-pwd', label: 'I know the password', description: 'Required to remove it', defaultValue: true },
     ],
@@ -197,7 +211,9 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Sign',
     noun: 'file',
     outputName: 'signed.pdf',
-    availability: 'coming-soon',
+    multipleFiles: false,
+    availability: 'available',
+    component: () => import('./modules/SignTool'),
     options: [
       { id: 'add-date', label: 'Add the date', description: 'Next to your signature', defaultValue: false },
       { id: 'save-sig', label: 'Save my signature', description: 'Stays on this device only', defaultValue: false },
@@ -213,6 +229,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Convert',
     noun: 'file',
     outputName: 'pages.zip',
+    multipleFiles: true,
     availability: 'available',
     component: () => import('./modules/PdfToImagesTool'),
     options: [],
@@ -227,6 +244,7 @@ export const TOOLS: ToolDefinition[] = [
     actionVerb: 'Extract text from',
     noun: 'file',
     outputName: 'text.txt',
+    multipleFiles: true,
     availability: 'available',
     component: () => import('./modules/ExtractTextTool'),
     options: [

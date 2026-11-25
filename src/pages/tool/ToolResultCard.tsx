@@ -1,8 +1,9 @@
 // Result card displayed when a PDF tool completes execution, with stats, download, and viewing options.
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertTriangle, Check, Copy, Download, Eye, Info, RefreshCw, XCircle } from 'lucide-react';
+import { Check, Copy, Download, Eye, RefreshCw, XCircle } from 'lucide-react';
 import OutputFilenameInput from '../../components/OutputFilenameInput';
+import NoticeBanner from '../../components/NoticeBanner';
 import { formatBytes } from '../../core/formatBytes';
 import type { PlatformType } from '../../platform';
 import type { StagedFile, ToolDefinition } from '../../tools/types';
@@ -141,46 +142,25 @@ export default function ToolResultCard({
       <b>{cardTitle}</b>
 
       {batchStats && batchStats.failureCount > 0 && (
-        <div
+        <NoticeBanner
+          variant="warning"
           role="alert"
-          style={{
-            marginTop: '8px',
-            marginBottom: '4px',
-            padding: '10px 12px',
-            borderRadius: 'var(--radius-sm)',
-            background: 'rgba(216, 59, 1, 0.08)',
-            border: '1px solid rgba(216, 59, 1, 0.3)',
-            color: 'var(--text)',
-            fontSize: '13px',
-            lineHeight: 1.5,
-          }}
+          title={`${batchStats.failureCount} of ${batchStats.total} files could not be ${tool.id === 'compress' ? 'compressed' : 'processed'}`}
+          style={{ marginTop: '8px', marginBottom: '4px' }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 600,
-              color: 'var(--accent, #d83b01)',
-              marginBottom: '4px',
-            }}
-          >
-            <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-            <span>
-              {`${batchStats.failureCount} of ${batchStats.total} files could not be ${tool.id === 'compress' ? 'compressed' : 'processed'}`}
-            </span>
+          <div>
+            <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              {`${batchStats.successCount} file${batchStats.successCount === 1 ? '' : 's'} successfully ${tool.id === 'compress' ? 'compressed' : 'processed'} and included in the ZIP. Failed files were excluded:`}
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px' }}>
+              {batchStats.failures.map((f, idx) => (
+                <li key={idx} style={{ marginBottom: '2px' }}>
+                  <strong>{f.fileName}</strong>: {f.reason}
+                </li>
+              ))}
+            </ul>
           </div>
-          <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-            {`${batchStats.successCount} file${batchStats.successCount === 1 ? '' : 's'} successfully ${tool.id === 'compress' ? 'compressed' : 'processed'} and included in the ZIP. Failed files were excluded:`}
-          </p>
-          <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '12px' }}>
-            {batchStats.failures.map((f, idx) => (
-              <li key={idx} style={{ marginBottom: '2px' }}>
-                <strong>{f.fileName}</strong>: {f.reason}
-              </li>
-            ))}
-          </ul>
-        </div>
+        </NoticeBanner>
       )}
 
       {tool.id === 'compress' ? (
@@ -197,13 +177,13 @@ export default function ToolResultCard({
                   borderRadius: 'var(--radius-pill)',
                   background: targetAchieved
                     ? 'var(--success-soft)'
-                    : 'rgba(216, 59, 1, 0.12)',
-                  color: targetAchieved ? 'var(--success)' : 'var(--accent, #d83b01)',
+                    : 'var(--warning-soft)',
+                  color: targetAchieved ? 'var(--success)' : 'var(--warning)',
                   fontWeight: 600,
                   fontSize: '12px',
                   border: targetAchieved
                     ? '1px solid var(--success)'
-                    : '1px solid rgba(216, 59, 1, 0.3)',
+                    : '1px solid var(--warning)',
                 }}
               >
                 {targetAchieved
@@ -230,11 +210,11 @@ export default function ToolResultCard({
                 style={{
                   padding: '3px 10px',
                   borderRadius: 'var(--radius-pill)',
-                  background: 'rgba(216, 59, 1, 0.12)',
-                  color: 'var(--accent, #d83b01)',
+                  background: 'var(--warning-soft)',
+                  color: 'var(--warning)',
                   fontWeight: 600,
                   fontSize: '12px',
-                  border: '1px solid rgba(216, 59, 1, 0.3)',
+                  border: '1px solid var(--warning)',
                 }}
               >
                 Larger by +{formatBytes(newBytesCount - originalBytesCount)}
@@ -319,46 +299,22 @@ export default function ToolResultCard({
       {isTextOutput && (
         <div style={{ marginTop: '12px', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           {wordCount === 0 && (
-            <div
-              role="status"
-              style={{
-                marginBottom: '10px',
-                padding: '10px 12px',
-                borderRadius: 'var(--radius-sm)',
-                background: extraState.hasImages
-                  ? 'rgba(216, 59, 1, 0.08)'
-                  : 'var(--surface-2)',
-                border: extraState.hasImages
-                  ? '1px solid rgba(216, 59, 1, 0.3)'
-                  : '1px solid var(--border)',
-                color: 'var(--text)',
-                fontSize: '13px',
-                lineHeight: 1.5,
-              }}
+            <NoticeBanner
+              variant={extraState.hasImages ? 'warning' : 'info'}
+              role={null}
+              title={
+                extraState.hasImages
+                  ? 'Image-based PDF (OCR required)'
+                  : 'No text found in document'
+              }
+              style={{ marginBottom: '10px' }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontWeight: 600,
-                  color: extraState.hasImages ? 'var(--accent, #d83b01)' : 'var(--text)',
-                  marginBottom: '4px',
-                }}
-              >
-                <Info size={15} style={{ flexShrink: 0 }} />
-                <span>
-                  {extraState.hasImages
-                    ? 'Image-based PDF (OCR required)'
-                    : 'No text found in document'}
-                </span>
-              </div>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
                 {extraState.hasImages
                   ? 'This PDF appears to contain scanned images rather than selectable text. Optical Character Recognition (OCR) is required to extract text from image-based PDFs, which is not currently supported in InTabPDF.'
                   : 'This document does not contain any selectable text characters or font streams (e.g. blank pages or vector-only artwork).'}
               </p>
-            </div>
+            </NoticeBanner>
           )}
 
           <div
@@ -376,17 +332,10 @@ export default function ToolResultCard({
             </span>
             <button
               type="button"
-              className="sb sm"
+              className="btn btn-secondary sm"
               onClick={() => void handleCopyText()}
               disabled={!textPreview || wordCount === 0}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                fontSize: '12px',
-                borderRadius: 'var(--radius-sm)',
-              }}
+              aria-label="Copy extracted text to clipboard"
             >
               {isCopied ? <Check size={13} color="var(--accent)" /> : <Copy size={13} />}
               <span>{isCopied ? 'Copied!' : 'Copy text'}</span>
@@ -471,14 +420,9 @@ export default function ToolResultCard({
         {!isZipOutput && !isTextOutput && outputExtension !== '.png' && outputExtension !== '.jpg' && outputExtension !== '.jpeg' && (
           <button
             type="button"
-            className="cta"
+            className="btn btn-secondary"
             onClick={onViewPdf}
-            style={{
-              background: 'var(--surface-2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              minHeight: '44px',
-            }}
+            style={{ minHeight: '44px' }}
           >
             <Eye size={16} style={{ flexShrink: 0 }} />
             <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.25 }}>
@@ -489,14 +433,9 @@ export default function ToolResultCard({
 
         <button
           type="button"
-          className="cta"
+          className="btn btn-secondary"
           onClick={onStartOver}
-          style={{
-            background: 'var(--surface-2)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
-            minHeight: '44px',
-          }}
+          style={{ minHeight: '44px' }}
         >
           <RefreshCw size={15} style={{ flexShrink: 0 }} />
           <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.25 }}>Change settings</span>
@@ -504,12 +443,13 @@ export default function ToolResultCard({
 
         <button
           type="button"
-          className="cta"
+          className="btn btn-secondary"
           onClick={onClearFiles || onStartOver}
           style={{
-            background: 'transparent',
-            color: 'var(--text-muted)',
             minHeight: '44px',
+            background: 'transparent',
+            borderColor: 'transparent',
+            color: 'var(--text-muted)',
           }}
         >
           <XCircle size={15} style={{ flexShrink: 0 }} />
