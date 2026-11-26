@@ -12,15 +12,23 @@
 <p align="center">
   <a href="https://intabpdf.pages.dev"><strong>Try Web App</strong></a>
   &middot;
-  <a href="https://github.com/intabtools/intabpdf/releases/latest"><strong>Latest Published Release</strong></a>
+  <a href="https://github.com/intabtools/intabpdf/releases/latest"><strong>Download</strong></a>
   &middot;
   <a href="docs/contributing.md"><strong>Contributing</strong></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/intabtools/intabpdf/actions/workflows/ci.yml"><img src="https://github.com/intabtools/intabpdf/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build status of main"></a>
-  <a href="https://github.com/intabtools/intabpdf/releases/latest"><img src="https://img.shields.io/github/v/release/intabtools/intabpdf?include_prereleases&label=latest" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS">
+  <img src="https://img.shields.io/badge/Electron-47848F?logo=electron&logoColor=white" alt="Electron">
+  <img src="https://img.shields.io/badge/Capacitor-119EFF?logo=capacitor&logoColor=white" alt="Capacitor">
 </p>
 
 ---
@@ -41,19 +49,25 @@ InTabPDF is a free, open-source PDF toolkit for Web, Desktop, and Android. It he
 
 ## Available platforms
 
-- **Web:** Browser-based application at [intabpdf.pages.dev](https://intabpdf.pages.dev) with all 13 PDF tools and native browser tab viewing.
-- **Desktop:** Electron application for Windows and Linux with all PDF tools and the built-in offline viewer. Installers are published on [GitHub Releases](https://github.com/intabtools/intabpdf/releases/latest); macOS builds are not currently provided.
-- **Android:** Native Android application (Capacitor) with all PDF tools, the built-in offline viewer, Storage Access Framework (SAF) file saving and recovery protection, an **InTabPDF – Save to Device** share target, and the Android-only document scanner.
+All PDF tools work on every platform.
+
+| Platform | Get it | Extras |
+|---|---|---|
+| **Web** | [Open app](https://intabpdf.pages.dev) | No install needed |
+| **Desktop** (Windows, Linux) | [Download](https://github.com/intabtools/intabpdf/releases/latest) | Offline viewer |
+| **Android** | [Download](https://github.com/intabtools/intabpdf/releases/latest) | Offline viewer, document scanner, Save to Device |
+
+No macOS build yet.
 
 ## Privacy
 
 InTabPDF processes documents locally on your device. There are no accounts, no analytics or ads, and no automatic document uploads.
 
-Network activity is limited to actions you explicitly choose, such as opening repository links or using the viewer's **Search the web** option on selected text. On Android, temporary staging and recovery files may be stored locally in app-private storage during saves or scans until the operation finishes or you confirm deletion. See the [Privacy Guide](docs/privacy.md) for full details.
+Network activity is limited to actions you explicitly choose, such as opening repository links or using the viewer's **Search the web** option on selected text. On Android, temporary files, such as copies of opened or shared PDFs, scans and files being saved, are kept in app-private storage and cleaned up automatically. If replacing a file fails or is interrupted, a recovery backup stays until you export it and confirm deletion. See the [Privacy Guide](docs/privacy.md) for full details.
 
 ## Getting started
 
-Requires [Node.js](https://nodejs.org) 20+ LTS (or Node 22+; `scripts/cap.cjs` wraps Capacitor CLI v8 for Node 20 compatibility). Building the Android app also requires Java 21 and Android SDK 36.
+Requires [Node.js](https://nodejs.org) 22.13+ or 24+. Building the Android app also requires Java 21 and Android SDK 36.
 
 ```bash
 git clone https://github.com/intabtools/intabpdf.git
