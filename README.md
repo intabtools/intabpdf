@@ -25,37 +25,35 @@
 
 ---
 
-> Preparing for **InTabPDF 2.0.0** (upcoming release). The [latest release link](https://github.com/intabtools/intabpdf/releases/latest) points to the latest published GitHub release until 2.0.0 is tagged and published.
+## About
 
-## Capabilities (2.0.0 release target)
+InTabPDF is a free, open-source PDF toolkit for Web, Desktop, and Android. It helps you create, view, organize, convert, and protect PDF documents directly on your own device without creating an account or sending files to a server.
 
-All 13 PDF tools run locally on your device across Web, Desktop (Windows and Linux), and Android:
+## What you can do
 
-- **Create**: Images to PDF (JPG, PNG, WebP input), Text to PDF
-- **Organize**: Merge, Split, Reorder pages, Rotate pages, Remove pages
-- **Shrink and secure**: Compress (presets or target size), Protect (password and permissions), Unlock
-- **Sign and convert**: Sign (draw, type, or upload PNG/JPEG/WebP with optional date), PDF to images (PNG, JPEG, or ZIP), Extract text (`.txt`)
+- **Create PDFs:** Turn images (`JPG`, `PNG`, `WebP`) or plain text into PDF files.
+- **Organize pages:** Merge multiple PDFs, split pages out, reorder pages, rotate pages, and remove pages.
+- **Compress and secure:** Reduce PDF file size (using presets or a target size), add password protection and permissions, and unlock supported encrypted PDFs (`RC4` and `AES-256`) when you know the password.
+- **Add visual signatures:** Draw, type, or upload a signature image (with an optional date) to stamp onto a page. This places a visual image rather than a cryptographic digital signature.
+- **Convert and extract:** Export PDF pages as `PNG` or `JPEG` images (or a `.zip` archive) and extract text to `.txt`.
+- **View PDFs:** Read documents in the built-in offline viewer on Desktop and Android (with search, zoom, thumbnails, and reading mode), or open them in your browser's PDF tab on the Web.
+- **Scan paper documents (Android only):** Capture multi-page scans with your camera or gallery, crop and filter pages, and export them to PDF inside the Android app.
 
-### Viewing by platform
+## Available platforms
 
-- **Web**: Opens PDFs directly in a browser tab using your browser's native PDF viewer.
-- **Desktop (Electron) and Android (Capacitor)**: Includes a built-in offline PDF viewer with full-text search, zoom (25% to 400%), fit-to-width, thumbnail rail, and reading mode.
+- **Web:** Browser-based application at [intabpdf.pages.dev](https://intabpdf.pages.dev) with all 13 PDF tools and native browser tab viewing.
+- **Desktop:** Electron application for Windows and Linux with all PDF tools and the built-in offline viewer. Installers are published on [GitHub Releases](https://github.com/intabtools/intabpdf/releases/latest); macOS builds are not currently provided.
+- **Android:** Native Android application (Capacitor) with all PDF tools, the built-in offline viewer, Storage Access Framework (SAF) file saving and recovery protection, an **InTabPDF – Save to Device** share target, and the Android-only document scanner.
 
-## Try or install
+## Privacy
 
-- **Web**: Open [intabpdf.pages.dev](https://intabpdf.pages.dev) in any modern browser.
-- **Desktop and Android**: View the [latest published GitHub release](https://github.com/intabtools/intabpdf/releases/latest) for currently available downloads. Starting with the 2.0.0 release workflow, published releases attach Windows (`.exe`, `.zip`), Linux (`.AppImage`, `.deb`, `.rpm`, `.tar.gz`), and Android (`.apk`) packages along with `SHA256SUMS.txt` and `SHA256SUMS.txt.asc`.
-- **macOS**: Deferred pending app icons and Apple code signing/notarization.
+InTabPDF processes documents locally on your device. There are no accounts, no analytics or ads, and no automatic document uploads.
 
-## Privacy by design
+Network activity is limited to actions you explicitly choose, such as opening repository links or using the viewer's **Search the web** option on selected text. On Android, temporary staging and recovery files may be stored locally in app-private storage during saves or scans until the operation finishes or you confirm deletion. See the [Privacy Guide](docs/privacy.md) for full details.
 
-- Files stay in memory on your device and are never automatically uploaded to a server.
-- Zero backend, accounts, analytics, crash reporters, or ads.
-- Web builds enforce a strict Content Security Policy (`public/_headers`) with no remote scripts or third-party CDNs.
+## Getting started
 
-## Quick start (Development)
-
-Requires [Node.js](https://nodejs.org) (v20+ LTS via `scripts/cap.cjs` wrapper, or Node 22+ for Capacitor CLI).
+Requires [Node.js](https://nodejs.org) 20+ LTS (or Node 22+; `scripts/cap.cjs` wraps Capacitor CLI v8 for Node 20 compatibility). Building the Android app also requires Java 21 and Android SDK 36.
 
 ```bash
 git clone https://github.com/intabtools/intabpdf.git
@@ -64,37 +62,38 @@ npm install
 npm run dev
 ```
 
-Common contributor commands:
+Useful scripts:
 
 ```bash
-npm test            # Run Vitest unit and integration tests
-npm run test:e2e    # Run Playwright end-to-end tests
-npm run lint        # Run ESLint and Prettier checks
-npm run build       # Build production web bundle (dist/)
-npm run dist        # Package Electron desktop installers
-npm run sync:android && npm run android:build  # Sync assets and build Android APK
+npm test                                       # Run Vitest unit and component tests
+npm run test:e2e                               # Run Playwright end-to-end browser tests
+npm run lint                                   # Run ESLint checks
+npm run build                                  # Build production web bundle (dist/)
+npm run build:desktop                          # Build web assets for Electron
+npm run dist                                   # Package Electron desktop installers
+npm run sync:android && npm run android:build  # Sync web assets and build debug Android APK
 ```
 
 ## Documentation
 
-Start with [contributing.md](docs/contributing.md) and [architecture.md](docs/architecture.md), or jump to a specific guide:
+Start with the [Contributing Guide](docs/contributing.md) and [Architecture Guide](docs/architecture.md), or jump directly to a topic:
 
 | Document | Covers |
 |---|---|
-| [contributing.md](docs/contributing.md) | Setup, PR workflow, and contributor guidelines |
-| [architecture.md](docs/architecture.md) | App shell, registry, worker pipeline, and CSP architecture |
-| [folder-guide.md](docs/folder-guide.md) | Repository directory layout |
-| [adding-a-tool.md](docs/adding-a-tool.md) | Step-by-step guide to adding a PDF tool |
-| [api-reference.md](docs/api-reference.md) | TypeScript interfaces, worker API, and native bridge types |
-| [privacy.md](docs/privacy.md) | Privacy rules and CSP verification |
-| [platforms.md](docs/platforms.md) | Web, Electron, and Android packaging and builds |
-| [dependencies.md](docs/dependencies.md) | Library selection and license rules |
-| [code-quality.md](docs/code-quality.md) | Engineering and testing conventions |
-| [commit-conventions.md](docs/commit-conventions.md) | Commit message format |
-| [maintainer-guide.md](docs/maintainer-guide.md) | Release checklist, CI/CD, and security handling |
-| [decisions.md](docs/decisions.md) | Architecture Decision Records |
+| [Contributing Guide](docs/contributing.md) | Setup, PR workflow, and contributor guidelines |
+| [Architecture Guide](docs/architecture.md) | App shell, tool registry, worker pipeline, CSP, Electron IPC, and Android plugins |
+| [Platforms & Builds](docs/platforms.md) | Web, Desktop, and Android capabilities, SAF saving, scanner, and packaging |
+| [Privacy Guide](docs/privacy.md) | Privacy rules, local storage behavior, CSP, and platform checks |
+| [Folder Guide](docs/folder-guide.md) | Repository directory layout and file placement rules |
+| [Adding a Tool](docs/adding-a-tool.md) | Step-by-step guide to building and registering a PDF tool |
+| [API Reference](docs/api-reference.md) | TypeScript interfaces, worker API, and native bridge contracts |
+| [Dependencies](docs/dependencies.md) | Library selection, licensing, and update rules |
+| [Code Quality](docs/code-quality.md) | Engineering, testing, and accessibility conventions |
+| [Commit Conventions](docs/commit-conventions.md) | Commit message prefixes and formatting |
+| [Maintainer Guide](docs/maintainer-guide.md) | Review checklist, CI/CD, and release steps |
+| [Decisions Log](docs/decisions.md) | Architecture Decision Records |
 
 ## Security and license
 
-- Report security or privacy issues privately following [SECURITY.md](SECURITY.md).
+- Report security or privacy issues privately by following [SECURITY.md](SECURITY.md).
 - Released under the [MIT License](LICENSE).

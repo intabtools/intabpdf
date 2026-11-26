@@ -131,20 +131,32 @@ To best fit the constraints and strengths of each environment, InTabPDF uses tai
 
 ---
 
-## 6. File Saving & Sharing Strategies
+## 6. File Saving, Sharing, and Android Scanner
 
-File saving across platforms is coordinated through `platform.saveFile()` in [src/platform/index.ts](../src/platform/index.ts):
+File saving across platforms is coordinated through `platform.saveFile()` in [src/platform/index.ts](../src/platform/index.ts).
 
 ### Android Mobile (Capacitor)
-- **Chunked Base64 Encoding:** High-resolution or multi-page PDFs can reach tens of megabytes. To prevent memory bottlenecks and call-stack limits, byte streams are encoded using 32 KB chunked buffers (`uint8ArrayToBase64`).
-- **Direct Documents Persistence (`src/platform/androidSave.ts`):** Checks for existing filename collisions in `Directory.Documents` (prompting Replace, Rename, or Cancel) and writes files directly to `Directory.Documents` via `@capacitor/filesystem`.
-- **System Share Sheet Integration:** Mirrors the saved file to `Directory.Cache` so Android's FileProvider can pass a content URI to `@capacitor/share`. Users can immediately save to external storage, send via email, or open in another viewer; cache-mirroring or Share sheet errors are logged without aborting the Documents save.
-- **Error Handling:** Native `Directory.Documents` write errors or missing conflict-dialog handlers are thrown to the caller rather than falling back to an HTML5 anchor download.
+
+Android separates normal tool saving, viewer sharing, incoming OS file shares, and document scanning into distinct workflows without requesting broad shared-storage permissions (`READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, or `MANAGE_EXTERNAL_STORAGE`):
+
+1. **Normal Tool Save & Replace (`DocumentSavePlugin`, `src/platform/androidSave.ts`):**
+   - Decodes payloads with chunked Base64 (`uint8ArrayToBase64`), stages bytes in app cache (`saf_save_staging/`), and saves through Android's Storage Access Framework (`ACTION_OPEN_DOCUMENT_TREE`) into a user-selected `Documents/InTabPDF/` folder (or a directly selected `InTabPDF` folder).
+   - Verifies persisted read/write grants and checks case-insensitive filename collisions via [src/components/FileConflictDialog.tsx](../src/components/FileConflictDialog.tsx) (offering **Replace**, **Save as new name**, or **Cancel**).
+   - Replaces existing files non-destructively using a staged temp + rename swap (`STAGED_SWAP`) when the provider supports create/rename/delete, or a verified local backup paired with strict truncating `"wt"` write (`CACHE_BACKUP_WT`) when only write is supported (never silently downgrading `"wt"` to non-truncating `"w"`).
+   - If a replacement and its automatic rollback both fail (or if `"wt"` replacement is interrupted), preserves a recovery backup and metadata index (`SafRecoveryStore`, `filesDir/saf_recovery_backups/`) so the user can export via `ACTION_CREATE_DOCUMENT` and explicitly confirm deletion in [SaveRecoveryDialog.tsx](../src/components/SaveRecoveryDialog.tsx) or from the About page.
+2. **Viewer Share (`src/platform/share.ts`):**
+   - Separate from tool saving. Sharing a PDF from the Android viewer writes a temporary `.share_tmp_*` copy to `Directory.Cache` and hands a `FileProvider` URI to `@capacitor/share`, scheduling cache cleanup afterward. Sharing selected text invokes `@capacitor/share` directly.
+3. **"InTabPDF – Save to Device" (`SaveToDeviceActivity`):**
+   - A separate Android share-target activity (`ACTION_SEND` / `ACTION_SEND_MULTIPLE`) that lets users share files from other Android apps and stream them to a chosen SAF destination.
+4. **Native Document Scanner (Android-only: `DocumentScannerPlugin`, `ScannerActivity`):**
+   - Available only in the native Android app (not on Web or Desktop).
+   - Uses `CAMERA` permission (with `android.hardware.camera` marked `required="false"`) via CameraX and OpenCV to capture or import gallery images, detect/crop document boundaries, apply image filters, and export a PDF into app cache, opening the result in the embedded viewer and cleaning up the temporary scanner output.
 
 ### Web Browser & Electron Desktop
 - Generates an in-memory `Blob` matching the file's MIME type.
 - Creates an invisible DOM `<a>` tag with the `download` attribute set to the sanitized filename.
 - Programmatically triggers the download and schedules `URL.revokeObjectURL()` cleanup after 1 second (`1000` ms) to prevent browser memory leaks.
+- On Web, `sharePdfDocument()` uses Web Share API Level 2 when supported and falls back to `platform.saveFile()`. On Desktop, Electron uses Web Share only if supported and otherwise directs users to Save / Download.
 
 ---
 
@@ -179,7 +191,8 @@ npm test
 npm run test:e2e
 ```
 
-### Android Asset Synchronization & Engine Guard
+### Android Asset Synchronization, Toolchain, & Engine Guard
+- **Android Toolchain:** Native compilation targets Java 21 and Android SDK 36 (`minSdkVersion = 24`, `compileSdkVersion = 36`, `targetSdkVersion = 36` in `android/variables.gradle`).
 - **Pre-Packaging Verification:** The Android build enforces asset freshness via a custom Gradle task `checkWebAssets` in `android/app/build.gradle`. If `android/app/src/main/assets/public/index.html` is missing or out-of-sync, the Gradle task immediately fails compilation, directing developers to run `npm run sync:android`.
 - **Node.js Compatibility:** `@capacitor/cli` v8 declares a Node >= 22 engine requirement. InTabPDF provides `scripts/cap.cjs` (`npm run cap`) to allow developers on Node 20 LTS to build and synchronize assets without false-positive engine errors.
 
@@ -243,9 +256,9 @@ Vite automatically copies this file to `dist/_redirects` during `npm run build`.
   - *Node Version Warning:* Ensure `NODE_VERSION: 20` is configured in Cloudflare Pages environment variables.
   - *Missing Assets / 404 on Refresh:* Ensure `public/_redirects` is in place with `/* /index.html 200`.
 
-### Available Tools in 2.0.0
+### Available Tools
 
-All 13 client-side PDF tools are available across Web, Desktop (Electron), and Android:
+All 13 client-side PDF tools are available across Web, Desktop (Electron), and Android. The native document scanner is available only in the Android app.
 
 | Category | Tools |
 |---|---|

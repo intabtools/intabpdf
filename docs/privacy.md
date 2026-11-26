@@ -8,7 +8,7 @@ The privacy promise is the heart of this project. Everything else can change, bu
 - No analytics, telemetry, tracking or ads. No third-party scripts that do any of these.
 - No accounts or sign-in.
 - No remote fonts, CDNs or scripts at runtime. Bundle everything inside the app.
-- Do not keep user files after the session, unless the user saves them on purpose. Prefer working in memory.
+- Do not retain user documents on remote servers or keep persistent document history after a session. Core web and desktop tools work in memory; on Android, native save, share, and scan workflows use temporary app-private cache files (cleaned automatically) and local recovery backups only when needed to protect against failed file replacements until the user exports and confirms deletion.
 
 ## How we keep the promise
 
@@ -39,7 +39,7 @@ flowchart TD
 3. **Library check.** New packages are checked for tracking or network code, not only for the licence.
 4. **Anyone can verify.** Open the browser Network tab, process a file, and see that no request is made.
 5. **Desktop shell check.** The Electron app loads only its own files and blocks navigation and network subrequests to external sites. External browser opening via `openExternalUrl` is strictly restricted to HTTPS URLs for the canonical GitHub repository and user-initiated Google Search (`https://www.google.com/search`). The main process reads a PDF only to give it to the window and never sends, logs, or saves the file elsewhere. Electron's crash reporter and auto-updater stay off.
-6. **Android shell check.** The Android app loads only its own bundled assets, and `android/app/src/main/AndroidManifest.xml` does not request the `INTERNET` permission. Android hands opened PDFs only to the in-app screen, and no native code or Capacitor plugin transmits user files or telemetry to a server.
+6. **Android shell check.** The Android app loads only its own bundled assets, and `android/app/src/main/AndroidManifest.xml` does not request the `INTERNET` permission. It requests `CAMERA` (optional hardware) solely for the on-device document scanner and uses Android's Storage Access Framework (`ACTION_OPEN_DOCUMENT_TREE` and `ACTION_CREATE_DOCUMENT`) rather than broad storage permissions. Opened PDFs (`cacheDir/external_launch.pdf`), viewer shares (`.share_tmp_*`), scanner sessions, and SAF save staging (`cacheDir/saf_save_staging/`) are stored temporarily on-device and pruned automatically; `SharedPreferences` stores only the user's chosen SAF destination folder URI, and app-private recovery backups (`filesDir/saf_recovery_backups/`) are kept locally only when a file replacement fails or is interrupted until the user exports and confirms deletion. No native code or Capacitor plugin transmits user files or telemetry to a server.
 
 ## What is allowed and what is not
 
@@ -48,9 +48,10 @@ flowchart TD
 | Loading the app files from the same site | Automatically uploading a file, its name, or its text to any server |
 | User-initiated web search on selected text in the viewer (`Search the web`) | Background network requests triggered without explicit user action |
 | Fonts and images bundled in the app | Google Fonts or any CDN link |
-| Saving the user's theme choice in `localStorage` | Saving file contents or file names in storage |
+| Saving UI preferences (`intab.theme`, `intab.shell`, `intab.sc`) in `localStorage`, or viewer auto-hide state in `sessionStorage` | Saving document contents or file history on remote servers or in browser storage |
+| Temporary on-device cache/staging and user-confirmed SAF recovery backups on Android | Retaining hidden copies after confirmed deletion or uploading recovery files |
 | Error messages shown on screen | Sending error reports to a server |
-| Showing a PDF in the viewer, in memory only | A "recent files" list that remembers file names or contents |
+| Showing a PDF in the viewer, in memory only | A "recent files" list that remembers file names or contents across sessions |
 
 If you are not sure about something, just ask in an issue before writing the code. We are happy to help.
 
