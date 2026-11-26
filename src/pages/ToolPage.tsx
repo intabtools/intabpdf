@@ -1,15 +1,17 @@
 // Screen component for staging files, executing operations, and downloading results for PDF tools.
 import { Suspense, createElement, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import DropZone from '../components/DropZone';
 
 const ImagePreviewModal = lazy(() => import('../components/ImagePreviewModal'));
 import { useShell } from '../hooks/useShell';
 import { useToast } from '../hooks/useToast';
 import { useViewer } from '../hooks/useViewer';
+import { resolveViewerNavigationTarget } from '../viewer/viewerContextDef';
 import { useProcessing } from '../hooks/useProcessing';
 import { getPlatformType, openPdfInNewTab, platform } from '../platform';
+import { useSaveRecovery } from '../hooks/useSaveRecovery';
 import type { OpenedFile } from '../platform';
 import {
   getDefaultOutputBaseName,
@@ -52,12 +54,15 @@ function getOperationMessage(toolId: string, count = 1): string {
 
 export default function ToolPage(): ReactNode {
   const { toolId } = useParams<{ toolId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { loadFile } = useViewer();
   const { shell } = useShell();
   const { showToast } = useToast();
   const { startProcessing, stopProcessing, runWithProcessing } = useProcessing();
+  const saveRecovery = useSaveRecovery();
   const activeImportReqRef = useRef<number | null>(null);
+  const isSavingRef = useRef(false);
 
   const tool = getToolById(toolId || '');
   const isImplemented = tool ? isToolImplemented(tool.id) : false;
@@ -207,7 +212,8 @@ export default function ToolPage(): ReactNode {
   };
 
   const handleDownload = async () => {
-    if (!outputBytes) return;
+    if (!outputBytes || isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       const mimeType = isZipOutput
         ? 'application/zip'
@@ -225,14 +231,22 @@ export default function ToolPage(): ReactNode {
         mimeType
       );
       if (res && res.saved === false) {
+        if (res.outcome === 'failed_recovery_available' && res.recovery) {
+          saveRecovery?.attachRetrySave?.(() => handleDownload());
+        } else if (res.outcome === 'failed_original_intact') {
+          showToast(res.message || 'Replacement did not finish; original file remains intact.', 4000);
+        }
         return;
       }
       const savedName = (res && res.fileName) || finalFileName;
       setIsSaved(true);
-      showToast(`Saved ${savedName}`);
+      showToast(res?.displayPath ? `Saved ${savedName} to ${res.displayPath}` : `Saved ${savedName}`);
     } catch (err) {
       console.error('Failed to save file:', err);
-      showToast('Failed to save file');
+      const message = err instanceof Error && err.message.trim() ? err.message : 'Failed to save file';
+      showToast(message);
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
@@ -251,7 +265,14 @@ export default function ToolPage(): ReactNode {
         name: finalFileName,
         bytes: outputBytes,
       });
-      navigate('/viewer');
+      const target = resolveViewerNavigationTarget(
+        location.pathname,
+        location.search,
+        typeof window !== 'undefined' ? window.location.search : '',
+      );
+      if (target) {
+        navigate(target);
+      }
     }
   };
 
@@ -363,7 +384,7 @@ export default function ToolPage(): ReactNode {
       {status !== 'done' && (stagedFiles.length > 0 || isDirectInputTool) && (
         <div className="tp">
           {stagedFiles.length > 0 && !isDirectInputTool && (
-            <div style={{ minWidth: 0, maxWidth: '100%', width: '100%' }}>
+            <div className="tp-staged">
               <StagedFileList
                 toolId={tool.id}
                 stagedFiles={stagedFiles}

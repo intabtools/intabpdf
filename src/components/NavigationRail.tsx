@@ -2,6 +2,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import { Code2, Eye, Info, LayoutGrid, Plus } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useViewer } from '../hooks/useViewer';
+import { resolveViewerNavigationTarget } from '../viewer/viewerContextDef';
 
 export default function NavigationRail(): ReactNode {
   const location = useLocation();
@@ -11,7 +12,14 @@ export default function NavigationRail(): ReactNode {
   const handleOpenPdf = async () => {
     const file = await openPdfPicker();
     if (file) {
-      navigate('/viewer');
+      const target = resolveViewerNavigationTarget(
+        location.pathname,
+        location.search,
+        typeof window !== 'undefined' ? window.location.search : '',
+      );
+      if (target) {
+        navigate(target);
+      }
     }
   };
 

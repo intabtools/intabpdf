@@ -31,6 +31,7 @@ interface ViewerPagesViewProps {
   matches: SearchMatch[];
   currentMatchIndex: number;
   linkService?: PdfLinkService;
+  allowCopying?: boolean;
 }
 
 export default function ViewerPagesView({
@@ -54,6 +55,7 @@ export default function ViewerPagesView({
   matches,
   currentMatchIndex,
   linkService,
+  allowCopying = true,
 }: ViewerPagesViewProps): ReactNode {
   return (
     <main
@@ -141,6 +143,7 @@ export default function ViewerPagesView({
                 matches={matches}
                 currentMatchIndex={currentMatchIndex}
                 linkService={linkService}
+                allowCopying={allowCopying}
               />
             );
           })}

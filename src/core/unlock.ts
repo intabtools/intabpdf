@@ -1,6 +1,7 @@
 // Pure core operation for unlocking password-protected PDF documents.
-import { decryptPDF, isEncrypted } from '@pdfsmaller/pdf-decrypt';
+import { decryptPDF } from '@pdfsmaller/pdf-decrypt';
 import { PDFDocument } from 'pdf-lib';
+import { inspectPdfEncryption } from './pdfEncryptionStatus';
 
 export interface UnlockPdfOptions {
   password: string;
@@ -35,10 +36,18 @@ export async function unlockPdf(
     throw new Error('Password must be provided to unlock.');
   }
 
-  // Check if document is encrypted
-  const encStatus = await isEncrypted(pdfBytes);
-  if (!encStatus.encrypted) {
+  // Check if document is encrypted (distinguishing unsupported variants and corrupt files)
+  const inspection = await inspectPdfEncryption(pdfBytes);
+  if (inspection.status === 'not-encrypted') {
     throw new Error('This PDF is not password protected.');
+  }
+  if (inspection.status === 'unsupported') {
+    throw new Error(
+      `This PDF uses an unsupported encryption variant (${inspection.message}). Client-side decryption supports RC4 and AES-256.`,
+    );
+  }
+  if (inspection.status === 'corrupt') {
+    throw new Error(`Invalid or corrupt PDF: ${inspection.message}`);
   }
 
   if (signal?.aborted) {

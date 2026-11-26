@@ -275,13 +275,11 @@ export default function SignTool({
     <>
       {/* Left Column: Signature Creation Studio */}
       <div
-        className="card"
+        className="card tp-work"
         style={{
-          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          minWidth: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
@@ -621,7 +619,7 @@ export default function SignTool({
         </div>
 
         {/* Output filename input */}
-        <div style={{ marginTop: '4px', marginBottom: '4px' }}>
+        <div className="opts-filename">
           <OutputFilenameInput
             value={outputBaseName ?? ''}
             onChange={onOutputBaseNameChange ?? (() => {})}

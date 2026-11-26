@@ -8,6 +8,7 @@ import {
   destroyPdf,
   getPageSize,
   loadPdf,
+  readDocumentAllowCopying,
   type PageSize,
   type PdfDocument,
 } from './renderPage';
@@ -24,6 +25,7 @@ export interface UsePdfDocumentLoaderResult {
   pdfDoc: PdfDocument | null;
   fileName: string;
   pageSizes: PageSize[];
+  allowCopying: boolean;
   currentPage: number;
   setCurrentPage: (page: number) => void;
   isLoading: boolean;
@@ -51,6 +53,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     activeDocFile = null,
     fileName: contextFileName = '',
     pageSizes: contextPageSizes = [],
+    allowCopying: contextAllowCopying = true,
     currentPage: contextCurrentPage = 1,
     saveViewerDocument,
     clearDocumentSession,
@@ -69,6 +72,9 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
   );
   const [pageSizes, setPageSizes] = useState<PageSize[]>(() =>
     isSessionActive ? contextPageSizes : []
+  );
+  const [allowCopying, setAllowCopying] = useState<boolean>(() =>
+    isSessionActive ? contextAllowCopying : true
   );
   const [currentPage, setCurrentPage] = useState(() =>
     isSessionActive ? contextCurrentPage || 1 : 1
@@ -122,6 +128,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     setPdfDoc(null);
     setFileName('');
     setPageSizes([]);
+    setAllowCopying(true);
     void clearDocumentSession?.();
     setCurrentFile(null);
     lastOpenedFileRef.current = null;
@@ -149,6 +156,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
       let adopted = false;
       setPdfDoc(null);
       setPageSizes([]);
+      setAllowCopying(true);
       setFileName(file.name);
       setCurrentPage(1);
       setLoading(true);
@@ -190,8 +198,10 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         passwordCallbackRef.current = null;
         activeLoadingTaskRef.current = null;
 
-        const firstSize =
-          doc.numPages > 0 ? await getPageSize(doc, 1) : DEFAULT_PAGE_SIZE;
+        const [firstSize, docAllowCopying] = await Promise.all([
+          doc.numPages > 0 ? getPageSize(doc, 1) : Promise.resolve(DEFAULT_PAGE_SIZE),
+          readDocumentAllowCopying(doc),
+        ]);
 
         if (requestId !== loadRequestRef.current) {
           void destroyPdf(doc).catch(() => undefined);
@@ -202,7 +212,8 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         setPdfDoc(doc);
         adopted = true;
         setPageSizes(initialSizes);
-        saveViewerDocument?.(doc, file, initialSizes);
+        setAllowCopying(docAllowCopying);
+        saveViewerDocument?.(doc, file, initialSizes, docAllowCopying);
 
         const activeDoc = doc;
         void Promise.all(
@@ -216,7 +227,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
         ).then((sizes) => {
           if (requestId === loadRequestRef.current) {
             setPageSizes(sizes);
-            saveViewerDocument?.(activeDoc, file, sizes);
+            saveViewerDocument?.(activeDoc, file, sizes, docAllowCopying);
           }
         });
       } catch (loadError) {
@@ -381,6 +392,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     setPdfDoc(null);
     setFileName('');
     setPageSizes([]);
+    setAllowCopying(true);
     setCurrentPage(1);
     setLoading(false);
     setError(null);
@@ -393,6 +405,7 @@ export function usePdfDocumentLoader(): UsePdfDocumentLoaderResult {
     pdfDoc,
     fileName,
     pageSizes,
+    allowCopying,
     currentPage,
     setCurrentPage,
     isLoading,

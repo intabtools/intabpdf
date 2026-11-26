@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.webkit.JavascriptInterface;
 import com.getcapacitor.BridgeActivity;
+import org.intabtools.intabpdf.save.DocumentSavePlugin;
+import org.intabtools.intabpdf.scanner.bridge.DocumentScannerPlugin;
 import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -21,6 +23,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(DocumentScannerPlugin.class);
+        registerPlugin(DocumentSavePlugin.class);
         super.onCreate(savedInstanceState);
         if (!isProcessInitialized) {
             isProcessInitialized = true;

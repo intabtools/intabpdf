@@ -1,11 +1,12 @@
 // Web layout shell for standalone browser usage with sticky navigation header, breadcrumbs, and footer.
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Moon, Search, Sun } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import CommandPalette from './CommandPalette';
 import Logo from './Logo';
 import { useShell } from '../hooks/useShell';
+import { useRouteScrollRestoration } from '../hooks/useRouteScrollRestoration';
 import { APP_VERSION } from '../config';
 import { ViewerContext } from '../viewer/viewerContextDef';
 import { ProcessingContext } from './processingContextDef';
@@ -27,6 +28,8 @@ export default function WebShell({
 }: WebShellProps): ReactNode {
   const location = useLocation();
   const { setShowAppLayout } = useShell();
+  const webScrollRef = useRef<HTMLDivElement>(null);
+  useRouteScrollRestoration(webScrollRef);
 
   const [isDark, setIsDark] = useState<boolean>(() => {
     try {
@@ -96,6 +99,7 @@ export default function WebShell({
       )}
 
       <div
+        ref={webScrollRef}
         className="wscroll"
         id="m"
         style={isFullScreenOverlay ? { display: 'none' } : undefined}

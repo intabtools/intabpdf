@@ -212,7 +212,7 @@ export default function SplitTool({
         </div>
       )}
 
-      <div style={{ marginTop: '10px', marginBottom: '4px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
+      <div className="opts-filename">
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -227,7 +227,6 @@ export default function SplitTool({
         className="cta"
         onClick={handleRun}
         disabled={isProcessing || !isValidToSplit}
-        style={{ marginTop: '12px' }}
       >
         <Files size={16} style={{ flexShrink: 0 }} />
         <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.3 }}>

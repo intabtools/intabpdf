@@ -60,6 +60,7 @@ export interface ToolDefinition {
   outputName: string;
   multipleFiles: boolean;
   options: ToolOption[];
+  keywords?: string[];
   availability: ToolAvailability;
   /**
    * Statically analyzable dynamic import loader for on-demand code splitting.

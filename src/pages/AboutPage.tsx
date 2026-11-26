@@ -1,8 +1,10 @@
 // About page presenting privacy guarantees, FAQ, open-source repository link, and dynamic version.
 import type { ReactNode } from 'react';
-import { Code2 } from 'lucide-react';
+import { Code2, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useSaveRecovery } from '../hooks/useSaveRecovery';
 import { useShell } from '../hooks/useShell';
+import { getPlatformType } from '../platform';
 import { APP_VERSION } from '../config';
 
 const FAQ_ITEMS = [
@@ -32,9 +34,37 @@ const PRIVACY_ITEMS = [
 
 export default function AboutPage(): ReactNode {
   const { shell } = useShell();
+  const saveRecovery = useSaveRecovery();
+  const isAndroid = getPlatformType() === 'android';
+  const recoveryCount = saveRecovery?.backups.length ?? 0;
 
   const content = (
     <div className="ab">
+      {isAndroid && saveRecovery && (
+        <section className="card wide" aria-label="Android file recovery">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <ShieldAlert size={18} color={recoveryCount > 0 ? 'var(--warning)' : 'var(--accent)'} />
+                <span>Saved file recovery</span>
+              </h2>
+              <small style={{ color: 'var(--text-muted)' }}>
+                {recoveryCount > 0
+                  ? `${recoveryCount} preserved recovery backup${recoveryCount === 1 ? '' : 's'} waiting for export or review.`
+                  : 'Check or export any backup preserved after an interrupted Android file replacement.'}
+              </small>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => saveRecovery.openRecoveryManager()}
+            >
+              {recoveryCount > 0 ? `Recover Backups (${recoveryCount})` : 'Manage Recovery Backups'}
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="card id">
         <h2>About InTab PDF</h2>
         <p>
@@ -82,6 +112,16 @@ export default function AboutPage(): ReactNode {
             <p>{item.answer}</p>
           </details>
         ))}
+        <details>
+          <summary>Open-source notices and licenses</summary>
+          <p>
+            InTab PDF is MIT licensed and uses open-source libraries including PDF.js (Apache-2.0),
+            pdf-lib (MIT), React (MIT), and Lucide (ISC).
+            {isAndroid
+              ? ' On Android, the native scanner and runtime also include OpenCV 4.12.0 (Apache-2.0; bundling libjpeg-turbo, libpng, libtiff, OpenJPEG, libwebp, zlib, KleidiCV, and ITT), LLVM libc++ (Apache-2.0 with LLVM Exception), AndroidX CameraX & Jetpack Compose (Apache-2.0), and Capacitor (MIT). See THIRD_PARTY_NOTICES.txt in the APK assets.'
+              : ''}
+          </p>
+        </details>
       </section>
     </div>
   );

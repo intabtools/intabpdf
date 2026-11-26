@@ -529,7 +529,7 @@ export default function CompressTool({
       </div>
 
       {/* Output filename */}
-      <div style={{ marginTop: '10px', marginBottom: '4px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
+      <div className="opts-filename">
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -546,13 +546,6 @@ export default function CompressTool({
         disabled={
           isProcessing || stagedFiles.length === 0 || (mode === 'target' && (!targetBytes || targetBytes <= 0))
         }
-        style={{
-          marginTop: '12px',
-          justifyContent: 'center',
-          minHeight: '44px',
-          minWidth: 0,
-          maxWidth: '100%',
-        }}
       >
         {mode === 'target' ? <Target size={16} style={{ flexShrink: 0 }} /> : <FileDown size={16} style={{ flexShrink: 0 }} />}
         <span style={{ minWidth: 0, textAlign: 'center', lineHeight: 1.3 }}>{actionLabel}</span>

@@ -8,6 +8,7 @@ import {
   Minus,
   Plus,
   Search,
+  Share2,
 } from 'lucide-react';
 
 interface ViewerFullscreenControlsProps {
@@ -19,6 +20,7 @@ interface ViewerFullscreenControlsProps {
   onExitFullscreen: () => void;
   isSearchOpen: boolean;
   onToggleSearch: () => void;
+  onSharePdf?: () => void;
   showThumbnails: boolean;
   mobileThumbnailsOpen: boolean;
   setShowThumbnails: Dispatch<SetStateAction<boolean>>;
@@ -50,6 +52,7 @@ export default function ViewerFullscreenControls({
   onExitFullscreen,
   isSearchOpen,
   onToggleSearch,
+  onSharePdf,
   showThumbnails,
   mobileThumbnailsOpen,
   setShowThumbnails,
@@ -110,6 +113,17 @@ export default function ViewerFullscreenControls({
         >
           <Search size={16} strokeWidth={1.8} />
         </button>
+        {onSharePdf && (
+          <button
+            type="button"
+            className="viewer-pill-btn"
+            onClick={onSharePdf}
+            aria-label="Share PDF"
+            title="Share PDF"
+          >
+            <Share2 size={16} strokeWidth={1.8} />
+          </button>
+        )}
         <button
           type="button"
           className={`viewer-pill-btn ${showThumbnails || mobileThumbnailsOpen ? 'active' : ''}`}

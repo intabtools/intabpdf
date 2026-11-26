@@ -33,7 +33,7 @@ intabpdf/
 │   │   ├── worker/      Centralized PDF worker service and worker thread
 │   │   ├── merge.ts, split.ts, reorder.ts, rotate.ts, remove-pages.ts, compress.ts, protect.ts, unlock.ts, sign.ts, images-to-pdf.ts, text-to-pdf.ts, extract-text.ts, zip.ts
 │   │   └── index.ts     Core operations export
-│   ├── platform/        Per-platform adapters (web, electron, android, androidSave)
+│   ├── platform/        Per-platform adapters (web, electron, androidSave, scanner, share, recoveryEvents)
 │   ├── tools/           Tools domain
 │   │   ├── modules/     Tool UI modules and tool-specific helper subfolders (`compress/`, `imagesToPdf/`, `pdfToImages/`, `split/`)
 │   │   ├── registry.ts  Tool discovery and queries
@@ -43,15 +43,15 @@ intabpdf/
 │   │   └── types.ts     ToolDefinition, WorkerRequest, WorkerResponse, and component prop types
 │   ├── viewer/          Embedded PDF viewer screen (Electron and Android)
 │   ├── pages/           Screens (HomePage, AboutPage, ToolPage, and `tool/` subcomponents)
-│   ├── components/      Shared UI (DropZone, ShellContainer, ModalDialog, SegmentedControl, NoticeBanner, PasswordInput, etc.)
-│   ├── hooks/           Shared React hooks (useShell, useProcessing, useToast, useViewer)
+│   ├── components/      Shared UI (DropZone, ShellContainer, ModalDialog, SegmentedControl, NoticeBanner, PasswordInput, ScanDocumentFab, SaveRecoveryDialog, etc.)
+│   ├── hooks/           Shared React hooks (useShell, useProcessing, useToast, useViewer, useScanDocument, useSaveRecovery)
 │   ├── config/          Screen configuration (`screens.ts`) and release version constant (`version.ts`)
 │   ├── styles/          Global CSS and theme variables (tokens.css, base.css, web.css)
 │   ├── assets/          Reserved static asset directory (currently empty)
 │   ├── App.tsx          Root application component
 │   └── main.tsx         Browser entry point
-├── electron/            Desktop app shell (main.cjs and preload.cjs)
-├── android/             Android app shell (Capacitor project with Gradle guards)
+├── electron/            Desktop app shell (main.cjs, preload.cjs, security.cjs, args.cjs)
+├── android/             Android app shell (Capacitor project, SAF save/recovery, native scanner, Save to Device)
 ├── e2e/                 Playwright end-to-end test suites, fixtures, and harnesses
 ├── scripts/             Build and verification scripts (cap.cjs, test-csp-runtime.mjs)
 ├── .github/workflows/   GitHub Actions workflows (ci.yml, release.yml)
@@ -119,9 +119,9 @@ intabpdf/
 
 ### `electron/` and `android/`
 
-- **Purpose:** Native application shells.
-- **Keep here:** In `electron/`: `main.cjs` and `preload.cjs`. In `android/`: Capacitor configuration and Gradle project.
-- **Avoid:** PDF logic. It stays in TypeScript. Never commit signing keys, keystores, or built binaries.
+- **Purpose:** Native application shells and Android-specific integrations.
+- **Keep here:** In `electron/`: `main.cjs`, `preload.cjs`, `security.cjs`, and `args.cjs`. In `android/`: Capacitor configuration, Gradle project, `save/` (SAF save & recovery), `scanner/` (Android-only CameraX/OpenCV scanner), and `savetodevice/` share target.
+- **Avoid:** Cross-platform PDF manipulation logic (keep all 13 PDF tools in `src/core/`). Never commit signing keys, keystores, or built binaries.
 
 ### `e2e/`
 

@@ -1,7 +1,8 @@
-const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
+const { app, BrowserWindow, Menu, clipboard, ipcMain, session, shell } = require('electron');
 const path = require('path');
 const { fileURLToPath } = require('url');
 const fs = require('fs');
+const { isAllowedPermission, isViewerUrl, buildContextMenuTemplate } = require('./security.cjs');
 
 const isDev = process.argv.includes('--dev');
 // INTAB_TEST_DIST lets the automated tests load a fixture page instead of the
@@ -17,6 +18,7 @@ const MAX_PDF_BYTES = 200 * 1024 * 1024; // 200 MB
 let win = null;
 let rendererReady = false;
 let drainingQueue = false;
+let viewerCopyAllowed = true;
 const pendingFiles = [];
 const { resolvePdfArg, findPdf } = require('./args.cjs');
 
@@ -183,11 +185,16 @@ function configureSessionSecurity() {
   ses.webRequest.onBeforeRequest((details, callback) => {
     callback({ cancel: !isAllowedRequest(details.url) });
   });
-  // Deny every permission request (camera, mic, notifications, etc.).
-  ses.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false);
+  // Allow only narrowly scoped clipboard permissions from the trusted app origin.
+  // Deny camera, microphone, geolocation, notifications, and unrelated requests.
+  ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const requestUrl = (details && details.requestingUrl) || (webContents && webContents.getURL()) || '';
+    callback(isAllowedPermission(permission, requestUrl, isAllowedNavigation));
   });
-  ses.setPermissionCheckHandler(() => false);
+  ses.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    const checkUrl = requestingOrigin || (webContents && webContents.getURL()) || '';
+    return isAllowedPermission(permission, checkUrl, isAllowedNavigation);
+  });
 }
 
 function createWindow() {
@@ -218,11 +225,33 @@ function createWindow() {
     event.preventDefault();
   });
   const wc = win.webContents;
-  // Reset readiness only when the top-level page reloads or navigates away.
+  // Reset readiness and viewer permission state on top-level navigation.
   // Do NOT listen to 'did-start-loading' because it fires for sub-resources and lazy chunks.
   wc.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
     if (isMainFrame && !isInPlace) {
       rendererReady = false;
+      viewerCopyAllowed = true;
+    }
+  });
+  // Register native right-click menu supporting Copy and viewer-scoped Select All on Page cleanly.
+  wc.on('context-menu', (_event, params) => {
+    if (!win || win.isDestroyed()) return;
+    if (!isAllowedNavigation(wc.getURL())) return;
+    const isViewerRoute = isViewerUrl(wc.getURL());
+    const template = buildContextMenuTemplate({
+      selectionText: params.selectionText || '',
+      isEditable: params.isEditable,
+      isViewerRoute,
+      viewerCopyAllowed: isViewerRoute ? viewerCopyAllowed : true,
+      onCopy: (text) => clipboard.writeText(text),
+      onSelectAll: () => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('context-select-all');
+        }
+      },
+    });
+    if (template.length > 0) {
+      Menu.buildFromTemplate(template).popup({ window: win });
     }
   });
   // If the renderer crashes, reset readiness and reload so queued files
@@ -258,6 +287,7 @@ function createWindow() {
   win.on('closed', () => {
     win = null;
     rendererReady = false;
+    viewerCopyAllowed = true;
   });
   if (isDev) {
     win.loadURL('http://localhost:5173');
@@ -313,6 +343,28 @@ if (!gotLock) {
         console.error('Failed to open external URL:', err);
       });
     }
+  });
+
+  // Scoped clipboard write IPC from verified main frame of the application.
+  ipcMain.handle('copy-text', (event, rawText) => {
+    if (!win || win.isDestroyed()) return false;
+    if (event.sender !== win.webContents) return false;
+    const frame = event.senderFrame;
+    if (!frame || frame !== win.webContents.mainFrame) return false;
+    if (!isAllowedNavigation(frame.url)) return false;
+    if (typeof rawText !== 'string') return false;
+    clipboard.writeText(rawText);
+    return true;
+  });
+
+  // Synchronize viewer copy-permission status for native context menus.
+  ipcMain.on('set-viewer-copy-allowed', (event, allowed) => {
+    if (!win || win.isDestroyed()) return;
+    if (event.sender !== win.webContents) return;
+    const frame = event.senderFrame;
+    if (!frame || frame !== win.webContents.mainFrame) return;
+    if (!isAllowedNavigation(frame.url)) return;
+    viewerCopyAllowed = Boolean(allowed);
   });
 
   // Only accept readiness messages from our own renderer's main frame,

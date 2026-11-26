@@ -5,12 +5,15 @@ import { AlertTriangle } from 'lucide-react';
 import ModalDialog from './ModalDialog';
 import {
   setConflictPromptHandler,
+  type ConflictPromptOptions,
   type ConflictResolution,
 } from '../platform/conflictDialog';
 
 interface ActiveConflict {
   fileName: string;
   suggestedName: string;
+  displayPath?: string;
+  replaceDisabledReason?: string;
   resolve: (res: ConflictResolution) => void;
 }
 
@@ -21,13 +24,15 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setConflictPromptHandler((fileName, suggestedName) => {
+    setConflictPromptHandler((fileName, suggestedName, options?: ConflictPromptOptions) => {
       return new Promise<ConflictResolution>((resolve) => {
         setCustomName(suggestedName);
         setNameError(null);
         setConflict({
           fileName,
           suggestedName,
+          displayPath: options?.displayPath,
+          replaceDisabledReason: options?.replaceDisabledReason,
           resolve: (res) => {
             setConflict(null);
             resolve(res);
@@ -85,7 +90,8 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
               <strong style={{ color: 'var(--text)', wordBreak: 'break-all' }}>
                 {conflict.fileName}
               </strong>{' '}
-              already exists in your Documents folder.
+              already exists in{' '}
+              <strong>{conflict.displayPath || 'Documents/InTabPDF'}</strong>.
             </span>
           }
           closeLabel="Cancel"
@@ -147,15 +153,23 @@ export function FileConflictProvider({ children }: { children: ReactNode }): Rea
                 Save as new name
               </button>
 
+              {conflict.replaceDisabledReason && (
+                <span style={{ fontSize: '12px', color: 'var(--warning)' }}>
+                  {conflict.replaceDisabledReason}
+                </span>
+              )}
+
               <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                <button
-                  type="button"
-                  onClick={handleReplace}
-                  className="btn btn-danger-soft"
-                  style={{ flex: 1 }}
-                >
-                  Replace
-                </button>
+                {!conflict.replaceDisabledReason && (
+                  <button
+                    type="button"
+                    onClick={handleReplace}
+                    className="btn btn-danger-soft"
+                    style={{ flex: 1 }}
+                  >
+                    Replace
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCancel}

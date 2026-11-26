@@ -920,11 +920,23 @@ textarea,
   max-width: 100%;
 }
 
+.tp-staged,
+.tp-work {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+}
+
+.card.tp-work {
+  padding: 16px;
 }
 
 .fi {
@@ -1196,10 +1208,26 @@ textarea,
 }
 
 .opts {
-  padding: 4px 16px 16px;
+  padding: 16px;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.opts > .sw:first-child {
+  padding-top: 0;
+}
+
+.opts-filename {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 12px;
+  box-sizing: border-box;
+}
+
+.opts > .opts-filename:first-child {
+  margin-top: 0;
 }
 
 .sw {
@@ -1217,7 +1245,9 @@ textarea,
   min-width: 0;
 }
 
-.sw:last-of-type {
+.sw:last-child,
+.sw:last-of-type,
+.sw:has(+ :not(.sw)) {
   border-bottom: 0;
 }
 
@@ -1280,9 +1310,10 @@ textarea,
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  min-height: 44px;
   box-sizing: border-box;
-  margin-top: 16px;
-  padding: 12px;
+  margin-top: 14px;
+  padding: 11px 14px;
   border: 0;
   border-radius: var(--radius-sm);
   background: var(--button);
@@ -2200,7 +2231,7 @@ html[data-platform="android"] .stb {
     display: none !important;
   }
   .opts {
-    padding: 4px 12px 14px;
+    padding: 14px 12px;
   }
   .busy {
     padding: 24px 14px;
@@ -2228,7 +2259,8 @@ html[data-platform="android"] .stb {
   }
   .cta {
     font-size: 13.5px;
-    padding: 11px 12px;
+    min-height: 44px;
+    padding: 11px 14px;
   }
   .mo {
     padding: 16px 12px calc(64px + env(safe-area-inset-bottom, 0px));
@@ -2295,7 +2327,7 @@ html[data-platform="android"] .stb {
     display: none !important;
   }
   .opts {
-    padding: 4px 12px 14px;
+    padding: 14px 12px;
   }
   .busy {
     padding: 24px 14px;
@@ -2323,7 +2355,8 @@ html[data-platform="android"] .stb {
   }
   .cta {
     font-size: 13.5px;
-    padding: 11px 12px;
+    min-height: 44px;
+    padding: 11px 14px;
   }
   .mo {
     padding: 16px 12px calc(64px + env(safe-area-inset-bottom, 0px));
@@ -2437,6 +2470,14 @@ html[data-platform="android"] .stb {
     max-width: 1240px;
     margin: 0 auto;
   }
+  .tp > .tp-staged,
+  .tp > .tp-work {
+    grid-column: 1;
+  }
+  .tp > .card.opts {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
   .ab {
     grid-template-columns: 1fr 1fr;
     gap: 22px;
@@ -2455,6 +2496,14 @@ html[data-platform="android"] .stb {
     gap: 24px;
     max-width: 1240px;
     margin: 0 auto;
+  }
+  .tp > .tp-staged,
+  .tp > .tp-work {
+    grid-column: 1;
+  }
+  .tp > .card.opts {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
   .ab {
     grid-template-columns: 1fr 1fr;
@@ -2942,5 +2991,156 @@ html[data-platform="android"] *::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
+  }
+}
+
+/* ==========================================================================
+   Android HomePage Floating Scan Document Action Pill
+   ========================================================================== */
+
+.cnt.cnt-with-scan-fab {
+  padding-bottom: 92px;
+}
+
+.scan-fab-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+  z-index: 9;
+}
+
+@container app (min-width: 520px) {
+  .scan-fab-dock {
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 520px) {
+  .scan-fab-dock {
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.scan-fab {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 22px 0 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--button);
+  color: #ffffff;
+  font-family: var(--font);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 10px 26px rgba(10, 20, 60, 0.24), 0 3px 10px rgba(10, 15, 40, 0.14);
+  transform: translate3d(0, 0, 0);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.15s ease,
+    box-shadow 0.2s ease;
+  will-change: transform;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.scan-fab:hover:not(:disabled) {
+  box-shadow: 0 12px 30px rgba(10, 20, 60, 0.3), 0 4px 12px rgba(10, 15, 40, 0.16);
+}
+
+.scan-fab.is-visible:active:not(:disabled) {
+  transform: translate3d(0, 0, 0) scale(0.97);
+}
+
+.scan-fab.is-hidden {
+  pointer-events: none;
+  transform: translate3d(0, calc(100% + 112px + env(safe-area-inset-bottom, 0px)), 0);
+}
+
+.scan-fab:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.scan-fab-icon {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+}
+
+.scan-fab-glyph {
+  display: block;
+}
+
+.scan-fab-beam {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.75);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scan-fab.has-idle-motion .scan-fab-glyph {
+  animation: scanFabIconBreath 3.2s ease-in-out infinite;
+}
+
+.scan-fab.has-idle-motion .scan-fab-beam {
+  animation: scanFabSweep 3.2s ease-in-out infinite;
+}
+
+.scan-fab-label {
+  display: inline-block;
+}
+
+@keyframes scanFabIconBreath {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.96;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes scanFabSweep {
+  0%, 18%, 82%, 100% {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  32%, 68% {
+    opacity: 0.78;
+  }
+  50% {
+    transform: translateY(6px);
+    opacity: 0.92;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-fab.has-idle-motion .scan-fab-glyph,
+  .scan-fab.has-idle-motion .scan-fab-beam {
+    animation: none;
   }
 }

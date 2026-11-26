@@ -460,7 +460,7 @@ export default function ImagesToPdfTool({
         </div>
       )}
 
-      <div style={{ marginTop: '10px', marginBottom: '4px' }}>
+      <div className="opts-filename">
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}
@@ -474,7 +474,6 @@ export default function ImagesToPdfTool({
         className="cta"
         onClick={handleRun}
         disabled={isProcessing || fileCount === 0}
-        style={{ marginTop: '14px' }}
       >
         <FileImage size={16} />
         <span>

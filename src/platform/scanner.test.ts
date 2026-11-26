@@ -1,0 +1,150 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const pluginMocks = vi.hoisted(() => ({
+  isAvailable: vi.fn(),
+  startScan: vi.fn(),
+  cleanupOutput: vi.fn(),
+}));
+
+let mockIsNative = false;
+let mockPlatformType: 'web' | 'electron' | 'android' = 'web';
+
+vi.mock('@capacitor/core', () => ({
+  Capacitor: {
+    isNativePlatform: () => mockIsNative,
+    convertFileSrc: (url: string) => `https://localhost/_capacitor_file_${encodeURI(url.replace('file://', ''))}`,
+  },
+  registerPlugin: () => pluginMocks,
+}));
+
+vi.mock('./index', () => ({
+  getPlatformType: () => mockPlatformType,
+}));
+
+import { cleanupScannerOutput, isDocumentScannerAvailable, scanDocumentToOpenedFile } from './scanner';
+
+describe('DocumentScanner Capacitor bridge', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsNative = false;
+    mockPlatformType = 'web';
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('reports unavailable on Web and Electron without calling native plugin', async () => {
+    for (const platform of ['web', 'electron'] as const) {
+      mockPlatformType = platform;
+      const res = await isDocumentScannerAvailable();
+      expect(res).toEqual({
+        available: false,
+        hasCameraHardware: false,
+        hasCameraPermission: false,
+      });
+      await expect(scanDocumentToOpenedFile()).rejects.toThrow(/only available on Android/i);
+    }
+    expect(pluginMocks.isAvailable).not.toHaveBeenCalled();
+    expect(pluginMocks.startScan).not.toHaveBeenCalled();
+  });
+
+  it('forwards availability check on native Android', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    pluginMocks.isAvailable.mockResolvedValue({
+      available: true,
+      hasCameraHardware: true,
+      hasCameraPermission: false,
+    });
+
+    const res = await isDocumentScannerAvailable();
+    expect(pluginMocks.isAvailable).toHaveBeenCalledTimes(1);
+    expect(res.available).toBe(true);
+    expect(res.hasCameraPermission).toBe(false);
+  });
+
+  it('handles scanner cancellation cleanly without reading or deleting files', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    pluginMocks.startScan.mockResolvedValue({ status: 'cancelled' });
+
+    const res = await scanDocumentToOpenedFile({ autoCaptureDefault: true });
+    expect(res).toEqual({ status: 'cancelled' });
+    expect(pluginMocks.cleanupOutput).not.toHaveBeenCalled();
+  });
+
+  it('reads completed PDF bytes via convertFileSrc and cleans up temporary file', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    pluginMocks.startScan.mockResolvedValue({
+      status: 'completed',
+      pdfFileUrl: 'file:///data/user/0/org.intabtools.intabpdf/cache/scanner_outputs/scan_1.pdf',
+      fileName: 'ReceiptScan',
+      pageCount: 2,
+    });
+    pluginMocks.cleanupOutput.mockResolvedValue({ deleted: true });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => pdfBytes.buffer,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await scanDocumentToOpenedFile();
+    expect(res.status).toBe('completed');
+    if (res.status === 'completed') {
+      expect(res.file.name).toBe('ReceiptScan.pdf');
+      expect(res.file.bytes).toEqual(pdfBytes);
+      expect(res.pageCount).toBe(2);
+    }
+    expect(pluginMocks.cleanupOutput).toHaveBeenCalledWith({
+      pdfFileUrl: 'file:///data/user/0/org.intabtools.intabpdf/cache/scanner_outputs/scan_1.pdf',
+    });
+  });
+
+  it('still triggers cleanup when reading the returned PDF fails', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    pluginMocks.startScan.mockResolvedValue({
+      status: 'completed',
+      pdfFileUrl: 'file:///cache/scanner_outputs/broken.pdf',
+      pageCount: 1,
+    });
+    pluginMocks.cleanupOutput.mockResolvedValue({ deleted: true });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+
+    await expect(scanDocumentToOpenedFile()).rejects.toThrow(/HTTP 404/);
+    expect(pluginMocks.cleanupOutput).toHaveBeenCalledWith({
+      pdfFileUrl: 'file:///cache/scanner_outputs/broken.pdf',
+    });
+
+    // cleanupScannerOutput suppresses native cleanup errors cleanly
+    pluginMocks.cleanupOutput.mockRejectedValueOnce(new Error('IO'));
+    await expect(cleanupScannerOutput('file:///cache/scanner_outputs/broken.pdf')).resolves.toBeUndefined();
+  });
+
+  it('rejects non-PDF corrupted output payloads while still cleaning up temporary files', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    pluginMocks.startScan.mockResolvedValue({
+      status: 'completed',
+      pdfFileUrl: 'file:///cache/scanner_outputs/not_a_pdf.pdf',
+      pageCount: 1,
+    });
+    pluginMocks.cleanupOutput.mockResolvedValue({ deleted: true });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => new Uint8Array([0x00, 0x01, 0x02, 0x03]).buffer,
+      }),
+    );
+
+    await expect(scanDocumentToOpenedFile()).rejects.toThrow(/not a valid PDF/i);
+    expect(pluginMocks.cleanupOutput).toHaveBeenCalledWith({
+      pdfFileUrl: 'file:///cache/scanner_outputs/not_a_pdf.pdf',
+    });
+  });
+});

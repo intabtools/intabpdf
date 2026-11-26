@@ -1,8 +1,11 @@
 // Screen component coordinating PDF viewer lifecycle, platform integrations, and sub-views.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ShieldAlert } from 'lucide-react';
 import { useShell } from '../hooks/useShell';
+import { useToast } from '../hooks/useToast';
+import { sharePdfDocument } from '../platform/share';
 import './viewer.css';
 
 import ViewerToolbar from './ViewerToolbar';
@@ -20,6 +23,7 @@ import { useViewerSearch } from './useViewerSearch';
 import { useViewerShortcuts } from './useViewerShortcuts';
 import { usePdfDocumentLoader } from './usePdfDocumentLoader';
 import { useViewerScrollSync } from './useViewerScrollSync';
+import { selectAllTextOnPage } from './pageTextSelection';
 
 export type { SearchMatch } from './types';
 
@@ -29,6 +33,7 @@ export default function ViewerPage(): ReactNode {
 
   const [showThumbnails, setShowThumbnails] = useState(true);
   const [mobileThumbnailsOpen, setMobileThumbnailsOpen] = useState(false);
+  const [selectAllSignal, setSelectAllSignal] = useState(0);
 
   const shellRef = useRef<HTMLDivElement>(null);
   const scrollRootRef = useRef<HTMLElement | null>(null);
@@ -38,6 +43,7 @@ export default function ViewerPage(): ReactNode {
     pdfDoc,
     fileName,
     pageSizes,
+    allowCopying,
     currentPage,
     setCurrentPage,
     isLoading,
@@ -53,10 +59,12 @@ export default function ViewerPage(): ReactNode {
   } = usePdfDocumentLoader();
 
   const {
+    activeDocFile = null,
     zoom: savedZoom = 100,
     isFitToWidth: savedIsFitToWidth = true,
     updateReadingState,
   } = useViewer();
+  const { showToast } = useToast();
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -195,6 +203,49 @@ export default function ViewerPage(): ReactNode {
     setIsEditingPage,
   ]);
 
+  const selectCurrentPageText = useCallback(() => {
+    if (!allowCopying) {
+      showToast('Copying text is restricted by this PDF\'s permissions.');
+      return;
+    }
+    const selected = selectAllTextOnPage(currentPage, shellRef.current);
+    if (!selected) {
+      showToast(`Page ${currentPage} text is still loading…`);
+      return;
+    }
+
+    setSelectAllSignal((prev) => prev + 1);
+
+    if (numPages > 1) {
+      showToast(`Selected text on page ${currentPage} of ${numPages}`);
+    }
+  }, [allowCopying, currentPage, numPages, showToast]);
+
+  const handleSharePdf = useCallback(async () => {
+    const outcome = await sharePdfDocument({
+      fileName: activeDocFile?.name || fileName,
+      bytes: activeDocFile?.bytes,
+    });
+    if (outcome.status !== 'canceled' && outcome.status !== 'shared') {
+      showToast(outcome.message);
+    }
+  }, [activeDocFile, fileName, showToast]);
+
+  // Synchronize copy permission and Electron native Context Select All listener
+  useEffect(() => {
+    window.intab?.setViewerCopyAllowed?.(allowCopying);
+    return () => {
+      window.intab?.setViewerCopyAllowed?.(true);
+    };
+  }, [allowCopying]);
+
+  useEffect(() => {
+    if (!window.intab?.onContextSelectAll) return;
+    return window.intab.onContextSelectAll(() => {
+      selectCurrentPageText();
+    });
+  }, [selectCurrentPageText]);
+
   useViewerShortcuts({
     isSearchOpen,
     setIsSearchOpen,
@@ -212,7 +263,18 @@ export default function ViewerPage(): ReactNode {
     zoomIn,
     zoomOut,
     toggleFitOrZoom,
+    onSelectAllPage: selectCurrentPageText,
   });
+
+  const handleShellCopyOrCut = useCallback(
+    (event: ReactClipboardEvent<HTMLDivElement>) => {
+      if (!allowCopying) {
+        event.preventDefault();
+        showToast('Copying text is restricted by this PDF\'s permissions.');
+      }
+    },
+    [allowCopying, showToast],
+  );
 
   const handleReturnHome = useCallback(async () => {
     await resetDocumentState();
@@ -223,6 +285,8 @@ export default function ViewerPage(): ReactNode {
     <div
       ref={shellRef}
       className={`viewer-shell ${isFullscreen ? 'is-fullscreen' : ''} ${showThumbnails ? 'thm-open' : ''}`}
+      onCopy={handleShellCopyOrCut}
+      onCut={handleShellCopyOrCut}
       onMouseMove={() => {
         if (isFullscreen) {
           revealControlsTemporarily(3000);
@@ -281,6 +345,7 @@ export default function ViewerPage(): ReactNode {
           onToggleFitOrZoom={toggleFitOrZoom}
           isSearchOpen={isSearchOpen}
           onToggleSearch={handleToggleSearch}
+          onSharePdf={pdfDoc ? () => void handleSharePdf() : undefined}
           isFullscreen={isFullscreen}
           onToggleFullscreen={() => void toggleFullscreen()}
           autoHideControls={autoHideControls}
@@ -300,6 +365,7 @@ export default function ViewerPage(): ReactNode {
           onExitFullscreen={() => void exitFullscreen()}
           isSearchOpen={isSearchOpen}
           onToggleSearch={handleToggleSearch}
+          onSharePdf={() => void handleSharePdf()}
           showThumbnails={showThumbnails}
           mobileThumbnailsOpen={mobileThumbnailsOpen}
           setShowThumbnails={setShowThumbnails}
@@ -321,6 +387,13 @@ export default function ViewerPage(): ReactNode {
           fitScale={fitScale}
           onToggleFitOrZoom={toggleFitOrZoom}
         />
+      )}
+
+      {pdfDoc && !error && !allowCopying && (
+        <div className="viewer-permission-banner" role="status" aria-live="polite">
+          <ShieldAlert size={14} aria-hidden="true" />
+          <span>Copying text is disabled by this PDF&apos;s permissions. Reading, search, and navigation remain available.</span>
+        </div>
       )}
 
       {isSearchOpen && pdfDoc && (
@@ -384,10 +457,18 @@ export default function ViewerPage(): ReactNode {
           matches={matches}
           currentMatchIndex={currentMatchIndex}
           linkService={linkService}
+          allowCopying={allowCopying}
         />
       </div>
 
-      <ViewerSelectionMenu containerRef={shellRef} currentPage={currentPage} />
+      <ViewerSelectionMenu
+        containerRef={shellRef}
+        currentPage={currentPage}
+        allowCopying={allowCopying}
+        onSelectAllPage={selectCurrentPageText}
+        selectAllSignal={selectAllSignal}
+        isFullscreen={isFullscreen}
+      />
 
       {passwordPrompt && (
         <PasswordDialog

@@ -411,7 +411,7 @@ export const platform: PlatformAdapter = {
         if (typeof window !== 'undefined' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
             try {
                 const { saveFileAndroid } = await import('./androidSave');
-                return await saveFileAndroid(bytes, fileName);
+                return await saveFileAndroid(bytes, fileName, type);
             } catch (nativeErr) {
                 console.warn('Native Capacitor Android save failed:', nativeErr);
                 throw nativeErr;

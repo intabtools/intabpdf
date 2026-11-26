@@ -184,14 +184,22 @@ export function useShell(): ShellContextType;
 Standard interface across Web, Electron desktop, and Capacitor Android.
 
 ```typescript
-export interface OpenedFile {
-  name: string;
-  bytes: Uint8Array;
-}
+export type SaveOutcomeStatus =
+  | 'saved'
+  | 'replaced'
+  | 'cancelled'
+  | 'failed_original_intact'
+  | 'failed_recovery_available';
 
 export interface SaveFileResult {
   saved: boolean;
+  outcome?: SaveOutcomeStatus;
   fileName?: string;
+  displayPath?: string;
+  originalIntact?: boolean;
+  message?: string;
+  cleanupWarning?: SaveCleanupWarning;
+  recovery?: RecoveryBackupSummary;
 }
 
 export interface PlatformAdapter {
@@ -205,7 +213,7 @@ export interface PlatformAdapter {
 }
 ```
 
-### Desktop & Mobile Bridge Extensions (`window.intab`, `window.NativeIntent`)
+### Desktop & Mobile Bridge Extensions (`window.intab`, `window.NativeIntent`, Capacitor Plugins)
 
 ```typescript
 declare global {
@@ -218,6 +226,9 @@ declare global {
       onOpenPdfError?(callback: (errorData: { name: string; error: string }) => void): () => void;
       onOpenPdfStart?(callback: (startData: { name: string }) => void): () => void;
       openExternalUrl?(url: string): void;
+      copyText?(text: string): Promise<boolean>;
+      setViewerCopyAllowed?(allowed: boolean): void;
+      onContextSelectAll?(callback: () => void): () => void;
     };
     /** Android Capacitor native intent bridge */
     NativeIntent?: {
@@ -229,6 +240,10 @@ declare global {
   }
 }
 ```
+
+Native Android Capacitor plugins registered in `MainActivity.java`:
+- `DocumentSave` (`src/platform/androidSave.ts` ↔ `DocumentSavePlugin.kt`): `prepareSaveDestination`, `writeToDestination`, `listRecoveryBackups`, `exportRecoveryBackup`, `confirmDeleteRecoveryBackup`, `cleanupLeftoverSafFile`.
+- `DocumentScanner` (`src/platform/scanner.ts` ↔ `DocumentScannerPlugin.kt`, Android-only): `isAvailable`, `startScan`, `cleanupOutput`.
 
 ---
 

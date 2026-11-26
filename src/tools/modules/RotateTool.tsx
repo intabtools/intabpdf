@@ -325,7 +325,7 @@ export default function RotateTool({
         </div>
       )}
 
-      <div style={{ marginTop: '6px', marginBottom: '8px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
+      <div className="opts-filename">
         <OutputFilenameInput
           value={outputBaseName ?? ''}
           onChange={onOutputBaseNameChange ?? (() => {})}

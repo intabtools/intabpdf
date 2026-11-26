@@ -19,6 +19,7 @@ export interface UseViewerShortcutsOptions {
   zoomIn: () => void;
   zoomOut: () => void;
   toggleFitOrZoom: () => void;
+  onSelectAllPage?: () => void;
 }
 
 export function useViewerShortcuts({
@@ -38,6 +39,7 @@ export function useViewerShortcuts({
   zoomIn,
   zoomOut,
   toggleFitOrZoom,
+  onSelectAllPage,
 }: UseViewerShortcutsOptions): void {
   useEffect(() => {
     const handleViewerKeyDown = (e: KeyboardEvent) => {
@@ -62,6 +64,14 @@ export function useViewerShortcuts({
         if (isDistractionFree) {
           e.preventDefault();
           exitDistractionFree();
+          return;
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        if (onSelectAllPage) {
+          e.preventDefault();
+          onSelectAllPage();
           return;
         }
       }
@@ -142,5 +152,6 @@ export function useViewerShortcuts({
     zoomIn,
     zoomOut,
     toggleFitOrZoom,
+    onSelectAllPage,
   ]);
 }

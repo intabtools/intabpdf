@@ -7,6 +7,7 @@ const errorListeners = new Set();
 const errorBacklog = [];
 const startListeners = new Set();
 const startBacklog = [];
+const contextSelectAllListeners = new Set();
 let announcedReady = false;
 
 // Single IPC subscriptions, registered once. If no React listener is
@@ -50,6 +51,16 @@ ipcRenderer.on('open-pdf-start', (_event, startData) => {
       listener(startData);
     } catch (error) {
       console.error('onOpenPdfStart listener threw:', error);
+    }
+  }
+});
+
+ipcRenderer.on('context-select-all', () => {
+  for (const listener of [...contextSelectAllListeners]) {
+    try {
+      listener();
+    } catch (error) {
+      console.error('onContextSelectAll listener threw:', error);
     }
   }
 });
@@ -125,5 +136,24 @@ contextBridge.exposeInMainWorld('intab', {
     if (typeof url === 'string') {
       ipcRenderer.send('open-external-url', url);
     }
+  },
+  copyText: (text) => {
+    if (typeof text !== 'string') {
+      return Promise.resolve(false);
+    }
+    return ipcRenderer.invoke('copy-text', text);
+  },
+  setViewerCopyAllowed: (allowed) => {
+    ipcRenderer.send('set-viewer-copy-allowed', Boolean(allowed));
+  },
+  onContextSelectAll: (callback) => {
+    if (typeof callback !== 'function') {
+      throw new TypeError('onContextSelectAll expects a callback function');
+    }
+    const listener = () => callback();
+    contextSelectAllListeners.add(listener);
+    return () => {
+      contextSelectAllListeners.delete(listener);
+    };
   },
 });

@@ -1,8 +1,28 @@
 // Component for rendering a single visible PDF page with canvas, text layer, search highlights, and annotation links.
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { drawPageOnCanvas, renderPageAnnotationLayer, renderPageTextLayer } from './renderPage';
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import {
+  beginSelectionRestorationGuard,
+  drawPageOnCanvas,
+  renderPageAnnotationLayer,
+  renderPageTextLayer,
+  restoreDocumentSelectionSnapshot,
+  snapshotActiveTextSelectionForLayer,
+} from './renderPage';
 import type { VisiblePageProps } from './types';
+
+function selectionIntersectsNode(node: HTMLElement | null): boolean {
+  if (!node || typeof window === 'undefined') return false;
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+  for (let i = 0; i < selection.rangeCount; i += 1) {
+    const range = selection.getRangeAt(i);
+    if (range.intersectsNode(node)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export default function VisiblePage({
   doc,
@@ -15,6 +35,7 @@ export default function VisiblePage({
   matches = [],
   currentMatchIndex = -1,
   linkService,
+  allowCopying = true,
 }: VisiblePageProps): ReactNode {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,12 +44,14 @@ export default function VisiblePage({
   const [isVisible, setIsVisible] = useState(
     () => pageNumber === 1 || typeof IntersectionObserver === 'undefined'
   );
+  const [preserveSelectionLayer, setPreserveSelectionLayer] = useState(false);
   const [textLayerReady, setTextLayerReady] = useState(0);
 
   const width = Math.max(1, Math.round(baseSize.width * scale));
   const height = Math.max(1, Math.round(baseSize.height * scale));
+  const isTextLayerMounted = isVisible || preserveSelectionLayer;
 
-  // Render canvas and textlayer only for pages near the visible scroll area
+  // Render canvas/annotations near viewport, while keeping textLayer alive across scroll if selected
   useEffect(() => {
     const element = containerRef.current;
     if (!element || typeof IntersectionObserver === 'undefined') return;
@@ -38,7 +61,13 @@ export default function VisiblePage({
       (entries) => {
         for (const entry of entries) {
           if (entry.target === element) {
-            setIsVisible(entry.isIntersecting);
+            const nextVisible = entry.isIntersecting;
+            if (!nextVisible && selectionIntersectsNode(textLayerRef.current)) {
+              setPreserveSelectionLayer(true);
+            } else if (nextVisible) {
+              setPreserveSelectionLayer(false);
+            }
+            setIsVisible(nextVisible);
           }
         }
       },
@@ -48,6 +77,18 @@ export default function VisiblePage({
     observer.observe(element);
     return () => observer.disconnect();
   }, [scrollRootRef]);
+
+  // Release off-screen preserved text layer once selection collapses
+  useEffect(() => {
+    if (!preserveSelectionLayer || typeof document === 'undefined') return;
+    const handleSelectionChange = () => {
+      if (!selectionIntersectsNode(textLayerRef.current)) {
+        setPreserveSelectionLayer(false);
+      }
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, [preserveSelectionLayer]);
 
   const appliedQueryRef = useRef<string>('');
   const appliedLayerReadyRef = useRef<number>(-1);
@@ -79,7 +120,7 @@ export default function VisiblePage({
   // Text layer rendering
   useEffect(() => {
     const textLayer = textLayerRef.current;
-    if (!isVisible || !textLayer) return;
+    if (!isTextLayerMounted || !textLayer) return;
 
     let active = true;
     const job = renderPageTextLayer(doc, pageNumber, textLayer, scale);
@@ -102,7 +143,50 @@ export default function VisiblePage({
       active = false;
       job.cancel();
     };
-  }, [doc, pageNumber, scale, isVisible]);
+  }, [doc, pageNumber, scale, isTextLayerMounted]);
+
+  // Manage .selecting state and .endOfContent expansion while selecting across links/margins
+  useEffect(() => {
+    const textLayer = textLayerRef.current;
+    if (!isTextLayerMounted || !textLayer || typeof document === 'undefined') return;
+
+    const resetSelecting = () => {
+      textLayer.classList.remove('selecting');
+    };
+
+    const handlePointerDown = () => {
+      if (allowCopying) {
+        textLayer.classList.add('selecting');
+      }
+    };
+
+    const handlePointerUp = () => {
+      if (!selectionIntersectsNode(textLayer)) {
+        resetSelecting();
+      }
+    };
+
+    const handleSelectionChange = () => {
+      if (allowCopying && selectionIntersectsNode(textLayer)) {
+        textLayer.classList.add('selecting');
+      } else {
+        resetSelecting();
+      }
+    };
+
+    textLayer.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    window.addEventListener('blur', resetSelecting);
+
+    return () => {
+      textLayer.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      window.removeEventListener('blur', resetSelecting);
+      resetSelecting();
+    };
+  }, [isTextLayerMounted, allowCopying]);
 
   // Annotation layer rendering (PDF links & destinations)
   useEffect(() => {
@@ -139,12 +223,24 @@ export default function VisiblePage({
     );
 
     if (!q) {
-      spans.forEach((span) => {
-        if (span.dataset.rawText !== undefined) {
-          span.textContent = span.dataset.rawText;
-          delete span.dataset.rawText;
+      const hasRawSpans = spans.some((span) => span.dataset.rawText !== undefined);
+      if (hasRawSpans) {
+        const savedSelection = snapshotActiveTextSelectionForLayer(container);
+        const releaseGuard = savedSelection ? beginSelectionRestorationGuard() : null;
+        try {
+          spans.forEach((span) => {
+            if (span.dataset.rawText !== undefined) {
+              span.textContent = span.dataset.rawText;
+              delete span.dataset.rawText;
+            }
+          });
+          if (savedSelection) {
+            restoreDocumentSelectionSnapshot(savedSelection);
+          }
+        } finally {
+          releaseGuard?.();
         }
-      });
+      }
       appliedQueryRef.current = '';
       appliedLayerReadyRef.current = textLayerReady;
       return;
@@ -183,60 +279,82 @@ export default function VisiblePage({
 
     const pageMatches = matches.filter((m) => m.pageNumber === pageNumber);
     let pageMatchCounter = 0;
+    const savedSelection = snapshotActiveTextSelectionForLayer(container);
+    const releaseGuard = savedSelection ? beginSelectionRestorationGuard() : null;
 
-    for (const span of spans) {
-      if (span.dataset.rawText === undefined) {
-        span.dataset.rawText = span.textContent ?? '';
-      }
-      const rawText = span.dataset.rawText;
-      const lower = rawText.toLowerCase();
+    try {
+      for (const span of spans) {
+        if (span.dataset.rawText === undefined) {
+          span.dataset.rawText = span.textContent ?? '';
+        }
+        const rawText = span.dataset.rawText;
+        const lower = rawText.toLowerCase();
 
-      if (!lower.includes(q)) {
-        span.textContent = rawText;
-        continue;
-      }
-
-      span.innerHTML = '';
-      let lastIndex = 0;
-      let pos = lower.indexOf(q, 0);
-
-      while (pos !== -1) {
-        if (pos > lastIndex) {
-          span.appendChild(document.createTextNode(rawText.slice(lastIndex, pos)));
+        if (!lower.includes(q)) {
+          span.textContent = rawText;
+          continue;
         }
 
-        const matchedText = rawText.slice(pos, pos + q.length);
-        const mark = document.createElement('mark');
-        mark.className = 'search-highlight';
-        mark.textContent = matchedText;
+        span.innerHTML = '';
+        let lastIndex = 0;
+        let pos = lower.indexOf(q, 0);
 
-        const currentMatch = pageMatches[pageMatchCounter];
-        if (currentMatch) {
-          mark.dataset.matchId = String(currentMatch.id);
-          if (currentMatch.id === currentMatchIndex) {
-            mark.classList.add('active-match');
-            try {
-              mark.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            } catch {
-              // ignore
+        while (pos !== -1) {
+          if (pos > lastIndex) {
+            span.appendChild(document.createTextNode(rawText.slice(lastIndex, pos)));
+          }
+
+          const matchedText = rawText.slice(pos, pos + q.length);
+          const mark = document.createElement('mark');
+          mark.className = 'search-highlight';
+          mark.textContent = matchedText;
+
+          const currentMatch = pageMatches[pageMatchCounter];
+          if (currentMatch) {
+            mark.dataset.matchId = String(currentMatch.id);
+            if (currentMatch.id === currentMatchIndex) {
+              mark.classList.add('active-match');
+              try {
+                mark.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              } catch {
+                // ignore
+              }
             }
           }
+          pageMatchCounter++;
+
+          span.appendChild(mark);
+          lastIndex = pos + q.length;
+          pos = lower.indexOf(q, lastIndex);
         }
-        pageMatchCounter++;
 
-        span.appendChild(mark);
-        lastIndex = pos + q.length;
-        pos = lower.indexOf(q, lastIndex);
+        if (lastIndex < rawText.length) {
+          span.appendChild(document.createTextNode(rawText.slice(lastIndex)));
+        }
       }
 
-      if (lastIndex < rawText.length) {
-        span.appendChild(document.createTextNode(rawText.slice(lastIndex)));
+      if (savedSelection) {
+        restoreDocumentSelectionSnapshot(savedSelection);
       }
+    } finally {
+      releaseGuard?.();
     }
 
     appliedQueryRef.current = q;
     appliedLayerReadyRef.current = textLayerReady;
   }, [searchQuery, matches, currentMatchIndex, pageNumber, textLayerReady]);
+
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (allowCopying && target?.closest('.textLayer span, .annotationLayer a')) {
+      return;
+    }
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    if (allowCopying && sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+      return;
+    }
+    onDoubleClick?.();
+  };
 
   return (
     <div
@@ -244,18 +362,22 @@ export default function VisiblePage({
       data-page={pageNumber}
       className="pg-item"
       style={{ width: `${width}px`, height: `${height}px` }}
-      onDoubleClick={onDoubleClick}
+      onDoubleClick={handleDoubleClick}
     >
-      {isVisible ? (
-        <>
-          <canvas
-            ref={canvasRef}
-            style={{ width: `${width}px`, height: `${height}px` }}
-          />
-          <div ref={textLayerRef} className="textLayer" />
-          <div ref={annotationLayerRef} className="annotationLayer" />
-        </>
-      ) : (
+      {isVisible && (
+        <canvas
+          ref={canvasRef}
+          style={{ width: `${width}px`, height: `${height}px` }}
+        />
+      )}
+      {isTextLayerMounted && (
+        <div
+          ref={textLayerRef}
+          className={allowCopying ? 'textLayer' : 'textLayer copy-restricted'}
+        />
+      )}
+      {isVisible && <div ref={annotationLayerRef} className="annotationLayer" />}
+      {!isVisible && !isTextLayerMounted && (
         <span className="pg-placeholder">Page {pageNumber}</span>
       )}
     </div>

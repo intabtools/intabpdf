@@ -211,13 +211,11 @@ export default function TextToPdfTool({
     <>
       {/* Left Column: Text Editor Workspace */}
       <div
-        className="card"
+        className="card tp-work"
         style={{
-          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          minWidth: 0,
         }}
       >
         <div
@@ -290,8 +288,8 @@ export default function TextToPdfTool({
               fontFamily === 'courier'
                 ? 'var(--font-mono, monospace)'
                 : fontFamily === 'times'
-                ? 'var(--font-serif, serif)'
-                : 'var(--font-sans, sans-serif)',
+                ? 'var(--font-serif)'
+                : 'var(--font-sans)',
             borderRadius: 'var(--radius-md)',
             border: isDragOver
               ? '2px dashed var(--accent)'
@@ -490,7 +488,7 @@ export default function TextToPdfTool({
         </div>
 
         {/* Output filename input */}
-        <div style={{ marginTop: '4px', marginBottom: '4px' }}>
+        <div className="opts-filename">
           <OutputFilenameInput
             value={outputBaseName ?? ''}
             onChange={onOutputBaseNameChange ?? (() => {})}
@@ -510,7 +508,6 @@ export default function TextToPdfTool({
             isOverLimit ||
             unsupportedChars.length > 0
           }
-          style={{ marginTop: '8px' }}
         >
           <FileText size={16} style={{ flexShrink: 0 }} />
           <span>{isProcessing ? 'Creating PDF...' : 'Create PDF'}</span>

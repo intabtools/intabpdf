@@ -3,8 +3,10 @@ import type { FocusEvent, MouseEvent, ReactNode } from 'react';
 import { Code2, Eye, Info, LayoutGrid, Plus, X } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TOOL_CATEGORIES, getToolsByCategory, isToolImplemented } from '../tools/registry';
+import { isAndroidScannerSupported, useScanDocument } from '../hooks/useScanDocument';
 import { useViewer } from '../hooks/useViewer';
 import { useToast } from '../hooks/useToast';
+import { resolveViewerNavigationTarget } from '../viewer/viewerContextDef';
 import Logo from './Logo';
 import ToolIcon from './ToolIcon';
 
@@ -28,6 +30,8 @@ export default function Sidebar({ onCloseDrawer, isCollapsed }: SidebarProps): R
   const navigate = useNavigate();
   const { openPdfPicker } = useViewer();
   const { showToast } = useToast();
+  const { isScanning, launchScanner } = useScanDocument();
+  const showAndroidScanner = isAndroidScannerSupported();
 
   const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
   const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,7 +76,14 @@ export default function Sidebar({ onCloseDrawer, isCollapsed }: SidebarProps): R
     onCloseDrawer();
     const file = await openPdfPicker();
     if (file) {
-      navigate('/viewer');
+      const target = resolveViewerNavigationTarget(
+        location.pathname,
+        location.search,
+        typeof window !== 'undefined' ? window.location.search : '',
+      );
+      if (target) {
+        navigate(target);
+      }
     }
   };
 
@@ -166,6 +177,26 @@ export default function Sidebar({ onCloseDrawer, isCollapsed }: SidebarProps): R
             return (
               <div key={category}>
                 <div className="sbt">{category}</div>
+                {showAndroidScanner && category === 'Create' && (
+                  <button
+                    type="button"
+                    className="si"
+                    disabled={isScanning}
+                    onClick={() => {
+                      handleNavClick();
+                      void launchScanner();
+                    }}
+                    onMouseEnter={(e) => handleTooltipShow(e, 'Scan Document')}
+                    onMouseLeave={handleTooltipHide}
+                    onFocus={(e) => handleTooltipShow(e, 'Scan Document')}
+                    onBlur={handleTooltipHide}
+                    title={isCollapsed ? 'Scan Document' : undefined}
+                    aria-label="Scan Document"
+                  >
+                    <ToolIcon name="scan" size={22} />
+                    <span>{isScanning ? 'Scanning…' : 'Scan Document'}</span>
+                  </button>
+                )}
                 {categoryTools.map((tool) => {
                   const isToolActive = location.pathname === `/tool/${tool.id}`;
                   const fullLabel = getFullToolLabel(tool.name);

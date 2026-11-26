@@ -2,7 +2,7 @@
 
 InTabPDF is a privacy-first, client-only PDF application running across Web browsers, Electron desktop, and Android (via Capacitor).
 
-There is zero backend server, zero analytics/telemetry, zero database, and zero network dependency during operation. All PDF document processing, parsing, rendering, and manipulation occur entirely inside the user's device memory.
+There is zero backend server, zero analytics/telemetry, zero database, and zero network dependency during operation. All 13 core PDF tools and the viewer parse, render, and manipulate documents in device memory; on Android, native plugins handle SAF file saving/recovery, incoming share targets, and on-device camera scanning using app-private storage.
 
 ---
 
@@ -64,10 +64,10 @@ flowchart TD
    - Zero DOM or browser dependencies: accepts typed byte arrays (`Uint8Array`) and returns transformed byte arrays.
    - 100% testable via unit tests in headless environments without DOM mocking.
 
-8. **Platform Integration Layer & Electron IPC Bridge (`src/platform/`, `electron/preload.cjs`)**
-   - Standardizes file selection, saving, sharing, and OS-level file opening across Web, Electron IPC, and Capacitor plugins.
-   - Electron desktop shell communicates securely via context isolation and the `window.intab` bridge API (`hasPendingPdf`, `clearPendingPdf`, `onOpenPdf`, `onOpenPdfError`, `onOpenPdfStart`, `openExternalUrl`).
-   - Capacitor Android integration coordinates native file opening via `window.NativeIntent` and file saving via `@capacitor/filesystem` and `@capacitor/share`.
+8. **Platform Integration Layer, Electron IPC, & Android Native Plugins (`src/platform/`, `electron/`, `android/`)**
+   - Standardizes file selection, saving, sharing, scanning, and OS-level file opening across Web, Electron IPC, and Capacitor plugins.
+   - Electron desktop shell communicates securely via context isolation and the `window.intab` bridge API (`hasPendingPdf`, `clearPendingPdf`, `onOpenPdf`, `onOpenPdfError`, `onOpenPdfStart`, `openExternalUrl`, `copyText`, `setViewerCopyAllowed`, `onContextSelectAll`).
+   - Android native integration includes `window.NativeIntent` (in `MainActivity.java`) for opening `content://` PDFs, `DocumentSavePlugin` (`SafSaveRepository` + `SafRecoveryStore`) for SAF saving, collision prompts, staged-swap/`"wt"` replacement, and crash-safe recovery export, `DocumentScannerPlugin` (`ScannerActivity` using CameraX + OpenCV + Android `PdfDocument`) for the Android-only document scanner, `SaveToDeviceActivity` as a separate `SEND`/`SEND_MULTIPLE` share target, and `share.ts` (`@capacitor/filesystem` + `@capacitor/share`) for viewer sharing.
 
 ---
 
@@ -205,3 +205,4 @@ In the desktop application (`platform === 'electron'`), communication between th
   - `onOpenPdfError(callback: (errorData: { name: string; error: string }) => void): () => void`: Receives notification if an OS-opened file cannot be read.
   - `onOpenPdfStart(callback: (startData: { name: string }) => void): () => void`: Receives notice when reading a large file from disk commences.
   - `openExternalUrl(url: string): void`: Requests the main process to open an allowed external URL in the user's default OS browser. `electron/main.cjs` restricts this strictly to `https:` URLs targeting the canonical repository (`https://github.com/intabtools/intabpdf` and subpaths) or Google Search (`https://www.google.com/search` and `https://google.com/search`).
+  - `copyText(text: string): Promise<boolean>`, `setViewerCopyAllowed(allowed: boolean): void`, and `onContextSelectAll(callback: () => void): () => void`: Coordinate the scoped native right-click context menu and clipboard copy permissions for the viewer.

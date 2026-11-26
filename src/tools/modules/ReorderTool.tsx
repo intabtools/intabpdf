@@ -133,13 +133,11 @@ export default function ReorderTool({
     <>
       {/* Left Column: Visual Reorder Workspace */}
       <div
-        className="card"
+        className="card tp-work"
         style={{
-          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          minWidth: 0,
         }}
       >
         <div
@@ -239,7 +237,7 @@ export default function ReorderTool({
                       ? '1px solid var(--accent)'
                       : '1px solid var(--border)',
                     borderRadius: 'var(--radius-md)',
-                    background: isMoved ? 'var(--accent-surface, var(--surface-2))' : 'var(--surface)',
+                    background: isMoved ? 'var(--accent-soft)' : 'var(--surface)',
                     padding: '8px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -344,7 +342,7 @@ export default function ReorderTool({
           );
         })}
 
-        <div style={{ marginTop: '6px', marginBottom: '8px', width: '100%', minWidth: 0, maxWidth: '100%' }}>
+        <div className="opts-filename">
           <OutputFilenameInput
             value={outputBaseName ?? ''}
             onChange={onOutputBaseNameChange ?? (() => {})}
