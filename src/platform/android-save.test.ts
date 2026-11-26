@@ -1,273 +1,232 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  saveFileAndroid,
   splitFileName,
   suggestUniqueFileName,
-  safeReplaceFile,
-  saveFileAndroid,
+  type DocumentSavePlugin,
 } from './androidSave';
-import {
-  setConflictPromptHandler,
-  type ConflictResolution,
-} from './conflictDialog';
+import { setConflictPromptHandler, type ConflictResolution } from './conflictDialog';
 
-// In-memory virtual filesystem for Directory.Documents and Directory.Cache
-const documentsStore = new Map<string, string>();
-const cacheStore = new Map<string, string>();
+const shareMock = vi.fn();
 
-let renameFailFilter: ((from: string) => boolean) | null = null;
+vi.mock('@capacitor/share', () => ({
+  Share: {
+    canShare: vi.fn(async () => ({ value: true })),
+    share: shareMock,
+  },
+}));
 
-vi.mock('@capacitor/filesystem', () => {
-  const Directory = {
-    Documents: 'DOCUMENTS',
-    Cache: 'CACHE',
-  };
+describe('Android SAF file saving and conflict protection', () => {
+  let safFiles: Map<string, { data: string; flags: 'full' | 'wt_only' | 'read_only' }>;
+  let folderCancelled = false;
+  let needsReselectOnce = false;
 
-  const Filesystem = {
-    stat: vi.fn(async (options: { path: string; directory?: string }) => {
-      const store = options.directory === Directory.Cache ? cacheStore : documentsStore;
-      if (store.has(options.path)) {
-        return {
-          type: 'file',
-          size: store.get(options.path)!.length,
-          mtime: Date.now(),
-          ctime: Date.now(),
-          uri: `file:///virtual/${options.path}`,
-        };
+  const createMockPlugin = (): DocumentSavePlugin => ({
+    prepareSaveDestination: vi.fn(async () => {
+      if (folderCancelled) {
+        return { ready: false, cancelled: true };
       }
-      throw new Error('File does not exist');
+      return {
+        ready: true,
+        cancelled: false,
+        folderUri: 'content://com.android.externalstorage.documents/tree/primary%3ADocuments/document/primary%3ADocuments%2FInTabPDF',
+        displayPath: 'Documents/InTabPDF',
+        existingNames: Array.from(safFiles.keys()),
+      };
     }),
 
-    writeFile: vi.fn(async (options: { path: string; data: string; directory?: string }) => {
-      const store = options.directory === Directory.Cache ? cacheStore : documentsStore;
-      store.set(options.path, options.data);
-      return { uri: `file:///virtual/${options.path}` };
-    }),
-
-    rename: vi.fn(async (options: { from: string; to: string; directory?: string }) => {
-      if (renameFailFilter && renameFailFilter(options.from)) {
-        throw new Error('Simulated disk I/O error during rename');
+    writeToDestination: vi.fn(async ({ fileName, base64Data, replaceExisting }) => {
+      if (needsReselectOnce) {
+        needsReselectOnce = false;
+        return { status: 'needs_folder_selection' as const };
       }
-      const store = options.directory === Directory.Cache ? cacheStore : documentsStore;
-      if (!store.has(options.from)) {
-        throw new Error(`Cannot rename non-existent file ${options.from}`);
+
+      const existingEntry = safFiles.get(fileName);
+      if (existingEntry) {
+        if (!replaceExisting) {
+          const suggested = await suggestUniqueFileName(fileName, (n) => safFiles.has(n));
+          return {
+            status: 'conflict' as const,
+            existingFileName: fileName,
+            suggestedFileName: suggested,
+          };
+        }
+        if (existingEntry.flags === 'read_only') {
+          const suggested = await suggestUniqueFileName(fileName, (n) => safFiles.has(n));
+          return {
+            status: 'replace_unsupported' as const,
+            existingFileName: fileName,
+            suggestedFileName: suggested,
+            reason: 'This storage provider does not allow safe replacement. Original file was kept untouched.',
+          };
+        }
       }
-      const data = store.get(options.from)!;
-      store.delete(options.from);
-      store.set(options.to, data);
+
+      safFiles.set(fileName, { data: base64Data, flags: 'full' });
+      return {
+        status: 'saved' as const,
+        fileName,
+        displayPath: 'Documents/InTabPDF',
+        documentUri: `content://com.android.externalstorage.documents/document/${encodeURIComponent(fileName)}`,
+        bytesWritten: base64Data.length,
+        replaced: Boolean(existingEntry),
+      };
     }),
+  });
 
-    deleteFile: vi.fn(async (options: { path: string; directory?: string }) => {
-      const store = options.directory === Directory.Cache ? cacheStore : documentsStore;
-      if (!store.has(options.path)) {
-        throw new Error(`Cannot delete non-existent file ${options.path}`);
-      }
-      store.delete(options.path);
-    }),
-  };
-
-  return { Directory, Filesystem };
-});
-
-describe('Android safe file saving and conflict protection', () => {
   beforeEach(() => {
-    documentsStore.clear();
-    cacheStore.clear();
-    renameFailFilter = null;
+    safFiles = new Map();
+    folderCancelled = false;
+    needsReselectOnce = false;
+    shareMock.mockClear();
     setConflictPromptHandler(null);
   });
 
-  describe('splitFileName helper', () => {
-    it('splits base and extension correctly', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('splitFileName and suggestUniqueFileName helpers', () => {
+    it('splits base and extension cleanly', () => {
       expect(splitFileName('document.pdf')).toEqual({ base: 'document', ext: '.pdf' });
       expect(splitFileName('archive.tar.gz')).toEqual({ base: 'archive.tar', ext: '.gz' });
       expect(splitFileName('noext')).toEqual({ base: 'noext', ext: '' });
       expect(splitFileName('.hidden')).toEqual({ base: '.hidden', ext: '' });
     });
-  });
 
-  describe('suggestUniqueFileName helper', () => {
-    it('suggests "name (1).pdf" when "name.pdf" exists', async () => {
-      const existing = new Set(['report.pdf']);
-      const checkExists = async (name: string) => existing.has(name);
-
-      const suggestion = await suggestUniqueFileName('report.pdf', checkExists);
-      expect(suggestion).toBe('report (1).pdf');
-    });
-
-    it('suggests "name (2).pdf" when "name.pdf" and "name (1).pdf" exist', async () => {
+    it('suggests incremental deduplicated filenames without collisions', async () => {
       const existing = new Set(['report.pdf', 'report (1).pdf']);
-      const checkExists = async (name: string) => existing.has(name);
-
-      const suggestion = await suggestUniqueFileName('report.pdf', checkExists);
-      expect(suggestion).toBe('report (2).pdf');
-    });
-
-    it('handles input already containing numeric suffix and increments to next available number', async () => {
-      const existing = new Set(['document (1).pdf', 'document (2).pdf']);
-      const checkExists = async (name: string) => existing.has(name);
-
-      const suggestion = await suggestUniqueFileName('document (1).pdf', checkExists);
-      expect(suggestion).toBe('document (3).pdf');
+      expect(await suggestUniqueFileName('report.pdf', (n) => existing.has(n))).toBe('report (2).pdf');
+      expect(await suggestUniqueFileName('report (1).pdf', (n) => existing.has(n))).toBe('report (2).pdf');
     });
   });
 
-  describe('saveFileAndroid execution with mocked Filesystem', () => {
-    it('saves directly when destination filename does not exist', async () => {
-      const bytes = new Uint8Array([1, 2, 3, 4]);
-      const result = await saveFileAndroid(bytes, 'new-file.pdf');
+  describe('saveFileAndroid SAF workflow', () => {
+    it('saves directly into Documents/InTabPDF without invoking Capacitor Share', async () => {
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([1, 2, 3, 4]), 'new-file.pdf', 'application/pdf', plugin);
 
-      expect(result).toEqual({ saved: true, fileName: 'new-file.pdf' });
-      expect(documentsStore.has('new-file.pdf')).toBe(true);
-      expect(cacheStore.has('new-file.pdf')).toBe(true);
+      expect(result).toEqual({
+        saved: true,
+        fileName: 'new-file.pdf',
+        displayPath: 'Documents/InTabPDF',
+      });
+      expect(safFiles.has('new-file.pdf')).toBe(true);
+      expect(shareMock).not.toHaveBeenCalled();
     });
 
-    it('detects existing file and aborts when user selects Cancel, preserving original file', async () => {
-      documentsStore.set('existing.pdf', 'original-content-bytes');
+    it('returns saved=false silently when user cancels SAF folder picker', async () => {
+      folderCancelled = true;
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([1, 2, 3]), 'report.pdf', 'application/pdf', plugin);
 
-      let promptCalled = false;
-      setConflictPromptHandler(async (fileName, suggestedName) => {
-        promptCalled = true;
+      expect(result).toEqual({ saved: false });
+      expect(safFiles.size).toBe(0);
+    });
+
+    it('preserves existing file when conflict dialog is cancelled', async () => {
+      safFiles.set('existing.pdf', { data: 'b3JpZ2luYWw=', flags: 'full' });
+      setConflictPromptHandler(async (fileName, suggestedName, options) => {
         expect(fileName).toBe('existing.pdf');
         expect(suggestedName).toBe('existing (1).pdf');
+        expect(options?.displayPath).toBe('Documents/InTabPDF');
         return { action: 'cancel' };
       });
 
-      const newBytes = new Uint8Array([9, 9, 9]);
-      const result = await saveFileAndroid(newBytes, 'existing.pdf');
-
-      expect(promptCalled).toBe(true);
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([9, 9]), 'existing.pdf', 'application/pdf', plugin);
       expect(result).toEqual({ saved: false });
-      // Original content is completely preserved
-      expect(documentsStore.get('existing.pdf')).toBe('original-content-bytes');
-      // Cache was not touched
-      expect(cacheStore.has('existing.pdf')).toBe(false);
+      expect(safFiles.get('existing.pdf')?.data).toBe('b3JpZ2luYWw=');
     });
 
-    it('detects existing file and replaces it safely when user selects Replace', async () => {
-      documentsStore.set('target.pdf', 'old-content');
+    it('replaces existing file via SAF when user confirms Replace', async () => {
+      safFiles.set('target.pdf', { data: 'b2xk', flags: 'full' });
+      setConflictPromptHandler(async () => ({ action: 'replace' }));
 
-      let promptCalled = false;
-      setConflictPromptHandler(async () => {
-        promptCalled = true;
-        return { action: 'replace' };
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([8, 8, 8]), 'target.pdf', 'application/pdf', plugin);
+      expect(result).toEqual({
+        saved: true,
+        fileName: 'target.pdf',
+        displayPath: 'Documents/InTabPDF',
       });
-
-      const newBytes = new Uint8Array([8, 8, 8]);
-      const result = await saveFileAndroid(newBytes, 'target.pdf');
-
-      expect(promptCalled).toBe(true);
-      expect(result).toEqual({ saved: true, fileName: 'target.pdf' });
-      // Content updated in documents and mirrored to cache
-      expect(documentsStore.has('target.pdf')).toBe(true);
-      expect(documentsStore.get('target.pdf')).not.toBe('old-content');
-      expect(cacheStore.has('target.pdf')).toBe(true);
+      expect(safFiles.get('target.pdf')?.data).not.toBe('b2xk');
+      expect(shareMock).not.toHaveBeenCalled();
     });
 
-    it('detects existing file and saves under new filename when user selects Save as new name', async () => {
-      documentsStore.set('sample.pdf', 'original-sample');
+    it('preserves extension when saving as new copy and handles replace_unsupported cleanly', async () => {
+      safFiles.set('locked.pdf', { data: 'bG9ja2Vk', flags: 'read_only' });
+      const seenPrompts: Array<{ fileName: string; replaceDisabledReason?: string }> = [];
 
-      setConflictPromptHandler(async (_fileName, suggestedName) => {
-        expect(suggestedName).toBe('sample (1).pdf');
-        return { action: 'rename', newFileName: 'sample (custom).pdf' };
+      setConflictPromptHandler(async (fileName, _suggested, options) => {
+        seenPrompts.push({ fileName, replaceDisabledReason: options?.replaceDisabledReason });
+        if (seenPrompts.length === 1) {
+          return { action: 'replace' };
+        }
+        return { action: 'rename', newFileName: 'locked-copy' };
       });
 
-      const newBytes = new Uint8Array([7, 7, 7]);
-      const result = await saveFileAndroid(newBytes, 'sample.pdf');
-
-      expect(result).toEqual({ saved: true, fileName: 'sample (custom).pdf' });
-      // Original file remains preserved
-      expect(documentsStore.get('sample.pdf')).toBe('original-sample');
-      // New file created separately
-      expect(documentsStore.has('sample (custom).pdf')).toBe(true);
-      expect(cacheStore.has('sample (custom).pdf')).toBe(true);
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([5, 5]), 'locked.pdf', 'application/pdf', plugin);
+      expect(result).toEqual({
+        saved: true,
+        fileName: 'locked-copy.pdf',
+        displayPath: 'Documents/InTabPDF',
+      });
+      expect(seenPrompts).toHaveLength(2);
+      expect(seenPrompts[1].replaceDisabledReason).toContain('Original file was kept untouched');
+      expect(safFiles.get('locked.pdf')?.data).toBe('bG9ja2Vk');
+      expect(safFiles.has('locked-copy.pdf')).toBe(true);
     });
 
-    it('automatically ensures matching file extension if omitted by user during rename', async () => {
-      documentsStore.set('document.pdf', 'orig');
-
-      setConflictPromptHandler(async () => {
-        // User typed "my-custom-doc" without .pdf extension
-        return { action: 'rename', newFileName: 'my-custom-doc' };
-      });
-
-      const newBytes = new Uint8Array([5, 5]);
-      const result = await saveFileAndroid(newBytes, 'document.pdf');
+    it('re-prompts destination selection if persisted access was revoked before write', async () => {
+      needsReselectOnce = true;
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([4, 5, 6]), 'reselect.pdf', 'application/pdf', plugin);
 
       expect(result.saved).toBe(true);
-      expect(result.fileName).toBe('my-custom-doc.pdf');
-      expect(documentsStore.has('my-custom-doc.pdf')).toBe(true);
+      expect(plugin.prepareSaveDestination).toHaveBeenCalledTimes(2);
     });
 
-    it('throws error and does not report success when invalid empty name is provided', async () => {
-      documentsStore.set('existing.pdf', 'data');
+    it('re-prompts if user enters a custom name that also collides case-insensitively', async () => {
+      safFiles.set('first.pdf', { data: 'Zmlyc3Q=', flags: 'full' });
+      safFiles.set('Second.pdf', { data: 'c2Vjb25k', flags: 'full' });
 
-      setConflictPromptHandler(async () => {
-        return { action: 'rename', newFileName: '   ' };
+      let callNum = 0;
+      setConflictPromptHandler(async (fileName) => {
+        callNum++;
+        if (callNum === 1) {
+          return { action: 'rename', newFileName: 'second.pdf' };
+        }
+        expect(fileName).toBe('Second.pdf');
+        return { action: 'rename', newFileName: 'third' };
       });
 
-      const newBytes = new Uint8Array([1, 2]);
-      await expect(saveFileAndroid(newBytes, 'existing.pdf')).rejects.toThrow(
-        'Invalid empty filename provided.'
-      );
-      expect(documentsStore.get('existing.pdf')).toBe('data');
-    });
-
-    it('safely handles conflict if destination appears between initial check and final write', async () => {
-      documentsStore.set('race.pdf', 'orig-data');
-
-      setConflictPromptHandler(async () => {
-        // Between initial check and prompt return, "other.pdf" gets created on disk
-        documentsStore.set('other.pdf', 'late-appearing-file');
-        return { action: 'rename', newFileName: 'other.pdf' };
-      });
-
-      const newBytes = new Uint8Array([3, 4]);
-      const result = await saveFileAndroid(newBytes, 'race.pdf');
-
+      const plugin = createMockPlugin();
+      const result = await saveFileAndroid(new Uint8Array([1, 2]), 'first.pdf', 'application/pdf', plugin);
       expect(result.saved).toBe(true);
-      expect(result.fileName).toBe('other.pdf');
-      // "other.pdf" was safely replaced without corrupting data
-      expect(documentsStore.has('other.pdf')).toBe(true);
-      // "race.pdf" remains untouched
-      expect(documentsStore.get('race.pdf')).toBe('orig-data');
-    });
-
-    it('safely restores original file if replacement fails partway through', async () => {
-      documentsStore.set('valuable.pdf', 'crucial-original-data');
-
-      // Fail during rename of temporary file to target
-      renameFailFilter = (from: string) => from.startsWith('.tmp_');
-
-      const base64Data = 'bmV3LWRhdGE=';
-      await expect(safeReplaceFile('valuable.pdf', base64Data)).rejects.toThrow(
-        'Simulated disk I/O error during rename'
-      );
-
-      // Crucial verification: original file is intact and restored!
-      expect(documentsStore.get('valuable.pdf')).toBe('crucial-original-data');
+      expect(result.fileName).toBe('third.pdf');
     });
 
     it('prevents concurrent save operations from racing', async () => {
-      documentsStore.set('concurrent.pdf', 'data');
+      safFiles.set('concurrent.pdf', { data: 'ZGF0YQ==', flags: 'full' });
 
       let resolvePrompt!: (res: ConflictResolution) => void;
-      setConflictPromptHandler(() => {
-        return new Promise<ConflictResolution>((r) => {
-          resolvePrompt = r;
-        });
-      });
-
-      const p1 = saveFileAndroid(new Uint8Array([1]), 'concurrent.pdf');
-
-      // Second save attempt while first is waiting for user dialog
-      await expect(saveFileAndroid(new Uint8Array([2]), 'concurrent.pdf')).rejects.toThrow(
-        'A save operation is already in progress.'
+      setConflictPromptHandler(
+        () =>
+          new Promise<ConflictResolution>((resolve) => {
+            resolvePrompt = resolve;
+          }),
       );
 
-      // Complete first save
+      const plugin = createMockPlugin();
+      const p1 = saveFileAndroid(new Uint8Array([1]), 'concurrent.pdf', 'application/pdf', plugin);
+      await expect(
+        saveFileAndroid(new Uint8Array([2]), 'concurrent.pdf', 'application/pdf', plugin),
+      ).rejects.toThrow('A save operation is already in progress.');
+
       resolvePrompt({ action: 'cancel' });
-      const r1 = await p1;
-      expect(r1.saved).toBe(false);
+      expect(await p1).toEqual({ saved: false });
     });
   });
 });

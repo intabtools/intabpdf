@@ -7,9 +7,15 @@ export interface ConflictResolution {
   newFileName?: string;
 }
 
+export interface ConflictPromptOptions {
+  displayPath?: string;
+  replaceDisabledReason?: string;
+}
+
 export type ConflictPromptHandler = (
   fileName: string,
   suggestedName: string,
+  options?: ConflictPromptOptions,
 ) => Promise<ConflictResolution>;
 
 let activeConflictPromptHandler: ConflictPromptHandler | null = null;

@@ -231,10 +231,11 @@ export default function ToolPage(): ReactNode {
       }
       const savedName = (res && res.fileName) || finalFileName;
       setIsSaved(true);
-      showToast(`Saved ${savedName}`);
+      showToast(res?.displayPath ? `Saved ${savedName} to ${res.displayPath}` : `Saved ${savedName}`);
     } catch (err) {
       console.error('Failed to save file:', err);
-      showToast('Failed to save file');
+      const message = err instanceof Error && err.message.trim() ? err.message : 'Failed to save file';
+      showToast(message);
     }
   };
 

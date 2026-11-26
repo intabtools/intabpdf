@@ -10,6 +10,7 @@ export interface OpenedFile {
 export interface SaveFileResult {
     saved: boolean;
     fileName?: string;
+    displayPath?: string;
 }
 
 export interface PlatformAdapter {
