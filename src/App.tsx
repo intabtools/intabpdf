@@ -5,6 +5,7 @@ import ShellContainer from './components/ShellContainer';
 import { ToastProvider } from './components/ToastContext';
 import { ProcessingProvider } from './components/ProcessingContext';
 import { FileConflictProvider } from './components/FileConflictDialog';
+import { SaveRecoveryProvider } from './components/SaveRecoveryDialog';
 import { ViewerProvider } from './viewer/ViewerContext';
 import { getInitialDestination, isScreenEnabled, resolveDestination } from './config/screens';
 import { getPlatformType } from './platform';
@@ -98,61 +99,63 @@ export default function App(): ReactNode {
     <ToastProvider>
       <ProcessingProvider>
         <FileConflictProvider>
-          <ViewerProvider>
-          <ShellContainer>
-            <ScreenErrorBoundary>
-              <Suspense fallback={<PageSuspenseFallback />}>
-                <Routes>
-                  <Route
-                    path="/"
-                    element={
-                      !isScreenEnabled('home', platform) ? (
-                        <Navigate to={initialDest} replace />
-                      ) : initialDest !== '/' ? (
-                        <Navigate to={initialDest} replace />
-                      ) : (
-                        <HomePage />
-                      )
-                    }
-                  />
-                  <Route
-                    path="/viewer"
-                    element={
-                      isScreenEnabled('viewer', platform) ? (
-                        <ViewerPage />
-                      ) : (
-                        <Navigate to={initialDest} replace />
-                      )
-                    }
-                  />
-                  <Route
-                    path="/about"
-                    element={
-                      isScreenEnabled('about', platform) ? (
-                        <AboutPage />
-                      ) : (
-                        <Navigate to={initialDest} replace />
-                      )
-                    }
-                  />
-                  <Route
-                    path="/tool/:toolId"
-                    element={
-                      isScreenEnabled('tool', platform) ? (
-                        <ToolRouteGuard />
-                      ) : (
-                        <Navigate to={initialDest} replace />
-                      )
-                    }
-                  />
-                  <Route path="*" element={<Navigate to={initialDest} replace />} />
-                </Routes>
-              </Suspense>
-            </ScreenErrorBoundary>
-          </ShellContainer>
-        </ViewerProvider>
-      </FileConflictProvider>
-    </ProcessingProvider>
-  </ToastProvider>
+          <SaveRecoveryProvider>
+            <ViewerProvider>
+            <ShellContainer>
+              <ScreenErrorBoundary>
+                <Suspense fallback={<PageSuspenseFallback />}>
+                  <Routes>
+                    <Route
+                      path="/"
+                      element={
+                        !isScreenEnabled('home', platform) ? (
+                          <Navigate to={initialDest} replace />
+                        ) : initialDest !== '/' ? (
+                          <Navigate to={initialDest} replace />
+                        ) : (
+                          <HomePage />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/viewer"
+                      element={
+                        isScreenEnabled('viewer', platform) ? (
+                          <ViewerPage />
+                        ) : (
+                          <Navigate to={initialDest} replace />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/about"
+                      element={
+                        isScreenEnabled('about', platform) ? (
+                          <AboutPage />
+                        ) : (
+                          <Navigate to={initialDest} replace />
+                        )
+                      }
+                    />
+                    <Route
+                      path="/tool/:toolId"
+                      element={
+                        isScreenEnabled('tool', platform) ? (
+                          <ToolRouteGuard />
+                        ) : (
+                          <Navigate to={initialDest} replace />
+                        )
+                      }
+                    />
+                    <Route path="*" element={<Navigate to={initialDest} replace />} />
+                  </Routes>
+                </Suspense>
+              </ScreenErrorBoundary>
+            </ShellContainer>
+            </ViewerProvider>
+          </SaveRecoveryProvider>
+        </FileConflictProvider>
+      </ProcessingProvider>
+    </ToastProvider>
 );
 }

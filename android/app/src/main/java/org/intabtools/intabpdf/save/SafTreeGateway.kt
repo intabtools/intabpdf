@@ -29,6 +29,7 @@ class SharedPrefsSafDestinationStorage(context: Context) : SafDestinationStorage
 
 interface SafTreeGateway {
     fun hasPersistedReadWritePermission(treeUriString: String): Boolean
+    fun hasAnyPersistedPermission(treeUriString: String): Boolean
     fun releasePersistedPermissionBestEffort(treeUriString: String)
     fun getTreeRootDocumentId(treeUriString: String): String
     fun buildDocumentUriUsingTree(treeUriString: String, documentId: String): String
@@ -40,11 +41,13 @@ interface SafTreeGateway {
     fun deleteDocument(documentUriString: String): Boolean
     fun copyLocalFileToDocument(localFile: File, destUriString: String, strictTruncate: Boolean): Long
     fun copyDocumentToLocalFile(sourceUriString: String, localFile: File): Long
+    fun measureDocumentByteSize(documentUriString: String): Long?
 }
 
-class AndroidSafTreeGateway(context: Context) : SafTreeGateway {
-
-    private val resolver: ContentResolver = context.applicationContext.contentResolver
+class AndroidSafTreeGateway(
+    context: Context,
+    private val resolver: ContentResolver = context.applicationContext.contentResolver,
+) : SafTreeGateway {
 
     override fun hasPersistedReadWritePermission(treeUriString: String): Boolean {
         val target = Uri.parse(treeUriString)
@@ -57,13 +60,35 @@ class AndroidSafTreeGateway(context: Context) : SafTreeGateway {
         }
     }
 
+    override fun hasAnyPersistedPermission(treeUriString: String): Boolean {
+        val target = Uri.parse(treeUriString)
+        return try {
+            resolver.persistedUriPermissions.any { perm -> perm.uri == target }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     override fun releasePersistedPermissionBestEffort(treeUriString: String) {
-        try {
-            resolver.releasePersistableUriPermission(
-                Uri.parse(treeUriString),
+        val target = Uri.parse(treeUriString)
+        val grantedFlags = try {
+            resolver.persistedUriPermissions.firstOrNull { it.uri == target }?.let { perm ->
+                var flags = 0
+                if (perm.isReadPermission) flags = flags or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                if (perm.isWritePermission) flags = flags or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                flags
+            }
+        } catch (_: Exception) {
+            null
+        }
+        val flagsToRelease = (grantedFlags ?: 0).let {
+            if (it != 0) it else {
                 android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            }
+        }
+        try {
+            resolver.releasePersistableUriPermission(target, flagsToRelease)
         } catch (_: Exception) {
             // Best-effort cleanup
         }
@@ -205,6 +230,21 @@ class AndroidSafTreeGateway(context: Context) : SafTreeGateway {
             FileOutputStream(localFile, false).use { outStream ->
                 return streamCopy(inStream, outStream)
             }
+        }
+    }
+
+    override fun measureDocumentByteSize(documentUriString: String): Long? {
+        val uri = Uri.parse(documentUriString)
+        val input = resolver.openInputStream(uri) ?: return null
+        return input.use { stream ->
+            val buffer = ByteArray(16 * 1024)
+            var total = 0L
+            while (true) {
+                val read = stream.read(buffer)
+                if (read == -1) break
+                total += read
+            }
+            total
         }
     }
 

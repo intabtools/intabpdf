@@ -11,6 +11,7 @@ import { useViewer } from '../hooks/useViewer';
 import { resolveViewerNavigationTarget } from '../viewer/viewerContextDef';
 import { useProcessing } from '../hooks/useProcessing';
 import { getPlatformType, openPdfInNewTab, platform } from '../platform';
+import { useSaveRecovery } from '../hooks/useSaveRecovery';
 import type { OpenedFile } from '../platform';
 import {
   getDefaultOutputBaseName,
@@ -59,7 +60,9 @@ export default function ToolPage(): ReactNode {
   const { shell } = useShell();
   const { showToast } = useToast();
   const { startProcessing, stopProcessing, runWithProcessing } = useProcessing();
+  const saveRecovery = useSaveRecovery();
   const activeImportReqRef = useRef<number | null>(null);
+  const isSavingRef = useRef(false);
 
   const tool = getToolById(toolId || '');
   const isImplemented = tool ? isToolImplemented(tool.id) : false;
@@ -209,7 +212,8 @@ export default function ToolPage(): ReactNode {
   };
 
   const handleDownload = async () => {
-    if (!outputBytes) return;
+    if (!outputBytes || isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       const mimeType = isZipOutput
         ? 'application/zip'
@@ -227,6 +231,11 @@ export default function ToolPage(): ReactNode {
         mimeType
       );
       if (res && res.saved === false) {
+        if (res.outcome === 'failed_recovery_available' && res.recovery) {
+          saveRecovery?.attachRetrySave?.(() => handleDownload());
+        } else if (res.outcome === 'failed_original_intact') {
+          showToast(res.message || 'Replacement did not finish; original file remains intact.', 4000);
+        }
         return;
       }
       const savedName = (res && res.fileName) || finalFileName;
@@ -236,6 +245,8 @@ export default function ToolPage(): ReactNode {
       console.error('Failed to save file:', err);
       const message = err instanceof Error && err.message.trim() ? err.message : 'Failed to save file';
       showToast(message);
+    } finally {
+      isSavingRef.current = false;
     }
   };
 

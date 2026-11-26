@@ -1,7 +1,8 @@
 // About page presenting privacy guarantees, FAQ, open-source repository link, and dynamic version.
 import type { ReactNode } from 'react';
-import { Code2 } from 'lucide-react';
+import { Code2, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useSaveRecovery } from '../hooks/useSaveRecovery';
 import { useShell } from '../hooks/useShell';
 import { getPlatformType } from '../platform';
 import { APP_VERSION } from '../config';
@@ -33,10 +34,37 @@ const PRIVACY_ITEMS = [
 
 export default function AboutPage(): ReactNode {
   const { shell } = useShell();
+  const saveRecovery = useSaveRecovery();
   const isAndroid = getPlatformType() === 'android';
+  const recoveryCount = saveRecovery?.backups.length ?? 0;
 
   const content = (
     <div className="ab">
+      {isAndroid && saveRecovery && (
+        <section className="card wide" aria-label="Android file recovery">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <ShieldAlert size={18} color={recoveryCount > 0 ? 'var(--warning)' : 'var(--accent)'} />
+                <span>Saved file recovery</span>
+              </h2>
+              <small style={{ color: 'var(--text-muted)' }}>
+                {recoveryCount > 0
+                  ? `${recoveryCount} preserved recovery backup${recoveryCount === 1 ? '' : 's'} waiting for export or review.`
+                  : 'Check or export any backup preserved after an interrupted Android file replacement.'}
+              </small>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => saveRecovery.openRecoveryManager()}
+            >
+              {recoveryCount > 0 ? `Recover Backups (${recoveryCount})` : 'Manage Recovery Backups'}
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="card id">
         <h2>About InTab PDF</h2>
         <p>
