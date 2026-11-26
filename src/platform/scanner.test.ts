@@ -80,6 +80,7 @@ describe('DocumentScanner Capacitor bridge', () => {
     const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
     pluginMocks.startScan.mockResolvedValue({
       status: 'completed',
+      action: 'save',
       pdfFileUrl: 'file:///data/user/0/org.intabtools.intabpdf/cache/scanner_outputs/scan_1.pdf',
       fileName: 'ReceiptScan',
       pageCount: 2,
@@ -95,6 +96,7 @@ describe('DocumentScanner Capacitor bridge', () => {
     const res = await scanDocumentToOpenedFile();
     expect(res.status).toBe('completed');
     if (res.status === 'completed') {
+      expect(res.action).toBe('save');
       expect(res.file.name).toBe('ReceiptScan.pdf');
       expect(res.file.bytes).toEqual(pdfBytes);
       expect(res.pageCount).toBe(2);

@@ -98,4 +98,28 @@ class NormalizedQuadTest {
         assertEquals(0.05f, mid.topLeft.x, 1e-4f)
         assertEquals(0.95f, mid.bottomRight.x, 1e-4f)
     }
+
+    @Test
+    fun `alignCornersTo prevents 45-degree corner index flips against reference`() {
+        val reference = NormalizedQuad(
+            topLeft = NormalizedPoint(0.20f, 0.20f),
+            topRight = NormalizedPoint(0.80f, 0.22f),
+            bottomRight = NormalizedPoint(0.78f, 0.82f),
+            bottomLeft = NormalizedPoint(0.18f, 0.80f),
+        )
+        // Same quad shifted cyclically by 1 (as happens around 45-degree rotation tie-breaks)
+        val cyclicallyShifted = NormalizedQuad(
+            topLeft = reference.topRight,
+            topRight = reference.bottomRight,
+            bottomRight = reference.bottomLeft,
+            bottomLeft = reference.topLeft,
+        )
+
+        val aligned = cyclicallyShifted.alignCornersTo(reference)
+        assertEquals(reference.topLeft.x, aligned.topLeft.x, 1e-5f)
+        assertEquals(reference.topLeft.y, aligned.topLeft.y, 1e-5f)
+        assertEquals(reference.topRight.x, aligned.topRight.x, 1e-5f)
+        assertEquals(reference.bottomRight.x, aligned.bottomRight.x, 1e-5f)
+        assertEquals(reference.bottomLeft.x, aligned.bottomLeft.x, 1e-5f)
+    }
 }

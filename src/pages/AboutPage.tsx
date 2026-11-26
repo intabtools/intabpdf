@@ -41,10 +41,10 @@ export default function AboutPage(): ReactNode {
   const content = (
     <div className="ab">
       {isAndroid && saveRecovery && (
-        <section className="card wide" aria-label="Android file recovery">
+        <section className="card wide ab-recovery" aria-label="Android file recovery">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ShieldAlert size={18} color={recoveryCount > 0 ? 'var(--warning)' : 'var(--accent)'} />
                 <span>Saved file recovery</span>
               </h2>

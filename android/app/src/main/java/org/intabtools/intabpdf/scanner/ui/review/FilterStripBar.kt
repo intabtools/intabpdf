@@ -25,8 +25,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,19 +110,19 @@ fun FilterStripBar(
             items(ScanFilter.entries, key = { it.wireValue }) { mode ->
                 val isSelected = mode == selectedFilter
                 val thumbFile = thumbnails[mode]
-                val thumbBitmap by produceState<Bitmap?>(
-                    initialValue = null,
-                    key1 = thumbFile?.absolutePath,
-                    key2 = thumbnailCacheKey,
-                ) {
-                    value = if (thumbFile != null) {
-                        bitmapLoader.loadDisplayBitmap(
+                var thumbBitmap by remember(mode.wireValue) { mutableStateOf<Bitmap?>(null) }
+                LaunchedEffect(thumbFile?.absolutePath, thumbnailCacheKey) {
+                    if (thumbFile != null) {
+                        val loaded = bitmapLoader.loadDisplayBitmap(
                             file = thumbFile,
                             cacheKey = "thumb_${thumbFile.absolutePath}_${thumbFile.lastModified()}",
                             maxPixels = 48_000L,
                         )
-                    } else {
-                        null
+                        if (loaded != null) {
+                            thumbBitmap = loaded
+                        }
+                    } else if (thumbnailCacheKey == null) {
+                        thumbBitmap = null
                     }
                 }
 

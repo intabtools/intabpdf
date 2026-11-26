@@ -5,6 +5,19 @@ import android.content.Intent
 import org.intabtools.intabpdf.scanner.vision.NormalizedQuad
 import java.io.File
 
+enum class PostExportAction(val wireValue: String) {
+    SAVE("save"),
+    VIEW("view"),
+    SHARE("share");
+
+    companion object {
+        fun fromWireValue(value: String?): PostExportAction {
+            val normalized = value?.trim()?.lowercase() ?: return SAVE
+            return entries.firstOrNull { it.wireValue == normalized } ?: SAVE
+        }
+    }
+}
+
 enum class ScanFilter(val wireValue: String) {
     AUTO("auto"),
     ORIGINAL("original"),
@@ -71,6 +84,7 @@ data class ScannerLaunchOptions(
         const val EXTRA_FILE_NAME = "org.intabtools.intabpdf.scanner.EXTRA_FILE_NAME"
         const val EXTRA_PAGE_COUNT = "org.intabtools.intabpdf.scanner.EXTRA_PAGE_COUNT"
         const val EXTRA_SIZE_BYTES = "org.intabtools.intabpdf.scanner.EXTRA_SIZE_BYTES"
+        const val EXTRA_POST_EXPORT_ACTION = "org.intabtools.intabpdf.scanner.EXTRA_POST_EXPORT_ACTION"
         const val EXTRA_ERROR_CODE = "org.intabtools.intabpdf.scanner.EXTRA_ERROR_CODE"
         const val EXTRA_ERROR_MESSAGE = "org.intabtools.intabpdf.scanner.EXTRA_ERROR_MESSAGE"
 

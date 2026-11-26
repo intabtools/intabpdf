@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,7 +38,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,6 +80,9 @@ fun ReviewScreen(
     onDismissExportError: () -> Unit,
     onCloseSession: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenInViewer: () -> Unit = {},
+    onSharePdf: () -> Unit = {},
+    onRetryExport: () -> Unit = onExportPdf,
 ) {
     Box(
         modifier = modifier
@@ -155,61 +164,90 @@ fun ReviewScreen(
                         .padding(24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "No pages in this scan yet",
-                            color = InTabColors.DarkText,
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Capture a document page with the camera or import photos from your gallery.",
-                            color = InTabColors.DarkTextMuted,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Button(
-                            onClick = onAddFromCamera,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Scan with Camera")
+                    if (uiState.isImportingGallery) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = InTabColors.BrandIndigoSoftText)
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Importing gallery image(s)…",
+                                color = InTabColors.DarkText,
+                                style = MaterialTheme.typography.titleSmall,
+                                textAlign = TextAlign.Center,
+                            )
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
-                            onClick = onImportGallery,
-                            enabled = !uiState.isImportingGallery,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(if (uiState.isImportingGallery) "Importing…" else "Import from Gallery")
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "No pages in this scan yet",
+                                color = InTabColors.DarkText,
+                                style = MaterialTheme.typography.titleMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Capture a document page with the camera or import photos from your gallery.",
+                                color = InTabColors.DarkTextMuted,
+                                style = MaterialTheme.typography.bodySmall,
+                                textAlign = TextAlign.Center,
+                            )
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Button(
+                                onClick = onAddFromCamera,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Scan with Camera")
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = onImportGallery,
+                                enabled = !uiState.isImportingGallery,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Import from Gallery")
+                            }
                         }
                     }
                 }
                 return@Box
             }
 
-            // Secondary Add-Page / Gallery Action Row
+            // Secondary Export (Open in Viewer / Share) & Add-Page / Gallery Action Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(InTabColors.DarkSurface)
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End,
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(
+                    onClick = onOpenInViewer,
+                    enabled = !uiState.isExportingPdf && !uiState.isImportingGallery,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.semantics { contentDescription = "Open in Viewer" },
+                ) {
+                    Text("Open in Viewer", color = InTabColors.DarkText, style = MaterialTheme.typography.labelMedium)
+                }
+                TextButton(
+                    onClick = onSharePdf,
+                    enabled = !uiState.isExportingPdf && !uiState.isImportingGallery,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.semantics { contentDescription = "Share" },
+                ) {
+                    Text("Share", color = InTabColors.DarkText, style = MaterialTheme.typography.labelMedium)
+                }
+                TextButton(
                     onClick = onImportGallery,
                     enabled = !uiState.isImportingGallery && !uiState.isExportingPdf,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                 ) {
                     Text("Import Photos", color = InTabColors.BrandIndigoSoftText, style = MaterialTheme.typography.labelMedium)
                 }
-                Spacer(modifier = Modifier.width(6.dp))
                 TextButton(
                     onClick = onAddFromCamera,
                     enabled = !uiState.isExportingPdf,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                 ) {
                     Text("+ Add Page", color = InTabColors.BrandIndigoSoftText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 }
@@ -219,11 +257,20 @@ fun ReviewScreen(
                 initialPage = uiState.selectedPageIndex.coerceIn(0, uiState.pages.lastIndex),
                 pageCount = { uiState.pages.size },
             )
+            val latestSelectedIndex by rememberUpdatedState(uiState.selectedPageIndex)
+            val latestPageCount by rememberUpdatedState(uiState.pages.size)
 
-            LaunchedEffect(pagerState.currentPage, uiState.pages.size) {
-                if (uiState.pages.isNotEmpty() && pagerState.currentPage != uiState.selectedPageIndex) {
-                    onSelectPage(pagerState.currentPage.coerceIn(0, uiState.pages.lastIndex))
-                }
+            LaunchedEffect(pagerState) {
+                snapshotFlow { pagerState.settledPage }
+                    .collect { settled ->
+                        val count = latestPageCount
+                        if (count > 0) {
+                            val clamped = settled.coerceIn(0, count - 1)
+                            if (clamped != latestSelectedIndex && pagerState.currentPage == pagerState.targetPage) {
+                                onSelectPage(clamped)
+                            }
+                        }
+                    }
             }
 
             LaunchedEffect(uiState.selectedPageIndex, uiState.pages.size) {
@@ -242,6 +289,7 @@ fun ReviewScreen(
             ) {
                 HorizontalPager(
                     state = pagerState,
+                    key = { index -> uiState.pages.getOrNull(index)?.pageId ?: index },
                     modifier = Modifier.fillMaxSize(),
                 ) { pageIndex ->
                     val page = uiState.pages.getOrNull(pageIndex) ?: return@HorizontalPager
@@ -303,7 +351,7 @@ fun ReviewScreen(
                                 TextButton(onClick = onDismissExportError) {
                                     Text("Dismiss")
                                 }
-                                TextButton(onClick = onExportPdf) {
+                                TextButton(onClick = onRetryExport) {
                                     Text("Retry")
                                 }
                             }
@@ -427,12 +475,16 @@ private fun PagePreviewCanvas(
         "src_preview_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
     }
 
-    val bitmap by produceState<Bitmap?>(initialValue = null, key1 = cacheKey) {
-        value = bitmapLoader.loadDisplayBitmap(
+    var bitmap by remember(page.pageId) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(cacheKey) {
+        val loaded = bitmapLoader.loadDisplayBitmap(
             file = fileToDisplay,
             cacheKey = cacheKey,
             maxPixels = 1_800_000L,
         )
+        if (loaded != null) {
+            bitmap = loaded
+        }
     }
 
     Box(

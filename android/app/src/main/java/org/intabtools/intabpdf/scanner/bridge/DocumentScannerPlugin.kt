@@ -14,6 +14,7 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
+import org.intabtools.intabpdf.scanner.data.PostExportAction
 import org.intabtools.intabpdf.scanner.data.ScanFilter
 import org.intabtools.intabpdf.scanner.data.ScanQuality
 import org.intabtools.intabpdf.scanner.data.ScannerLaunchOptions
@@ -118,6 +119,9 @@ class DocumentScannerPlugin : Plugin() {
         val pdfFileUrl = data?.getStringExtra(ScannerLaunchOptions.EXTRA_PDF_FILE_URL)
         val pageCount = data?.getIntExtra(ScannerLaunchOptions.EXTRA_PAGE_COUNT, 0) ?: 0
         val fileName = data?.getStringExtra(ScannerLaunchOptions.EXTRA_FILE_NAME) ?: "scan.pdf"
+        val action = PostExportAction.fromWireValue(
+            data?.getStringExtra(ScannerLaunchOptions.EXTRA_POST_EXPORT_ACTION)
+        ).wireValue
 
         if (pdfFileUrl.isNullOrBlank() || pageCount <= 0) {
             call.reject("Scanner completed without a valid PDF output.", "INVALID_OUTPUT")
@@ -139,6 +143,7 @@ class DocumentScannerPlugin : Plugin() {
 
         val ret = JSObject().apply {
             put("status", "completed")
+            put("action", action)
             put("pdfFileUrl", pdfFileUrl)
             put("fileName", fileName)
             put("pageCount", pageCount)

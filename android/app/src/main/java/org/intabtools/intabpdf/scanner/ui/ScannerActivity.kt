@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import org.intabtools.intabpdf.scanner.data.PostExportAction
 import org.intabtools.intabpdf.scanner.data.ScanSessionController
 import org.intabtools.intabpdf.scanner.data.ScannerLaunchOptions
 import org.intabtools.intabpdf.scanner.data.ScannerPaths
@@ -53,6 +54,7 @@ class ScannerActivity : ComponentActivity() {
     private var isPermissionPermanentlyDenied by mutableStateOf(false)
     private var hasRequestedPermissionOnce = false
     private var shouldDeleteSessionDirOnDestroy = false
+    private var isGalleryPickerOpen = false
 
     private val requestCameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -65,6 +67,7 @@ class ScannerActivity : ComponentActivity() {
     private val pickGalleryImagesLauncher = registerForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_GALLERY_BATCH)
     ) { uris ->
+        isGalleryPickerOpen = false
         sessionController.importGalleryUris(uris)
     }
 
@@ -132,7 +135,7 @@ class ScannerActivity : ComponentActivity() {
                 val exported = sessionState.completedExport
                 LaunchedEffect(exported) {
                     if (exported != null) {
-                        completeWithPdfResult(exported)
+                        completeWithPdfResult(exported, sessionState.completedExportAction)
                     }
                 }
 
@@ -145,6 +148,11 @@ class ScannerActivity : ComponentActivity() {
                                 sessionPageCount = sessionState.pages.size,
                                 isRetakeMode = sessionState.retakeTargetPageId != null,
                                 isImportingGallery = sessionState.isImportingGallery,
+                                canBindCamera = {
+                                    !isGalleryPickerOpen &&
+                                        !sessionController.uiState.value.isImportingGallery &&
+                                        sessionController.uiState.value.route is ScannerRoute.Camera
+                                },
                                 onOpenGallery = ::launchGalleryPicker,
                                 onOpenReview = { sessionController.openReview() },
                                 onClose = { handleBackNavigation() },
@@ -190,7 +198,10 @@ class ScannerActivity : ComponentActivity() {
                                 sessionController.setApplyFilterToAll(applyAll)
                             },
                             onSelectFilter = { filter -> sessionController.selectFilter(filter) },
-                            onExportPdf = { sessionController.exportPdf() },
+                            onExportPdf = { sessionController.exportPdf(action = PostExportAction.SAVE) },
+                            onOpenInViewer = { sessionController.exportPdf(action = PostExportAction.VIEW) },
+                            onSharePdf = { sessionController.exportPdf(action = PostExportAction.SHARE) },
+                            onRetryExport = { sessionController.retryLastExport() },
                             onCancelExport = { sessionController.cancelPdfExport() },
                             onDismissExportError = { sessionController.dismissExportError() },
                             onCloseSession = { cancelAndFinish() },
@@ -279,9 +290,15 @@ class ScannerActivity : ComponentActivity() {
     }
 
     private fun launchGalleryPicker() {
-        pickGalleryImagesLauncher.launch(
-            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-        )
+        if (isGalleryPickerOpen || sessionController.uiState.value.isImportingGallery) return
+        isGalleryPickerOpen = true
+        runCatching {
+            pickGalleryImagesLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
+        }.onFailure {
+            isGalleryPickerOpen = false
+        }
     }
 
     private fun handleBackNavigation() {
@@ -317,13 +334,14 @@ class ScannerActivity : ComponentActivity() {
         }
     }
 
-    private fun completeWithPdfResult(exported: PdfExportResult) {
+    private fun completeWithPdfResult(exported: PdfExportResult, action: PostExportAction) {
         shouldDeleteSessionDirOnDestroy = true
         val resultIntent = Intent().apply {
             putExtra(ScannerLaunchOptions.EXTRA_PDF_FILE_URL, Uri.fromFile(exported.outputFile).toString())
             putExtra(ScannerLaunchOptions.EXTRA_FILE_NAME, exported.fileName)
             putExtra(ScannerLaunchOptions.EXTRA_PAGE_COUNT, exported.pageCount)
             putExtra(ScannerLaunchOptions.EXTRA_SIZE_BYTES, exported.sizeBytes)
+            putExtra(ScannerLaunchOptions.EXTRA_POST_EXPORT_ACTION, action.wireValue)
         }
         setResult(Activity.RESULT_OK, resultIntent)
         finish()

@@ -205,6 +205,36 @@ class ScanSessionMilestone3BIntegrationTest {
         }
     }
 
+    @Test
+    fun galleryImportDeduplicatesUrisTransitionsOffCameraSynchronouslyAndExportActionsPropagate(): Unit = runBlocking {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store = StillCaptureStore(context, OpenCvDocumentDetector())
+        val controller = ScanSessionController(
+            context = context,
+            captureStore = store,
+            mainDispatcher = Dispatchers.Default,
+        )
+        val file1 = writeSamplePage(store, Scalar(244.0, 244.0, 244.0))
+        try {
+            val dupUri = Uri.fromFile(file1)
+            controller.importGalleryUris(listOf(dupUri, dupUri))
+            // Immediately leaves Camera route and marks isImportingGallery so ON_RESUME cannot rebind CameraX
+            assertEquals(ScannerRoute.Review, controller.uiState.value.route)
+            assertTrue(controller.uiState.value.isImportingGallery)
+
+            waitUntil { !controller.uiState.value.isImportingGallery && controller.uiState.value.pages.size == 1 }
+            assertEquals("Duplicate URIs in one batch must only import once", 1, controller.uiState.value.pages.size)
+
+            controller.exportPdf(action = PostExportAction.SAVE)
+            waitUntil { controller.uiState.value.completedExport != null }
+            assertEquals(PostExportAction.SAVE, controller.uiState.value.completedExportAction)
+        } finally {
+            file1.delete()
+            controller.shutdown()
+        }
+    }
+
     private suspend fun waitUntil(timeoutMs: Long = 10_000L, condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {

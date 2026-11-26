@@ -11,6 +11,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +23,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -48,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -135,7 +142,8 @@ fun CropEditorScreen(
             .fillMaxSize()
             .background(InTabColors.DarkBackground)
             .statusBarsPadding()
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            .displayCutoutPadding(),
     ) {
         // Header
         Row(
@@ -173,20 +181,38 @@ fun CropEditorScreen(
             } else {
                 val imageAspect = bmp.width.toFloat() / bmp.height.coerceAtLeast(1).toFloat()
                 val touchRadiusPx = with(density) { 52.dp.toPx() }
+                val layoutDirection = LocalLayoutDirection.current
+                val gesturePadding = WindowInsets.systemGestures.asPaddingValues()
+                val safeInsetStartPx = with(density) {
+                    maxOf(gesturePadding.calculateStartPadding(layoutDirection) + 6.dp, 24.dp).toPx()
+                }
+                val safeInsetEndPx = with(density) {
+                    maxOf(gesturePadding.calculateEndPadding(layoutDirection) + 6.dp, 24.dp).toPx()
+                }
+                val safeInsetVerticalPx = with(density) { 16.dp.toPx() }
 
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(imageAspect, canvasSize, touchRadiusPx) {
+                        .pointerInput(
+                            imageAspect,
+                            canvasSize,
+                            touchRadiusPx,
+                            safeInsetStartPx,
+                            safeInsetEndPx,
+                            safeInsetVerticalPx,
+                        ) {
                             detectDragGestures(
                                 onDragStart = { startOffset ->
+                                    val safeW = (size.width - safeInsetStartPx - safeInsetEndPx).coerceAtLeast(1f)
+                                    val safeH = (size.height - safeInsetVerticalPx * 2f).coerceAtLeast(1f)
                                     val found = CropGeometry.findClosestHandle(
-                                        tapX = startOffset.x,
-                                        tapY = startOffset.y,
+                                        tapX = startOffset.x - safeInsetStartPx,
+                                        tapY = startOffset.y - safeInsetVerticalPx,
                                         quad = workingQuad,
                                         imageAspectRatio = imageAspect,
-                                        canvasWidth = size.width.toFloat(),
-                                        canvasHeight = size.height.toFloat(),
+                                        canvasWidth = safeW,
+                                        canvasHeight = safeH,
                                         maxDistancePx = touchRadiusPx,
                                     )
                                     activeHandle = found
@@ -195,12 +221,14 @@ fun CropEditorScreen(
                                 onDrag = { change, _ ->
                                     val handle = activeHandle ?: return@detectDragGestures
                                     change.consume()
+                                    val safeW = (size.width - safeInsetStartPx - safeInsetEndPx).coerceAtLeast(1f)
+                                    val safeH = (size.height - safeInsetVerticalPx * 2f).coerceAtLeast(1f)
                                     val normPoint = CropGeometry.canvasPointToNormalizedImagePoint(
-                                        canvasX = change.position.x,
-                                        canvasY = change.position.y,
+                                        canvasX = change.position.x - safeInsetStartPx,
+                                        canvasY = change.position.y - safeInsetVerticalPx,
                                         imageAspectRatio = imageAspect,
-                                        canvasWidth = size.width.toFloat(),
-                                        canvasHeight = size.height.toFloat(),
+                                        canvasWidth = safeW,
+                                        canvasHeight = safeH,
                                     ) ?: return@detectDragGestures
                                     workingQuad = CropGeometry.updateCornerSafely(
                                         current = workingQuad,
@@ -224,38 +252,50 @@ fun CropEditorScreen(
                             )
                         },
                 ) {
-                    val topLeft = CoordinateTransform.mapNormalizedToFitCenterCanvas(
+                    val safeW = (size.width - safeInsetStartPx - safeInsetEndPx).coerceAtLeast(1f)
+                    val safeH = (size.height - safeInsetVerticalPx * 2f).coerceAtLeast(1f)
+                    val rawTopLeft = CoordinateTransform.mapNormalizedToFitCenterCanvas(
                         org.intabtools.intabpdf.scanner.vision.NormalizedPoint(0f, 0f),
                         imageAspect,
-                        size.width,
-                        size.height,
+                        safeW,
+                        safeH,
                     )
-                    val bottomRight = CoordinateTransform.mapNormalizedToFitCenterCanvas(
+                    val rawBottomRight = CoordinateTransform.mapNormalizedToFitCenterCanvas(
                         org.intabtools.intabpdf.scanner.vision.NormalizedPoint(1f, 1f),
                         imageAspect,
-                        size.width,
-                        size.height,
+                        safeW,
+                        safeH,
                     )
-                    val dstOffset = IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt())
+                    val topLeftX = rawTopLeft.x + safeInsetStartPx
+                    val topLeftY = rawTopLeft.y + safeInsetVerticalPx
+                    val bottomRightX = rawBottomRight.x + safeInsetStartPx
+                    val bottomRightY = rawBottomRight.y + safeInsetVerticalPx
+
+                    val dstOffset = IntOffset(topLeftX.roundToInt(), topLeftY.roundToInt())
                     val dstSize = IntSize(
-                        (bottomRight.x - topLeft.x).roundToInt().coerceAtLeast(1),
-                        (bottomRight.y - topLeft.y).roundToInt().coerceAtLeast(1),
+                        (bottomRightX - topLeftX).roundToInt().coerceAtLeast(1),
+                        (bottomRightY - topLeftY).roundToInt().coerceAtLeast(1),
                     )
                     drawImage(image = bmp, dstOffset = dstOffset, dstSize = dstSize)
 
                     val pts = CoordinateTransform.mapQuadToFitCenterCanvas(
                         quad = workingQuad,
                         imageAspectRatio = imageAspect,
-                        canvasWidth = size.width,
-                        canvasHeight = size.height,
-                    )
+                        canvasWidth = safeW,
+                        canvasHeight = safeH,
+                    ).map { pt ->
+                        org.intabtools.intabpdf.scanner.vision.CanvasPoint(
+                            x = pt.x + safeInsetStartPx,
+                            y = pt.y + safeInsetVerticalPx,
+                        )
+                    }
                     if (pts.size == 4) {
                         val scrimPath = Path().apply {
                             fillType = PathFillType.EvenOdd
-                            moveTo(topLeft.x, topLeft.y)
-                            lineTo(bottomRight.x, topLeft.y)
-                            lineTo(bottomRight.x, bottomRight.y)
-                            lineTo(topLeft.x, bottomRight.y)
+                            moveTo(topLeftX, topLeftY)
+                            lineTo(bottomRightX, topLeftY)
+                            lineTo(bottomRightX, bottomRightY)
+                            lineTo(topLeftX, bottomRightY)
                             close()
 
                             moveTo(pts[0].x, pts[0].y)

@@ -165,10 +165,51 @@ object PageFilterEngine {
     }
 
     /**
-     * Grayscale enhancement: local shadow removal normalizing paper background toward clean white
-     * + percentile ink contrast stretch + light edge-preserving smoothing.
+     * Grayscale enhancement: white-balanced luminance -> balanced local shadow normalization
+     * -> natural midtone-preserving tonal mapping without crushing faint ink or clipping highlights.
      */
     fun enhanceGrayscale(srcBgr: Mat): Mat {
+        val balanced = if (srcBgr.channels() >= 3) {
+            applyPaperWhiteBalance(srcBgr)
+        } else {
+            srcBgr.clone()
+        }
+        val gray = Mat()
+        try {
+            if (balanced.channels() >= 3) {
+                Imgproc.cvtColor(balanced, gray, Imgproc.COLOR_BGR2GRAY)
+            } else {
+                balanced.copyTo(gray)
+            }
+        } finally {
+            balanced.release()
+        }
+
+        val flattened = flattenLuminanceBackground(gray, blendWeight = 0.84, targetPaperLevel = 244.0)
+        val toned = applySafeGrayscaleToneCurve(flattened)
+        val shouldDenoise = minOf(toned.cols(), toned.rows()) >= 400
+        if (!shouldDenoise) {
+            gray.release()
+            flattened.release()
+            return toned
+        }
+
+        val denoised = Mat()
+        try {
+            Imgproc.bilateralFilter(toned, denoised, 5, 10.0, 10.0)
+            return denoised
+        } finally {
+            gray.release()
+            flattened.release()
+            toned.release()
+        }
+    }
+
+    /**
+     * Stronger background flattening + percentile stretch dedicated to Sauvola bitonal thresholding
+     * so Grayscale improvements stay completely independent of B&W processing.
+     */
+    private fun prepareGrayscaleForThreshold(srcBgr: Mat): Mat {
         val gray = Mat()
         if (srcBgr.channels() >= 3) {
             Imgproc.cvtColor(srcBgr, gray, Imgproc.COLOR_BGR2GRAY)
@@ -198,7 +239,7 @@ object PageFilterEngine {
         isLowRamDevice: Boolean = false,
         targetMaxPixels: Long = 6_000_000L,
     ): Mat {
-        val flatGray = enhanceGrayscale(srcBgr)
+        val flatGray = prepareGrayscaleForThreshold(srcBgr)
         val effectiveCap = if (isLowRamDevice) targetMaxPixels.coerceAtMost(3_200_000L) else targetMaxPixels
         val working = upscaleIfBelowPixels(flatGray, effectiveCap)
         flatGray.release()
@@ -320,6 +361,29 @@ object PageFilterEngine {
             bgFloat.release()
             normalized.release()
             blended.release()
+        }
+    }
+
+    private fun applySafeGrayscaleToneCurve(gray: Mat): Mat {
+        // Anchor black point gently only when genuine dark ink exists; never crush sparse/pencil pages.
+        val p002 = computePercentileValue(gray, 0.002)
+        val low = if (p002 < 55.0) (p002 * 0.6).coerceIn(0.0, 32.0) else 0.0
+        val high = computePercentileValue(gray, 0.96).coerceIn(max(low + 60.0, 224.0), 255.0)
+        val span = (high - low).coerceAtLeast(60.0)
+
+        val lutData = ByteArray(256)
+        for (i in 0 until 256) {
+            val v = ((i - low) * 255.0 / span).roundToInt().coerceIn(0, 255)
+            lutData[i] = v.toByte()
+        }
+        val lut = Mat(1, 256, CvType.CV_8U)
+        val out = Mat()
+        try {
+            lut.put(0, 0, lutData)
+            Core.LUT(gray, lut, out)
+            return out
+        } finally {
+            lut.release()
         }
     }
 

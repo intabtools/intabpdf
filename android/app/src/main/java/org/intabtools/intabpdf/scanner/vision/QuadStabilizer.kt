@@ -11,7 +11,8 @@ enum class CameraUserHint {
 
 data class StabilizerConfig(
     val minConfidence: Float = 0.45f,
-    val maxLockCornerDelta: Float = 0.032f,
+    val maxLockCornerDelta: Float = 0.036f,
+    val maxTrackingCornerDelta: Float = 0.14f,
     val minLockFrames: Int = 3,
     val maxMissFrames: Int = 2,
     val autoCaptureMaxCornerDelta: Float = 0.016f,
@@ -34,15 +35,20 @@ data class StabilizerState(
 
 /**
  * Pure Kotlin temporal stabilizer for document boundary overlay and Auto-Capture eligibility.
- * Requires sustained 4-corner detection confidence, corner steadiness, camera steadiness,
- * adequate illumination/sharpness, post-capture cooldown, and duplicate-scene protection.
+ * Aligns corner ordering across frames, smoothly tracks gradual movement without dropping lock,
+ * rejects single-frame outlier jumps, tolerates brief detection dropouts, and enforces strict
+ * steadiness/quality/cooldown/duplicate checks before Auto-Capture triggers.
  */
 class QuadStabilizer(
     private val config: StabilizerConfig = StabilizerConfig(),
 ) {
     private var lastValidQuad: NormalizedQuad? = null
+    private var trackedQuad: NormalizedQuad? = null
     private var lockStreakCount = 0
     private var missStreakCount = 0
+
+    private var candidateJumpQuad: NormalizedQuad? = null
+    private var jumpConfirmCount = 0
 
     private var steadyAnchorQuad: NormalizedQuad? = null
     private var steadyStartMs: Long? = null
@@ -58,12 +64,14 @@ class QuadStabilizer(
         autoCaptureEnabled: Boolean,
         nowMs: Long,
     ): StabilizerState {
-        val validQuad = detectedQuad?.takeIf { confidence >= config.minConfidence && it.isValidConvex() }
+        val rawValid = detectedQuad?.takeIf { confidence >= config.minConfidence && it.isValidConvex() }
 
-        if (validQuad == null) {
+        if (rawValid == null) {
             missStreakCount++
             steadyAnchorQuad = null
             steadyStartMs = null
+            candidateJumpQuad = null
+            jumpConfirmCount = 0
 
             val lastCapturedAt = lastAutoCaptureMs
             if (lastCapturedAt != null && missStreakCount >= config.maxMissFrames) {
@@ -71,9 +79,10 @@ class QuadStabilizer(
                 seenShiftOrExitSinceCapture = true
             }
 
-            if (missStreakCount <= config.maxMissFrames && lockStreakCount >= config.minLockFrames && lastValidQuad != null) {
+            val heldOverlay = trackedQuad ?: lastValidQuad
+            if (missStreakCount <= config.maxMissFrames && lockStreakCount >= config.minLockFrames && heldOverlay != null) {
                 return StabilizerState(
-                    overlayQuad = lastValidQuad,
+                    overlayQuad = heldOverlay,
                     isLocked = true,
                     autoCaptureProgress = 0f,
                     shouldTriggerAutoCapture = false,
@@ -84,6 +93,7 @@ class QuadStabilizer(
 
             if (missStreakCount > config.maxMissFrames) {
                 lastValidQuad = null
+                trackedQuad = null
                 lockStreakCount = 0
             }
 
@@ -97,21 +107,92 @@ class QuadStabilizer(
             )
         }
 
-        // Valid detection present
+        // Valid detection present: align corner indices against active reference to avoid ~45-deg swaps
         missStreakCount = 0
-        val prev = lastValidQuad
-        if (prev != null && prev.maxCornerDistance(validQuad) <= config.maxLockCornerDelta) {
-            lockStreakCount++
+        val wasLocked = lockStreakCount >= config.minLockFrames && trackedQuad != null
+        val referenceQuad = trackedQuad ?: lastValidQuad
+        val alignedQuad = if (referenceQuad != null) rawValid.alignCornersTo(referenceQuad) else rawValid
+
+        val activeQuad: NormalizedQuad
+        val isLocked: Boolean
+        val rawDeltaFromPrev: Float
+
+        if (wasLocked && trackedQuad != null) {
+            val prevTracked = trackedQuad!!
+            val deltaFromTracked = prevTracked.maxCornerDistance(alignedQuad)
+
+            if (deltaFromTracked <= config.maxTrackingCornerDelta) {
+                // Smooth tracking & panning: keep lock alive and filter jitter with velocity-adaptive EMA
+                candidateJumpQuad = null
+                jumpConfirmCount = 0
+                rawDeltaFromPrev = lastValidQuad?.let { it.maxCornerDistance(alignedQuad) } ?: deltaFromTracked
+                val alpha = when {
+                    deltaFromTracked <= 0.012f -> 0.24f
+                    deltaFromTracked <= 0.045f -> 0.44f
+                    else -> 0.68f
+                }
+                val smoothed = prevTracked.lerpTo(alignedQuad, alpha)
+                trackedQuad = smoothed
+                lastValidQuad = alignedQuad
+                lockStreakCount++
+                activeQuad = smoothed
+                isLocked = true
+            } else {
+                // Large jump: reject single-frame outlier spikes; require 2 consistent frames to accept relocation
+                val pendingJump = candidateJumpQuad
+                if (pendingJump != null && pendingJump.alignCornersTo(alignedQuad).maxCornerDistance(alignedQuad) <= config.maxLockCornerDelta * 1.5f) {
+                    jumpConfirmCount++
+                } else {
+                    candidateJumpQuad = alignedQuad
+                    jumpConfirmCount = 1
+                }
+
+                if (jumpConfirmCount >= 2) {
+                    candidateJumpQuad = null
+                    jumpConfirmCount = 0
+                    trackedQuad = alignedQuad
+                    lastValidQuad = alignedQuad
+                    steadyAnchorQuad = null
+                    steadyStartMs = null
+                    rawDeltaFromPrev = config.maxTrackingCornerDelta
+                    activeQuad = alignedQuad
+                    isLocked = true
+                } else {
+                    // Hold existing smooth overlay for 1 outlier frame without triggering auto-capture
+                    steadyAnchorQuad = null
+                    steadyStartMs = null
+                    return StabilizerState(
+                        overlayQuad = prevTracked,
+                        isLocked = true,
+                        autoCaptureProgress = 0f,
+                        shouldTriggerAutoCapture = false,
+                        userHint = determineHint(hasQuad = true, quality = quality, inCooldown = isInCooldown(nowMs)),
+                        lastConfidence = confidence,
+                    )
+                }
+            }
         } else {
-            lockStreakCount = 1
+            // Acquiring lock: require minLockFrames consistent frames
+            val prev = lastValidQuad
+            rawDeltaFromPrev = if (prev != null) prev.maxCornerDistance(alignedQuad) else 0f
+            if (prev != null && rawDeltaFromPrev <= config.maxLockCornerDelta) {
+                lockStreakCount++
+            } else {
+                lockStreakCount = 1
+            }
+            lastValidQuad = alignedQuad
+            isLocked = lockStreakCount >= config.minLockFrames
+            if (isLocked) {
+                trackedQuad = alignedQuad
+            }
+            activeQuad = trackedQuad ?: alignedQuad
         }
-        lastValidQuad = validQuad
-        val isLocked = lockStreakCount >= config.minLockFrames
 
         // Track scene change for duplicate protection after a previous capture
         val capturedRef = lastCapturedQuad
         if (capturedRef != null && !seenShiftOrExitSinceCapture) {
-            if (capturedRef.maxCornerDistance(validQuad) >= config.duplicateShiftThreshold) {
+            val alignedToCaptured = alignedQuad.alignCornersTo(capturedRef)
+            if (capturedRef.maxCornerDistance(alignedToCaptured) >= config.duplicateShiftThreshold) {
                 seenShiftOrExitSinceCapture = true
             }
         }
@@ -129,7 +210,7 @@ class QuadStabilizer(
                 else -> CameraUserHint.LOCKED_READY
             }
             return StabilizerState(
-                overlayQuad = if (isLocked) validQuad else null,
+                overlayQuad = if (isLocked) activeQuad else null,
                 isLocked = isLocked,
                 autoCaptureProgress = 0f,
                 shouldTriggerAutoCapture = false,
@@ -138,16 +219,17 @@ class QuadStabilizer(
             )
         }
 
-        // Check camera steadiness, focus sharpness, and lighting
+        // Check camera steadiness, focus sharpness, lighting, and raw frame-to-frame stability
         val lightingOk = quality.meanLuminance >= config.minLuminance
         val sharpnessOk = quality.sharpnessVariance >= config.minSharpnessVariance
         val motionOk = quality.motionDelta <= config.maxMotionDelta
+        val frameSteady = rawDeltaFromPrev <= config.autoCaptureMaxCornerDelta
 
-        if (!lightingOk || !sharpnessOk || !motionOk) {
+        if (!lightingOk || !sharpnessOk || !motionOk || !frameSteady) {
             steadyAnchorQuad = null
             steadyStartMs = null
             return StabilizerState(
-                overlayQuad = validQuad,
+                overlayQuad = activeQuad,
                 isLocked = true,
                 autoCaptureProgress = 0f,
                 shouldTriggerAutoCapture = false,
@@ -156,15 +238,15 @@ class QuadStabilizer(
             )
         }
 
-        // Verify corner steadiness across hold window
+        // Verify corner steadiness across hold window using raw aligned quad (never capture a drifting quad)
         val anchor = steadyAnchorQuad
         val start = steadyStartMs
-        if (anchor != null && start != null && anchor.maxCornerDistance(validQuad) <= config.autoCaptureMaxCornerDelta) {
+        if (anchor != null && start != null && anchor.maxCornerDistance(alignedQuad) <= config.autoCaptureMaxCornerDelta) {
             val heldMs = (nowMs - start).coerceAtLeast(0L)
             val progress = (heldMs.toFloat() / config.autoCaptureHoldDurationMs.toFloat()).coerceIn(0f, 1f)
             val readyToFire = heldMs >= config.autoCaptureHoldDurationMs
             return StabilizerState(
-                overlayQuad = validQuad,
+                overlayQuad = activeQuad,
                 isLocked = true,
                 autoCaptureProgress = progress,
                 shouldTriggerAutoCapture = readyToFire,
@@ -172,10 +254,10 @@ class QuadStabilizer(
                 lastConfidence = confidence,
             )
         } else {
-            steadyAnchorQuad = validQuad
+            steadyAnchorQuad = alignedQuad
             steadyStartMs = nowMs
             return StabilizerState(
-                overlayQuad = validQuad,
+                overlayQuad = activeQuad,
                 isLocked = true,
                 autoCaptureProgress = 0f,
                 shouldTriggerAutoCapture = false,
@@ -199,8 +281,11 @@ class QuadStabilizer(
 
     fun reset() {
         lastValidQuad = null
+        trackedQuad = null
         lockStreakCount = 0
         missStreakCount = 0
+        candidateJumpQuad = null
+        jumpConfirmCount = 0
         steadyAnchorQuad = null
         steadyStartMs = null
         lastAutoCaptureMs = null

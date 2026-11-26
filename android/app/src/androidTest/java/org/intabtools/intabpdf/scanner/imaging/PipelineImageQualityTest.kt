@@ -158,6 +158,40 @@ class PipelineImageQualityTest {
     }
 
     @Test
+    fun grayscalePreservesFaintPencilLinesAndAvoidsDarkHeaderHalos() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val doc = createShadowedMonochromeDoc(1000, 1400)
+        // Faint pencil / light-gray table line (~32 levels darker than local ~164 paper at y=660, x=500)
+        val pencilY = 660.0
+        Imgproc.line(doc, Point(180.0, pencilY), Point(820.0, pencilY), Scalar(132.0, 132.0, 135.0), 3)
+
+        val grayOut = PageFilterEngine.enhanceGrayscale(doc)
+        try {
+            val paperSample = grayOut.get(640, 500)?.get(0) ?: 0.0
+            val pencilSample = grayOut.get(660, 500)?.get(0) ?: 255.0
+            assertTrue(
+                "Faint pencil mark must remain visibly darker than surrounding paper (paper=$paperSample, pencil=$pencilSample)",
+                paperSample - pencilSample >= 18.0,
+            )
+
+            // Solid dark header banner interior in grayscale must stay dark (no bright division halo)
+            val bannerCenter = grayOut.submat(
+                Rect(grayOut.cols() / 3, (grayOut.rows() * 0.14).toInt(), grayOut.cols() / 3, (grayOut.rows() * 0.04).toInt())
+            )
+            val bannerMean = Core.mean(bannerCenter).`val`[0]
+            bannerCenter.release()
+            assertTrue(
+                "Solid dark header interior in grayscale must remain dark without hollow halo (<= 85), got $bannerMean",
+                bannerMean <= 85.0,
+            )
+        } finally {
+            doc.release()
+            grayOut.release()
+        }
+    }
+
+    @Test
     fun autoFilterDistinguishesMonochromeTextFromColorStampedPage() {
         assertTrue(OpenCvRuntime.ensureInitialized())
 

@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -74,6 +75,7 @@ fun CameraFoundationScreen(
     sessionPageCount: Int = 0,
     isRetakeMode: Boolean = false,
     isImportingGallery: Boolean = false,
+    canBindCamera: () -> Boolean = { true },
     onOpenGallery: () -> Unit = {},
     onOpenReview: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -109,10 +111,16 @@ fun CameraFoundationScreen(
         }
     }
 
+    val latestIsImportingGallery by rememberUpdatedState(isImportingGallery)
+    val latestCanBindCamera by rememberUpdatedState(canBindCamera)
+
     DisposableEffect(lifecycleOwner, controller) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && uiState.bindState !is CameraBindState.Ready) {
-                controller.bindToLifecycle(lifecycleOwner)
+            if (event == Lifecycle.Event.ON_RESUME && !latestIsImportingGallery && latestCanBindCamera()) {
+                val bindState = controller.uiState.value.bindState
+                if (bindState is CameraBindState.Idle || bindState is CameraBindState.Unavailable) {
+                    controller.bindToLifecycle(lifecycleOwner)
+                }
             } else if (event == Lifecycle.Event.ON_STOP) {
                 controller.unbind()
             }
@@ -235,7 +243,9 @@ fun CameraFoundationScreen(
                 AndroidView(
                     factory = {
                         controller.createPreviewView().also {
-                            controller.bindToLifecycle(lifecycleOwner)
+                            if (!latestIsImportingGallery && latestCanBindCamera()) {
+                                controller.bindToLifecycle(lifecycleOwner)
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxSize(),
@@ -480,11 +490,12 @@ private fun DocumentBoundaryOverlay(
         }
         while (true) {
             val current = displayedQuad ?: targetQuad
-            if (current.maxCornerDistance(targetQuad) <= 0.0005f) {
-                displayedQuad = targetQuad
+            val alignedTarget = targetQuad.alignCornersTo(current)
+            if (current.maxCornerDistance(alignedTarget) <= 0.0005f) {
+                displayedQuad = alignedTarget
                 break
             }
-            displayedQuad = current.lerpTo(targetQuad, 0.24f)
+            displayedQuad = current.lerpTo(alignedTarget, 0.28f)
             withFrameNanos { }
         }
     }

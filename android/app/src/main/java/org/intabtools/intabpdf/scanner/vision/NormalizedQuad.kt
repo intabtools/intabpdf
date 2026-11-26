@@ -65,6 +65,37 @@ data class NormalizedQuad(
         bottomLeft = bottomLeft.lerpTo(target.bottomLeft, factor),
     )
 
+    /**
+     * Returns the cyclic corner rotation of this quad that minimizes total corner distance to
+     * [reference], preserving clockwise winding while preventing ~45-degree corner-index flips.
+     */
+    fun alignCornersTo(reference: NormalizedQuad): NormalizedQuad {
+        val pts = points()
+        val refPts = reference.points()
+        var bestShift = 0
+        var bestCost = Float.MAX_VALUE
+        for (shift in 0 until 4) {
+            var cost = 0f
+            for (i in 0 until 4) {
+                cost += pts[(shift + i) % 4].distanceTo(refPts[i])
+            }
+            if (cost < bestCost) {
+                bestCost = cost
+                bestShift = shift
+            }
+        }
+        return if (bestShift == 0) {
+            this
+        } else {
+            NormalizedQuad(
+                topLeft = pts[bestShift],
+                topRight = pts[(bestShift + 1) % 4],
+                bottomRight = pts[(bestShift + 2) % 4],
+                bottomLeft = pts[(bestShift + 3) % 4],
+            )
+        }
+    }
+
     fun touchesOuterMargin(margin: Float = 0.015f): Boolean {
         val limitHigh = 1f - margin
         return points().any { p ->

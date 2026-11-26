@@ -5,6 +5,7 @@ import type { OpenedFile } from './types';
 
 export type ScanFilter = 'auto' | 'original' | 'color' | 'grayscale' | 'bw';
 export type ScanQuality = 'low' | 'balanced' | 'high';
+export type ScanPostExportAction = 'save' | 'view' | 'share';
 
 export interface StartScanOptions {
   defaultFilter?: ScanFilter;
@@ -21,6 +22,7 @@ export interface ScannerAvailability {
 
 export interface ScanResult {
   status: 'completed' | 'cancelled';
+  action?: ScanPostExportAction;
   pdfFileUrl?: string;
   fileName?: string;
   pageCount?: number;
@@ -73,7 +75,10 @@ export async function cleanupScannerOutput(pdfFileUrl?: string): Promise<void> {
  */
 export async function scanDocumentToOpenedFile(
   options?: StartScanOptions,
-): Promise<{ status: 'completed'; file: OpenedFile; pageCount: number } | { status: 'cancelled' }> {
+): Promise<
+  | { status: 'completed'; action: ScanPostExportAction; file: OpenedFile; pageCount: number }
+  | { status: 'cancelled' }
+> {
   if (!isAndroidRuntime()) {
     throw new Error('Document scanner is only available on Android.');
   }
@@ -100,8 +105,13 @@ export async function scanDocumentToOpenedFile(
 
     const rawName = result.fileName?.trim() || 'scan.pdf';
     const fileName = rawName.toLowerCase().endsWith('.pdf') ? rawName : `${rawName}.pdf`;
+    const action: ScanPostExportAction =
+      result.action === 'save' || result.action === 'share' || result.action === 'view'
+        ? result.action
+        : 'view';
     return {
       status: 'completed',
+      action,
       file: { name: fileName, bytes },
       pageCount: result.pageCount && result.pageCount > 0 ? result.pageCount : 1,
     };

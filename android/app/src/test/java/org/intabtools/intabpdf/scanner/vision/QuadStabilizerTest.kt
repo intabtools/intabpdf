@@ -137,4 +137,43 @@ class QuadStabilizerTest {
         assertFalse(manualOnly.shouldTriggerAutoCapture)
         assertEquals(0f, manualOnly.autoCaptureProgress, 1e-5f)
     }
+
+    @Test
+    fun `smoothly tracks gradual movement and rejects isolated single-frame outlier jumps`() {
+        val stabilizer = QuadStabilizer()
+        repeat(3) { i ->
+            stabilizer.update(docQuad, 0.85f, goodQuality, true, (i + 1) * 50L)
+        }
+
+        // Gradual pan larger than maxLockCornerDelta (0.036f) but within maxTrackingCornerDelta (0.14f)
+        val panned = NormalizedQuad(
+            topLeft = NormalizedPoint(0.21f, 0.16f),
+            topRight = NormalizedPoint(0.91f, 0.16f),
+            bottomRight = NormalizedPoint(0.91f, 0.86f),
+            bottomLeft = NormalizedPoint(0.21f, 0.86f),
+        )
+        val tracked = stabilizer.update(panned, 0.85f, goodQuality, true, 250L)
+        assertTrue("Gradual panning should preserve overlay lock without blinking", tracked.isLocked)
+        assertNotNull(tracked.overlayQuad)
+        assertTrue(tracked.overlayQuad!!.topLeft.x > 0.15f && tracked.overlayQuad!!.topLeft.x < 0.21f)
+
+        // Single-frame wild outlier jump (> 0.14f) must be ignored
+        val outlier = NormalizedQuad(
+            topLeft = NormalizedPoint(0.55f, 0.55f),
+            topRight = NormalizedPoint(0.95f, 0.55f),
+            bottomRight = NormalizedPoint(0.95f, 0.95f),
+            bottomLeft = NormalizedPoint(0.55f, 0.95f),
+        )
+        val afterOutlier = stabilizer.update(outlier, 0.85f, goodQuality, true, 300L)
+        assertTrue(afterOutlier.isLocked)
+        assertFalse(afterOutlier.shouldTriggerAutoCapture)
+        assertEquals(tracked.overlayQuad, afterOutlier.overlayQuad)
+
+        // Two consistent frames at new location relocate cleanly
+        val relocated1 = stabilizer.update(outlier, 0.85f, goodQuality, true, 350L)
+        assertTrue(relocated1.isLocked)
+        val relocated2 = stabilizer.update(outlier, 0.85f, goodQuality, true, 400L)
+        assertTrue(relocated2.isLocked)
+        assertEquals(outlier.topLeft.x, relocated2.overlayQuad!!.topLeft.x, 1e-4f)
+    }
 }

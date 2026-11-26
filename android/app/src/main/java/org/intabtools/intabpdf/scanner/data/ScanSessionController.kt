@@ -44,6 +44,7 @@ data class ScannerSessionUiState(
     val exportProgressTotal: Int = 0,
     val exportErrorMessage: String? = null,
     val completedExport: PdfExportResult? = null,
+    val completedExportAction: PostExportAction = PostExportAction.SAVE,
     val statusMessage: String? = null,
 ) {
     val selectedPage: ReversiblePageRecord?
@@ -72,7 +73,9 @@ class ScanSessionController(
     private var thumbnailJob: Job? = null
     private val thumbnailToken = AtomicLong(0L)
     private var galleryImportJob: Job? = null
+    private val galleryImportToken = AtomicLong(0L)
     private var exportJob: Job? = null
+    private var lastRequestedExportAction: PostExportAction = PostExportAction.SAVE
 
     init {
         scope.launch {
@@ -187,15 +190,34 @@ class ScanSessionController(
     }
 
     fun importGalleryUris(uris: List<Uri>) {
-        if (uris.isEmpty()) return
+        val uniqueUris = uris.distinct()
+        if (uniqueUris.isEmpty()) return
+        val token = galleryImportToken.incrementAndGet()
         galleryImportJob?.cancel()
+        // Transition off Camera synchronously before Activity.onResume() so CameraX will not rebind
+        _uiState.update {
+            it.copy(
+                route = ScannerRoute.Review,
+                isImportingGallery = true,
+                statusMessage = null,
+            )
+        }
         galleryImportJob = scope.launch {
             enqueueMutation {
-                _uiState.update { it.copy(isImportingGallery = true, statusMessage = null) }
+                if (galleryImportToken.get() != token) return@enqueueMutation
+                cancelBackgroundWork()
+                _uiState.update {
+                    it.copy(
+                        route = ScannerRoute.Review,
+                        isImportingGallery = true,
+                        statusMessage = null,
+                    )
+                }
             }
             try {
-                val summary = captureStore.importFromGalleryUris(uris)
+                val summary = captureStore.importFromGalleryUris(uniqueUris)
                 enqueueMutation {
+                    if (galleryImportToken.get() != token) return@enqueueMutation
                     val existingBefore = pipeline.orderedRecords()
                     val inheritFilter = if (_uiState.value.applyFilterToAll && existingBefore.isNotEmpty()) {
                         existingBefore.first().selectedFilter
@@ -241,6 +263,7 @@ class ScanSessionController(
             } catch (ex: Exception) {
                 if (ex is kotlinx.coroutines.CancellationException) throw ex
                 enqueueMutation {
+                    if (galleryImportToken.get() != token) return@enqueueMutation
                     _uiState.update {
                         it.copy(
                             isImportingGallery = false,
@@ -406,10 +429,14 @@ class ScanSessionController(
         }
     }
 
-    fun exportPdf(availableSpaceOverrideBytes: Long? = null) {
+    fun exportPdf(
+        availableSpaceOverrideBytes: Long? = null,
+        action: PostExportAction = PostExportAction.SAVE,
+    ) {
         enqueueMutation {
             val state = _uiState.value
             if (state.isExportingPdf || state.completedExport != null) return@enqueueMutation
+            lastRequestedExportAction = action
             val pagesSnapshot = pipeline.orderedRecords()
             if (pagesSnapshot.isEmpty()) {
                 _uiState.update {
@@ -450,6 +477,7 @@ class ScanSessionController(
                         it.copy(
                             isExportingPdf = false,
                             completedExport = result,
+                            completedExportAction = action,
                         )
                     }
                 } catch (ex: Exception) {
@@ -466,6 +494,10 @@ class ScanSessionController(
                 }
             }
         }
+    }
+
+    fun retryLastExport() {
+        exportPdf(action = lastRequestedExportAction)
     }
 
     fun cancelPdfExport() {
