@@ -2,11 +2,27 @@ package org.intabtools.intabpdf;
 
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Outline;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import android.view.ViewTreeObserver;
 import android.webkit.JavascriptInterface;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import androidx.annotation.VisibleForTesting;
+import androidx.core.content.ContextCompat;
+import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 import org.intabtools.intabpdf.platform.ScreenAwakePlugin;
 import org.intabtools.intabpdf.save.DocumentSavePlugin;
 import org.intabtools.intabpdf.scanner.bridge.DocumentScannerPlugin;
@@ -21,19 +37,35 @@ public class MainActivity extends BridgeActivity {
     private static volatile boolean hasPdfLaunchIntent = false;
     private static volatile String pendingPdfUri = null;
     private static volatile String pendingPdfName = null;
+    private volatile boolean isWebUiReady = false;
+    private WebViewListener startupWebViewListener = null;
+    private FrameLayout splashOverlay = null;
+    private boolean isHidingSplashOverlay = false;
+    private Runnable pendingFallbackRemoval = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        SplashScreen.installSplashScreen(this);
+        isWebUiReady = false;
+        isHidingSplashOverlay = false;
+
         registerPlugin(DocumentScannerPlugin.class);
         registerPlugin(DocumentSavePlugin.class);
         registerPlugin(ScreenAwakePlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Override Capacitor BridgeActivity's dark theme with the app's DayNight theme
+        setTheme(org.intabtools.intabpdf.R.style.AppTheme_NoActionBar);
+        applyInitialWindowColors();
+        attachSplashOverlay();
+
         if (!isProcessInitialized) {
             isProcessInitialized = true;
             cleanStaleExternalLaunchPdf(getCacheDir());
         }
         handleIntent(getIntent());
         setupNativeBridge();
+        setupStartupListeners();
     }
 
     static void cleanStaleExternalLaunchPdf(File cacheDir) {
@@ -103,13 +135,193 @@ public class MainActivity extends BridgeActivity {
         return name;
     }
 
-    private void setupNativeBridge() {
-        if (getBridge() != null && getBridge().getWebView() != null) {
-            getBridge().getWebView().addJavascriptInterface(new NativeIntentBridge(), "NativeIntent");
+    private void attachSplashOverlay() {
+        ViewGroup content = findViewById(android.R.id.content);
+        if (content == null) {
+            return;
+        }
+        int splashBgColor = ContextCompat.getColor(this, org.intabtools.intabpdf.R.color.splash_background);
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(splashBgColor);
+        overlay.setClickable(true);
+        overlay.setFocusable(true);
+
+        int iconSizePx = Math.round(TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 192f, getResources().getDisplayMetrics()
+        ));
+        ImageView iconView = new ImageView(this);
+        iconView.setImageResource(org.intabtools.intabpdf.R.mipmap.ic_launcher);
+        iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        iconView.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setOval(0, 0, view.getWidth(), view.getHeight());
+            }
+        });
+        iconView.setClipToOutline(true);
+
+        FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(
+            iconSizePx,
+            iconSizePx,
+            Gravity.CENTER
+        );
+        overlay.addView(iconView, iconParams);
+        content.addView(overlay, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        splashOverlay = overlay;
+    }
+
+    private void revealMainContentAfterHwuiCommit() {
+        if (isWebUiReady || isHidingSplashOverlay) {
+            return;
+        }
+        if (isFinishing() || isDestroyed()) {
+            removeSplashOverlayImmediate();
+            return;
+        }
+        isHidingSplashOverlay = true;
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null || splashOverlay == null) {
+            removeSplashOverlayImmediate();
+            return;
+        }
+        webView.invalidate();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ViewTreeObserver observer = webView.getViewTreeObserver();
+            if (observer.isAlive()) {
+                observer.registerFrameCommitCallback(this::removeSplashOverlayImmediate);
+                return;
+            }
+        }
+        pendingFallbackRemoval = () -> {
+            pendingFallbackRemoval = null;
+            if (isFinishing() || isDestroyed()) {
+                removeSplashOverlayImmediate();
+                return;
+            }
+            WebView currentWebView = getBridge() != null ? getBridge().getWebView() : null;
+            if (currentWebView == null) {
+                removeSplashOverlayImmediate();
+                return;
+            }
+            pendingFallbackRemoval = this::removeSplashOverlayImmediate;
+            currentWebView.postOnAnimation(pendingFallbackRemoval);
+        };
+        webView.postOnAnimation(pendingFallbackRemoval);
+    }
+
+    private void removeSplashOverlayImmediate() {
+        isWebUiReady = true;
+        isHidingSplashOverlay = true;
+        if (pendingFallbackRemoval != null) {
+            WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+            if (webView != null) {
+                webView.removeCallbacks(pendingFallbackRemoval);
+            }
+            pendingFallbackRemoval = null;
+        }
+        if (splashOverlay != null) {
+            if (splashOverlay.getParent() instanceof ViewGroup parent) {
+                parent.removeView(splashOverlay);
+            }
+            splashOverlay = null;
         }
     }
 
+    private void setupNativeBridge() {
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().addJavascriptInterface(new NativeIntentBridge(), "NativeIntent");
+        } else {
+            removeSplashOverlayImmediate();
+        }
+    }
+
+    private void applyInitialWindowColors() {
+        int bgColor = ContextCompat.getColor(this, org.intabtools.intabpdf.R.color.app_background);
+        getWindow().getDecorView().setBackgroundColor(bgColor);
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().setBackgroundColor(bgColor);
+        }
+    }
+
+    private void setupStartupListeners() {
+        if (getBridge() == null) {
+            removeSplashOverlayImmediate();
+            return;
+        }
+        startupWebViewListener = new WebViewListener() {
+            @Override
+            public void onPageLoaded(WebView webView) {
+                if (!isWebUiReady && getBridge() != null) {
+                    String errorUrl = getBridge().getErrorUrl();
+                    if (errorUrl != null && errorUrl.equals(webView.getUrl())) {
+                        markInitialUiReadyAfterPaint();
+                    }
+                }
+            }
+
+            @Override
+            public void onReceivedError(WebView webView) {
+                if (!isWebUiReady) {
+                    markInitialUiReadyAfterPaint();
+                }
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                removeSplashOverlayImmediate();
+                return super.onRenderProcessGone(view, detail);
+            }
+        };
+        getBridge().addWebViewListener(startupWebViewListener);
+    }
+
+    private void markInitialUiReadyAfterPaint() {
+        if (isWebUiReady || isHidingSplashOverlay || isFinishing() || isDestroyed()) {
+            removeSplashOverlayImmediate();
+            return;
+        }
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) {
+            removeSplashOverlayImmediate();
+            return;
+        }
+        webView.postVisualStateCallback(0L, new WebView.VisualStateCallback() {
+            @Override
+            public void onComplete(long requestId) {
+                revealMainContentAfterHwuiCommit();
+            }
+        });
+    }
+
+    @Override
+    public void onDestroy() {
+        if (getBridge() != null && startupWebViewListener != null) {
+            getBridge().removeWebViewListener(startupWebViewListener);
+            startupWebViewListener = null;
+        }
+        removeSplashOverlayImmediate();
+        super.onDestroy();
+    }
+
+    @VisibleForTesting
+    public boolean isWebUiReadyForTest() {
+        return isWebUiReady;
+    }
+
+    @VisibleForTesting
+    public boolean isSplashOverlayAttachedForTest() {
+        return splashOverlay != null;
+    }
+
     public class NativeIntentBridge {
+        @JavascriptInterface
+        public void notifyInitialUiReady() {
+            runOnUiThread(() -> markInitialUiReadyAfterPaint());
+        }
+
         @JavascriptInterface
         public boolean hasPendingPdf() {
             return hasPdfLaunchIntent;

@@ -176,6 +176,12 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
   const isSubPage = location.pathname !== '/';
   const isViewerPage = location.pathname.startsWith('/viewer');
   const mainScrollRef = useRef<HTMLElement>(null);
+  const [mountPath] = useState(location.pathname);
+  const [hasNavigatedSinceMount, setHasNavigatedSinceMount] = useState(false);
+  if (!hasNavigatedSinceMount && location.pathname !== mountPath) {
+    setHasNavigatedSinceMount(true);
+  }
+  const animateMainWrap = !isAndroid || hasNavigatedSinceMount;
   useRouteScrollRestoration(mainScrollRef, { disabled: isViewerPage });
   const viewer = useContext(ViewerContext);
   const processing = useContext(ProcessingContext);
@@ -241,7 +247,7 @@ export default function AppShell({ children, onSwitchToWeb, showAppLayout = true
           style={isFullScreenOverlay ? { display: 'none' } : undefined}
           aria-hidden={isFullScreenOverlay ? true : undefined}
         >
-          <div className={`an ${isViewerPage ? 'flush-wrap' : ''}`}>{children}</div>
+          <div className={`${animateMainWrap ? 'an' : ''} ${isViewerPage ? 'flush-wrap' : ''}`.trim()}>{children}</div>
         </main>
       </div>
 

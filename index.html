@@ -20,6 +20,35 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#0B2EA8" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#10131D" media="(prefers-color-scheme: dark)" />
+    <style>
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        background-color: #F2F4FA;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body, #root {
+          background-color: #0C0E18;
+        }
+      }
+      html[data-theme="light"], html[data-theme="light"] body, html[data-theme="light"] #root {
+        background-color: #F2F4FA;
+      }
+      html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root {
+        background-color: #0C0E18;
+      }
+    </style>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('intab.theme');
+          var dark = saved
+            ? saved === 'dark'
+            : Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
 
     <!-- Favicon & Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

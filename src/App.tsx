@@ -13,8 +13,9 @@ import { getInitialDestination, isScreenEnabled, resolveDestination } from './co
 import { getPlatformType } from './platform';
 import { setKeepScreenAwake } from './platform/screenAwake';
 
-// On-demand lazy-loaded screen components for optimal startup bundle size
-const HomePage = lazy(() => import('./pages/HomePage'));
+import HomePage from './pages/HomePage';
+
+// On-demand lazy-loaded secondary screens; HomePage loads eagerly for instant initial paint
 const ViewerPage = lazy(() => import('./viewer/ViewerPage'));
 const AboutPage = lazy(() => import('./pages/AboutPage'));
 const ToolPage = lazy(() => import('./pages/ToolPage'));
@@ -102,6 +103,24 @@ function ScreenAwakeSync(): null {
   useEffect(() => {
     void setKeepScreenAwake(isBusy);
   }, [isBusy]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        const nativeBridge = (window as Window & {
+          NativeIntent?: { notifyInitialUiReady?: () => void };
+        }).NativeIntent;
+        nativeBridge?.notifyInitialUiReady?.();
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
