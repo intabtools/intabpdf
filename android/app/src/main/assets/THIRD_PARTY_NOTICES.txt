@@ -1,0 +1,38 @@
+InTab PDF - Third-Party Open-Source Notices (Android Distribution)
+
+InTab PDF is licensed under the MIT License.
+This Android application includes the following third-party open-source software:
+
+1. OpenCV for Android (org.opencv:opencv:4.12.0)
+   License: Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+   Upstream: https://github.com/opencv/opencv
+   Bundled third-party codecs and libraries inside libopencv_java4.so:
+   - libjpeg-turbo (IJG / BSD 3-Clause / zlib)
+   - libpng (libpng License)
+   - libtiff (BSD-like)
+   - OpenJPEG / libopenjp2 (BSD 2-Clause)
+   - libwebp (BSD 3-Clause)
+   - zlib (zlib License)
+   - KleidiCV (Apache License, Version 2.0)
+   - ITT / ittnotify (BSD 3-Clause)
+
+2. LLVM libc++ Shared Runtime (libc++_shared.so)
+   License: Apache License, Version 2.0 with LLVM Exception
+
+3. AndroidX CameraX (1.5.0), Jetpack Compose (BOM 2025.09.00), ExifInterface (1.4.0), AppCompat
+   License: Apache License, Version 2.0
+
+4. Kotlin Standard Library & Compose Compiler (2.2.10)
+   License: Apache License, Version 2.0
+
+5. Capacitor Runtime & Plugins (@capacitor/core, @capacitor/app, @capacitor/filesystem, @capacitor/share)
+   License: MIT License
+
+6. PDF.js (pdfjs-dist)
+   License: Apache License, Version 2.0
+
+7. pdf-lib, React, React Router, @pdfsmaller/pdf-encrypt, @pdfsmaller/pdf-decrypt
+   License: MIT License
+
+8. Lucide Icons (lucide-react)
+   License: ISC License

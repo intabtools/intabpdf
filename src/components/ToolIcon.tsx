@@ -1,4 +1,5 @@
 import {
+  Camera,
   Code2,
   Eye,
   FileText,
@@ -10,6 +11,7 @@ import {
   Minimize2,
   PenTool,
   RotateCw,
+  ScanLine,
   Scissors,
   Trash2,
   Unlock,
@@ -60,6 +62,10 @@ export default function ToolIcon({
       return <Info size={size} strokeWidth={strokeWidth} className={className} />;
     case 'code':
       return <Code2 size={size} strokeWidth={strokeWidth} className={className} />;
+    case 'scan':
+      return <ScanLine size={size} strokeWidth={strokeWidth} className={className} />;
+    case 'camera':
+      return <Camera size={size} strokeWidth={strokeWidth} className={className} />;
     default:
       return <FileText size={size} strokeWidth={strokeWidth} className={className} />;
   }

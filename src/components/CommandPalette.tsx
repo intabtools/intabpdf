@@ -4,6 +4,7 @@ import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { isScreenEnabled } from '../config/screens';
 import { TOOLS, isToolImplemented } from '../tools/registry';
+import { isAndroidScannerSupported, useScanDocument } from '../hooks/useScanDocument';
 import { useToast } from '../hooks/useToast';
 import { filterAndRankPaletteItems, type SearchablePaletteItem } from './commandPaletteSearch';
 import ToolIcon from './ToolIcon';
@@ -21,6 +22,8 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { launchScanner } = useScanDocument();
+  const showAndroidScanner = isAndroidScannerSupported();
 
   // Reset search state on open during render
   if (isOpen && !prevIsOpen) {
@@ -34,6 +37,22 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   // Create items list including enabled navigation routes and all registered tools
   const viewerEnabled = isScreenEnabled('viewer');
   const staticItems: SearchablePaletteItem[] = [
+    ...(showAndroidScanner
+      ? [
+          {
+            id: 'scan-document',
+            name: 'Scan Document',
+            description: 'Capture paper pages or photos into a PDF',
+            category: 'Create',
+            keywords: ['scan', 'scanner', 'camera', 'document', 'capture', 'receipt', 'pdf'],
+            icon: 'scan',
+            action: () => {
+              onClose();
+              void launchScanner();
+            },
+          },
+        ]
+      : []),
     ...(viewerEnabled
       ? [
           {

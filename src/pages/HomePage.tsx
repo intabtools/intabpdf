@@ -1,8 +1,9 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { Check, Code2, Download, Lock } from 'lucide-react';
+import { Check, Code2, Download, Lock, Plus, ScanLine } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import DropZone from '../components/DropZone';
 import ToolIcon from '../components/ToolIcon';
+import { useScanDocument, isAndroidScannerSupported } from '../hooks/useScanDocument';
 import { useShell } from '../hooks/useShell';
 import { useToast } from '../hooks/useToast';
 import { useViewer } from '../hooks/useViewer';
@@ -17,6 +18,7 @@ export default function HomePage(): ReactNode {
   const { loadFile, setIsLoading } = useViewer();
   const { shell } = useShell();
   const { showToast } = useToast();
+  const { isScanning, launchScanner } = useScanDocument();
 
   const navigateToViewerRoute = () => {
     const target = resolveViewerNavigationTarget(
@@ -184,10 +186,37 @@ export default function HomePage(): ReactNode {
   }
 
   // App Shell Layout (Desktop Electron, Android, Tablet)
-  const isMobilePlatform = getPlatformType() === 'android';
+  const platform = getPlatformType();
+  const isMobilePlatform = platform === 'android';
+  const showAndroidScanner = isAndroidScannerSupported(platform);
 
   return (
     <div className="cnt">
+      {showAndroidScanner && (
+        <button
+          type="button"
+          className="dz"
+          disabled={isScanning}
+          onClick={() => {
+            void launchScanner();
+          }}
+          aria-label="Scan Document: Capture pages or import photos into a PDF"
+          style={{ marginBottom: '12px', borderStyle: 'solid', borderColor: 'var(--accent)' }}
+        >
+          <span className="di">
+            <ScanLine size={20} strokeWidth={1.9} />
+            <u>
+              <Plus size={12} strokeWidth={2.8} />
+            </u>
+          </span>
+          <span className="dt">
+            <b>{isScanning ? 'Opening scanner…' : 'Scan Document'}</b>
+            <small>Capture pages or import photos into a PDF</small>
+          </span>
+          <span className="go">Scan</span>
+        </button>
+      )}
+
       <DropZone
         title="Open PDF files"
         subtitle={isMobilePlatform ? 'Tap to select files from device' : 'Choose files or drop them here.'}
@@ -208,6 +237,23 @@ export default function HomePage(): ReactNode {
             <h2 className="sec">{category}</h2>
             <div className="idx">
               <div className="grid">
+                {showAndroidScanner && category === 'Create' && (
+                  <button
+                    type="button"
+                    disabled={isScanning}
+                    onClick={() => {
+                      void launchScanner();
+                    }}
+                    className="cell"
+                    aria-label="Scan Document: Turn paper pages into a PDF"
+                  >
+                    <ToolIcon name="scan" size={24} />
+                    <span>
+                      <b>Scan Document</b>
+                      <small>Turn paper pages into a PDF</small>
+                    </span>
+                  </button>
+                )}
                 {categoryTools.map((tool) => (
                   <Link
                     key={tool.id}

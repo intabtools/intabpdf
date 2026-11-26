@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Code2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useShell } from '../hooks/useShell';
+import { getPlatformType } from '../platform';
 import { APP_VERSION } from '../config';
 
 const FAQ_ITEMS = [
@@ -32,6 +33,7 @@ const PRIVACY_ITEMS = [
 
 export default function AboutPage(): ReactNode {
   const { shell } = useShell();
+  const isAndroid = getPlatformType() === 'android';
 
   const content = (
     <div className="ab">
@@ -82,6 +84,16 @@ export default function AboutPage(): ReactNode {
             <p>{item.answer}</p>
           </details>
         ))}
+        <details>
+          <summary>Open-source notices and licenses</summary>
+          <p>
+            InTab PDF is MIT licensed and uses open-source libraries including PDF.js (Apache-2.0),
+            pdf-lib (MIT), React (MIT), and Lucide (ISC).
+            {isAndroid
+              ? ' On Android, the native scanner and runtime also include OpenCV 4.12.0 (Apache-2.0; bundling libjpeg-turbo, libpng, libtiff, OpenJPEG, libwebp, zlib, KleidiCV, and ITT), LLVM libc++ (Apache-2.0 with LLVM Exception), AndroidX CameraX & Jetpack Compose (Apache-2.0), and Capacitor (MIT). See THIRD_PARTY_NOTICES.txt in the APK assets.'
+              : ''}
+          </p>
+        </details>
       </section>
     </div>
   );

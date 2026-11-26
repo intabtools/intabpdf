@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 def releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
 def releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
@@ -37,13 +39,32 @@ android {
         }
     }
     buildTypes {
+        debug {
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+            }
+        }
         release {
             if (hasReleaseSigning) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
         }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+    buildFeatures {
+        compose true
     }
 }
 
@@ -58,6 +79,29 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.activity:activity-compose:$androidxActivityVersion"
+    implementation "androidx.exifinterface:exifinterface:$androidxExifInterfaceVersion"
+
+    def kotlinBom = platform("org.jetbrains.kotlin:kotlin-bom:$rootProject.ext.kotlin_version")
+    implementation kotlinBom
+    androidTestImplementation kotlinBom
+
+    def composeBom = platform("androidx.compose:compose-bom:$rootProject.ext.composeBomVersion")
+    implementation composeBom
+    androidTestImplementation composeBom
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
+    implementation "androidx.camera:camera-core:$rootProject.ext.cameraXVersion"
+    implementation "androidx.camera:camera-camera2:$rootProject.ext.cameraXVersion"
+    implementation "androidx.camera:camera-lifecycle:$rootProject.ext.cameraXVersion"
+    implementation "androidx.camera:camera-view:$rootProject.ext.cameraXVersion"
+    implementation "org.opencv:opencv:$rootProject.ext.opencvVersion"
+
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -97,5 +141,3 @@ tasks.register('checkReleaseSigning') {
 tasks.matching { it.name == 'assembleRelease' || it.name == 'bundleRelease' || it.name == 'packageRelease' }.configureEach {
     dependsOn checkReleaseSigning
 }
-
-
