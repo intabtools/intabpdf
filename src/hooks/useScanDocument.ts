@@ -14,7 +14,7 @@ export function isAndroidScannerSupported(platform = getPlatformType()): boolean
 }
 
 export interface ScanToViewerDeps {
-  loadFile: (file: OpenedFile) => void;
+  loadFile?: (file: OpenedFile) => void;
   setIsLoading: (loading: boolean) => void;
   showToast: (message: string, durationMs?: number) => void;
   saveFile?: (bytes: Uint8Array, fileName: string, mimeType?: string) => Promise<SaveFileResult | void>;
@@ -86,11 +86,7 @@ export async function runScanToViewerHandoff(
       return 'cancelled';
     }
 
-    const action = outcome.action ?? 'view';
-    if (action === 'save') {
-      return await handleSaveScannedPdf(outcome.file, deps);
-    }
-
+    const action = outcome.action ?? 'save';
     if (action === 'share') {
       const shareFn = deps.sharePdf ?? sharePdfDocument;
       const shareOutcome = await shareFn({
@@ -107,8 +103,7 @@ export async function runScanToViewerHandoff(
       return 'shared';
     }
 
-    deps.loadFile(outcome.file);
-    return 'completed';
+    return await handleSaveScannedPdf(outcome.file, deps);
   } catch (err) {
     deps.setIsLoading(false);
     const message =
@@ -126,8 +121,9 @@ export interface ScanDocumentLauncherState {
 }
 
 /**
- * Launches the native Android document scanner, routes Save PDF via SAF, Open in Viewer via
- * ViewerContext, or Share via native sharing, without exposing any UI on Web or Desktop.
+ * Launches the native Android document scanner without exposing any UI on Web or Desktop.
+ * Save PDF and Share are handled directly inside the native Scanner Review flow so the
+ * session remains available and never opens the general PDF Viewer as a side effect.
  */
 export function useScanDocument(): ScanDocumentLauncherState {
   const viewer = useContext(ViewerContext);
@@ -137,7 +133,7 @@ export function useScanDocument(): ScanDocumentLauncherState {
   const inFlightRef = useRef(false);
 
   const launchScanner = useCallback(async () => {
-    if (!isAndroidScannerSupported() || !viewer) {
+    if (!isAndroidScannerSupported()) {
       return;
     }
     if (inFlightRef.current) {
@@ -148,8 +144,7 @@ export function useScanDocument(): ScanDocumentLauncherState {
     setIsScanning(true);
     try {
       await runScanToViewerHandoff({
-        loadFile: viewer.loadFile,
-        setIsLoading: viewer.setIsLoading,
+        setIsLoading: viewer?.setIsLoading ?? (() => {}),
         showToast,
         saveFile: platformApi.saveFile,
         sharePdf: sharePdfDocument,

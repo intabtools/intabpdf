@@ -122,4 +122,33 @@ class NormalizedQuadTest {
         assertEquals(reference.bottomRight.x, aligned.bottomRight.x, 1e-5f)
         assertEquals(reference.bottomLeft.x, aligned.bottomLeft.x, 1e-5f)
     }
+
+    @Test
+    fun `isValidConvex accepts trapezoidal perspective distortion with unequal angles and side lengths`() {
+        // Strong trapezoidal keystone (short top edge, wide bottom edge, acute ~28-deg base corners)
+        val trapezoid = NormalizedQuad(
+            topLeft = NormalizedPoint(0.32f, 0.28f),
+            topRight = NormalizedPoint(0.68f, 0.26f),
+            bottomRight = NormalizedPoint(0.92f, 0.62f),
+            bottomLeft = NormalizedPoint(0.08f, 0.60f),
+        )
+        assertTrue("Trapezoidal oblique page should be accepted", trapezoid.isValidConvex())
+
+        // Corner correspondence preserved under slight perspective shift
+        val shifted = NormalizedQuad(
+            topLeft = NormalizedPoint(0.34f, 0.29f),
+            topRight = NormalizedPoint(0.69f, 0.27f),
+            bottomRight = NormalizedPoint(0.93f, 0.63f),
+            bottomLeft = NormalizedPoint(0.09f, 0.61f),
+        )
+        val rotatedInput = NormalizedQuad(
+            topLeft = shifted.topRight,
+            topRight = shifted.bottomRight,
+            bottomRight = shifted.bottomLeft,
+            bottomLeft = shifted.topLeft,
+        )
+        val aligned = rotatedInput.alignCornersTo(trapezoid)
+        assertEquals(shifted.topLeft.x, aligned.topLeft.x, 1e-5f)
+        assertEquals(shifted.bottomRight.x, aligned.bottomRight.x, 1e-5f)
+    }
 }

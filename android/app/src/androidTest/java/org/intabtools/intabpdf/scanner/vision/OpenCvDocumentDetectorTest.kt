@@ -129,4 +129,255 @@ class OpenCvDocumentDetectorTest {
             scene.release()
         }
     }
+
+    @Test
+    fun detectPerspectiveDistortedTrapezoidAtObliqueAngle() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(58.0, 48.0, 40.0, 255.0))
+        try {
+            // Strongly foreshortened oblique trapezoid (short far top edge, wide near bottom edge,
+            // unequal side lengths and non-90 corner angles ~55..125 deg)
+            val trapezoid = MatOfPoint(
+                Point(215.0, 105.0),
+                Point(435.0, 120.0),
+                Point(545.0, 390.0),
+                Point(90.0, 365.0),
+            )
+            Imgproc.fillPoly(scene, listOf(trapezoid), Scalar(240.0, 238.0, 234.0, 255.0))
+            trapezoid.release()
+
+            // Simulated document text lines
+            for (i in 0 until 5) {
+                val y = 165.0 + i * 36.0
+                Imgproc.line(scene, Point(190.0, y), Point(450.0, y + 6.0), Scalar(40.0, 40.0, 40.0, 255.0), 3)
+            }
+
+            val detector = OpenCvDocumentDetector()
+            val result = detector.detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on oblique trapezoidal page", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45 on trapezoidal page, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected top edge shorter than bottom edge", quad.topLeft.distanceTo(quad.topRight) < quad.bottomLeft.distanceTo(quad.bottomRight))
+            assertTrue("Expected TL left of TR", quad.topLeft.x < quad.topRight.x)
+            assertTrue("Expected BL left of BR", quad.bottomLeft.x < quad.bottomRight.x)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectOpenNotebookTargetPageWithCurvedSpineWithoutIncludingOppositePage() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(72.0, 58.0, 44.0, 255.0))
+        try {
+            // Dark notebook cover spanning both pages
+            Imgproc.rectangle(scene, Point(50.0, 55.0), Point(590.0, 430.0), Scalar(28.0, 30.0, 36.0, 255.0), -1)
+
+            // Left page (partially visible opposite page)
+            val leftPage = MatOfPoint(
+                Point(65.0, 72.0),
+                Point(210.0, 78.0),
+                Point(210.0, 412.0),
+                Point(65.0, 416.0),
+            )
+            Imgproc.fillPoly(scene, listOf(leftPage), Scalar(230.0, 228.0, 222.0, 255.0))
+            leftPage.release()
+
+            // Target right page with slightly curved/bowed spine edge along the center binding
+            val rightPagePts = mutableListOf(
+                Point(230.0, 76.0),
+                Point(572.0, 70.0),
+                Point(574.0, 416.0),
+                Point(230.0, 412.0),
+            )
+            // Add slight bow along spine edge (between 230,412 back up to 230,76)
+            for (step in 1..6) {
+                val t = step / 7.0
+                val y = 412.0 - t * (412.0 - 76.0)
+                val bowX = 230.0 + kotlin.math.sin(t * Math.PI) * 14.0
+                rightPagePts.add(Point(bowX, y))
+            }
+            val rightPage = MatOfPoint(*rightPagePts.toTypedArray())
+            Imgproc.fillPoly(scene, listOf(rightPage), Scalar(244.0, 242.0, 238.0, 255.0))
+            rightPage.release()
+
+            // Notebook ruled lines on target right page
+            for (row in 0 until 6) {
+                val y = 120.0 + row * 42.0
+                Imgproc.line(scene, Point(265.0, y), Point(540.0, y), Scalar(130.0, 140.0, 160.0, 255.0), 2)
+            }
+
+            val detector = OpenCvDocumentDetector()
+            val result = detector.detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on open notebook page", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            // Must stay on the right target page (x >= 0.25) rather than wrapping the whole left+right spread
+            assertTrue("Expected target right page boundary, got topLeft.x=${quad.topLeft.x}", quad.topLeft.x >= 0.25f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectPageRightEdgeAccuratelyDespiteStackedLowerPagesAndCover() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(68.0, 56.0, 44.0, 255.0))
+        try {
+            // Dark cover peeking beyond the page edges (especially on the right margin)
+            Imgproc.rectangle(scene, Point(96.0, 56.0), Point(552.0, 430.0), Scalar(32.0, 34.0, 40.0, 255.0), -1)
+
+            // Lower stacked sheet protruding asymmetrically on the right side (x up to 494)
+            Imgproc.rectangle(scene, Point(122.0, 76.0), Point(494.0, 410.0), Scalar(212.0, 210.0, 204.0, 255.0), -1)
+            Imgproc.rectangle(scene, Point(122.0, 76.0), Point(494.0, 410.0), Scalar(135.0, 132.0, 128.0, 255.0), 2)
+
+            // Top target page with crisp right edge at x = 472 (472 / 640 = 0.7375)
+            val topPage = MatOfPoint(
+                Point(116.0, 72.0),
+                Point(472.0, 74.0),
+                Point(470.0, 412.0),
+                Point(114.0, 414.0),
+            )
+            Imgproc.fillPoly(scene, listOf(topPage), Scalar(244.0, 242.0, 238.0, 255.0))
+            Imgproc.polylines(scene, listOf(topPage), true, Scalar(105.0, 105.0, 110.0, 255.0), 2)
+            // Contact shadow along the right edge where top page meets lower protruding sheet
+            Imgproc.line(scene, Point(474.0, 76.0), Point(472.0, 410.0), Scalar(92.0, 92.0, 96.0, 255.0), 3)
+            topPage.release()
+
+            // Ruled text lines inside target sheet
+            for (row in 0 until 5) {
+                val y = 128.0 + row * 48.0
+                Imgproc.line(scene, Point(155.0, y), Point(430.0, y), Scalar(120.0, 130.0, 145.0, 255.0), 2)
+            }
+
+            val detector = OpenCvDocumentDetector()
+            val result = detector.detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on top sheet", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue(
+                "Expected right edge near top page (~0.737), not stacked sheet/cover; topRight.x=${quad.topRight.x}, bottomRight.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.68f..0.78f && quad.bottomRight.x in 0.68f..0.78f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectOpenNotebookLeftPageRightSpineEdgeAccurately() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(66.0, 54.0, 42.0, 255.0))
+        try {
+            // Notebook dark cover
+            Imgproc.rectangle(scene, Point(48.0, 50.0), Point(596.0, 434.0), Scalar(30.0, 32.0, 38.0, 255.0), -1)
+
+            // Opposite right page (neighbouring page on the right side of binding)
+            val oppositeRightPage = MatOfPoint(
+                Point(432.0, 74.0),
+                Point(580.0, 70.0),
+                Point(578.0, 416.0),
+                Point(432.0, 412.0),
+            )
+            Imgproc.fillPoly(scene, listOf(oppositeRightPage), Scalar(232.0, 230.0, 224.0, 255.0))
+            oppositeRightPage.release()
+
+            // Target left page with slightly curved right spine boundary near x = 408 (408 / 640 = 0.6375)
+            val leftPagePts = mutableListOf(
+                Point(72.0, 68.0),
+                Point(408.0, 76.0),
+            )
+            for (step in 1..6) {
+                val t = step / 7.0
+                val y = 76.0 + t * (412.0 - 76.0)
+                val bowX = 408.0 - kotlin.math.sin(t * Math.PI) * 10.0
+                leftPagePts.add(Point(bowX, y))
+            }
+            leftPagePts.add(Point(408.0, 412.0))
+            leftPagePts.add(Point(72.0, 416.0))
+            val leftPage = MatOfPoint(*leftPagePts.toTypedArray())
+            Imgproc.fillPoly(scene, listOf(leftPage), Scalar(246.0, 244.0, 240.0, 255.0))
+            leftPage.release()
+
+            // Binding gutter shadow right of the left page
+            Imgproc.rectangle(scene, Point(408.0, 72.0), Point(428.0, 416.0), Scalar(52.0, 50.0, 54.0, 255.0), -1)
+
+            // Notes on target left page
+            for (row in 0 until 6) {
+                val y = 118.0 + row * 44.0
+                Imgproc.line(scene, Point(110.0, y), Point(372.0, y), Scalar(125.0, 135.0, 150.0, 255.0), 2)
+            }
+
+            val detector = OpenCvDocumentDetector()
+            val result = detector.detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on left notebook page", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue(
+                "Expected right edge near centre spine (~0.637), not opposite page; topRight.x=${quad.topRight.x}, bottomRight.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.56f..0.70f && quad.bottomRight.x in 0.56f..0.70f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectTiltedTrapezoidPageWithDimmerRightEdgeLighting() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(62.0, 54.0, 48.0, 255.0))
+        try {
+            val page = MatOfPoint(
+                Point(110.0, 80.0),
+                Point(515.0, 108.0),
+                Point(552.0, 405.0),
+                Point(86.0, 392.0),
+            )
+            Imgproc.fillPoly(scene, listOf(page), Scalar(238.0, 236.0, 232.0, 255.0))
+
+            // Simulate uneven directional shading dimming the right half of the page
+            for (x in 0 until width) {
+                val factor = if (x < 300) 1.0 else (1.0 - ((x - 300.0) / 340.0) * 0.28)
+                if (factor < 1.0) {
+                    val col = scene.col(x)
+                    org.opencv.core.Core.multiply(col, Scalar(factor, factor, factor, 1.0), col)
+                    col.release()
+                }
+            }
+            page.release()
+
+            val detector = OpenCvDocumentDetector()
+            val result = detector.detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected tilted quad with shaded right edge", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            // Exact vertices: topRight.x = 515/640 = 0.805, bottomRight.x = 552/640 = 0.863
+            assertTrue(
+                "Expected accurate shaded right corners; topRight.x=${quad.topRight.x}, bottomRight.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.74f..0.86f && quad.bottomRight.x in 0.80f..0.92f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
 }

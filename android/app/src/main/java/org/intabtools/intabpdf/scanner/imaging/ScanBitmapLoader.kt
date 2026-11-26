@@ -16,18 +16,29 @@ import java.io.File
 class ScanBitmapLoader(context: Context) {
 
     private val memoryProfile = DeviceMemoryProfile.forContext(context.applicationContext)
-    private val maxCacheBytes = if (memoryProfile.isConstrained) 3 * 1024 * 1024 else 6 * 1024 * 1024
+    private val maxPreviewCacheBytes = if (memoryProfile.isConstrained) 5 * 1024 * 1024 else 10 * 1024 * 1024
+    private val maxThumbCacheBytes = if (memoryProfile.isConstrained) 1 * 1024 * 1024 else 2 * 1024 * 1024
 
-    private val cache = object : LruCache<String, Bitmap>(maxCacheBytes) {
+    private val previewCache = object : LruCache<String, Bitmap>(maxPreviewCacheBytes) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount.coerceAtLeast(1)
+    }
+
+    private val thumbnailCache = object : LruCache<String, Bitmap>(maxThumbCacheBytes) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount.coerceAtLeast(1)
+    }
+
+    fun getCachedDisplayBitmap(cacheKey: String, maxPixels: Long): Bitmap? {
+        val targetCache = if (maxPixels <= THUMBNAIL_PIXEL_THRESHOLD) thumbnailCache else previewCache
+        return targetCache.get(cacheKey)?.takeIf { !it.isRecycled }
     }
 
     suspend fun loadDisplayBitmap(
         file: File,
         cacheKey: String,
-        maxPixels: Long = if (memoryProfile.isConstrained) 1_100_000L else 1_800_000L,
+        maxPixels: Long = if (memoryProfile.isConstrained) 900_000L else 1_400_000L,
     ): Bitmap? = withContext(Dispatchers.IO) {
-        cache.get(cacheKey)?.takeIf { !it.isRecycled }?.let { return@withContext it }
+        val targetCache = if (maxPixels <= THUMBNAIL_PIXEL_THRESHOLD) thumbnailCache else previewCache
+        targetCache.get(cacheKey)?.takeIf { !it.isRecycled }?.let { return@withContext it }
         if (!file.exists() || !file.isFile || file.length() <= 0L) return@withContext null
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -40,7 +51,7 @@ class ScanBitmapLoader(context: Context) {
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
         val bitmap = BitmapFactory.decodeFile(file.absolutePath, opts) ?: return@withContext null
-        cache.put(cacheKey, bitmap)
+        targetCache.put(cacheKey, bitmap)
         bitmap
     }
 
@@ -76,6 +87,11 @@ class ScanBitmapLoader(context: Context) {
     }
 
     fun evictAll() {
-        cache.evictAll()
+        previewCache.evictAll()
+        thumbnailCache.evictAll()
+    }
+
+    private companion object {
+        const val THUMBNAIL_PIXEL_THRESHOLD = 100_000L
     }
 }

@@ -340,6 +340,27 @@ class PdfScanExporter(
             return if (base.lowercase(Locale.US).endsWith(".pdf")) base else "$base.pdf"
         }
 
+        /**
+         * Ensures the shared file on disk exposes the user-friendly [PdfExportResult.fileName]
+         * rather than a collision-suffixed or internal temporary filename.
+         */
+        fun prepareShareablePdfFile(outputDir: File, exported: PdfExportResult): File {
+            val desiredName = sanitizePdfFileName(exported.fileName)
+            if (exported.outputFile.name == desiredName) {
+                return exported.outputFile
+            }
+            val shareDir = File(outputDir, "share_${UUID.randomUUID()}")
+            if (!shareDir.exists() && !shareDir.mkdirs()) {
+                throw IOException("Could not prepare directory for sharing PDF.")
+            }
+            val target = File(shareDir, desiredName)
+            if (!exported.outputFile.renameTo(target)) {
+                exported.outputFile.copyTo(target, overwrite = true)
+                exported.outputFile.delete()
+            }
+            return target
+        }
+
         private fun detectJpegComponents(file: File): Int {
             return runCatching {
                 FileInputStream(file).use { input ->

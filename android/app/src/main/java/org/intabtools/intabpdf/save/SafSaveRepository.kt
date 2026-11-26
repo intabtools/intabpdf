@@ -1,5 +1,6 @@
 package org.intabtools.intabpdf.save
 
+import android.content.Context
 import android.provider.DocumentsContract
 import java.io.File
 import java.io.FileOutputStream
@@ -470,6 +471,109 @@ class SafSaveRepository(
                 SafSaveOutcome.Failed(
                     "WRITE_FAILED",
                     ex.message ?: "Failed to write file bytes to destination.",
+                    originalIntact = true,
+                )
+            }
+        }
+    }
+
+    /**
+     * Saves [sourceFile] directly to a user-selected SAF document URI (e.g. from ACTION_CREATE_DOCUMENT),
+     * reusing SAF size verification, conflict detection when the target already has content, and
+     * backup-before-truncate replacement with recovery preservation.
+     */
+    fun saveLocalFileToDocumentUri(
+        sourceFile: File,
+        destUriString: String,
+        destDisplayName: String?,
+        mimeType: String = "application/pdf",
+        replaceExisting: Boolean = false,
+        attemptedDestination: String = "Selected location",
+    ): SafSaveOutcome {
+        if (!sourceFile.exists() || !sourceFile.isFile || sourceFile.length() <= 0L) {
+            return SafSaveOutcome.Failed(
+                code = "INVALID_SOURCE_PAYLOAD",
+                errorMessage = "Generated file data is missing or empty.",
+                originalIntact = true,
+            )
+        }
+
+        val fileLock = fileSaveLocks.computeIfAbsent(destUriString) { Any() }
+        synchronized(fileLock) {
+            val existingMeta = runCatching { gateway.queryDocumentMetadata(destUriString) }.getOrNull()
+            val existingSize = existingMeta?.sizeBytes
+                ?: runCatching { gateway.measureDocumentByteSize(destUriString) }.getOrNull()
+            val rawName = existingMeta?.displayName?.ifBlank { null }
+                ?: destDisplayName?.ifBlank { null }
+                ?: sourceFile.name
+            val resolvedName = SafDocumentRules.sanitizeTargetFileName(rawName)
+
+            if (existingSize != null && existingSize > 0L) {
+                val suggested = SafDocumentRules.suggestUniqueName(resolvedName, listOf(resolvedName))
+                if (!replaceExisting) {
+                    return SafSaveOutcome.ConflictDetected(
+                        existingFileName = resolvedName,
+                        suggestedFileName = suggested,
+                    )
+                }
+                if (existingMeta != null &&
+                    (existingMeta.flags and DocumentsContract.Document.FLAG_SUPPORTS_WRITE) == 0
+                ) {
+                    return SafSaveOutcome.ReplaceUnsupported(
+                        existingFileName = resolvedName,
+                        suggestedFileName = suggested,
+                        reason = "This storage provider does not allow safe replacement. Original file was kept untouched.",
+                    )
+                }
+                return executeBackupAndTruncateWrite(
+                    stagedFile = sourceFile,
+                    targetUriString = destUriString,
+                    targetDisplayName = resolvedName,
+                    targetExpectedSize = existingMeta?.sizeBytes ?: existingSize,
+                    attemptedDestination = attemptedDestination,
+                    mimeType = mimeType,
+                    suggestedAlternative = suggested,
+                )
+            }
+
+            val canSafelyDeleteFailedTarget = existingSize == 0L
+            val expectedBytes = sourceFile.length()
+            return try {
+                val writtenBytes = gateway.copyLocalFileToDocument(
+                    localFile = sourceFile,
+                    destUriString = destUriString,
+                    strictTruncate = false,
+                )
+                val verified = runCatching { gateway.queryDocumentMetadata(destUriString) }.getOrNull()
+                val reportedSize = verified?.sizeBytes
+                    ?: if (verified == null) runCatching { gateway.measureDocumentByteSize(destUriString) }.getOrNull() else null
+                if (writtenBytes != expectedBytes || (reportedSize != null && reportedSize != expectedBytes)) {
+                    if (canSafelyDeleteFailedTarget) {
+                        gateway.deleteDocument(destUriString)
+                    }
+                    return SafSaveOutcome.Failed(
+                        code = "WRITE_VERIFY_FAILED",
+                        errorMessage = "Written file size verification failed (expected $expectedBytes bytes, wrote $writtenBytes).",
+                        originalIntact = true,
+                    )
+                }
+                val finalName = verified?.displayName?.ifBlank { null }
+                    ?: destDisplayName?.ifBlank { null }
+                    ?: resolvedName
+                SafSaveOutcome.Success(
+                    savedFileName = finalName,
+                    displayPath = attemptedDestination,
+                    documentUriString = verified?.uriString ?: destUriString,
+                    bytesWritten = writtenBytes,
+                    replaced = false,
+                )
+            } catch (ex: Throwable) {
+                if (canSafelyDeleteFailedTarget) {
+                    gateway.deleteDocument(destUriString)
+                }
+                SafSaveOutcome.Failed(
+                    code = "WRITE_FAILED",
+                    errorMessage = ex.message ?: "Failed to write file bytes to destination.",
                     originalIntact = true,
                 )
             }
@@ -1073,6 +1177,24 @@ class SafSaveRepository(
         existingEntry: SafChildEntry,
         mimeType: String,
         suggestedAlternative: String,
+    ): SafSaveOutcome = executeBackupAndTruncateWrite(
+        stagedFile = stagedFile,
+        targetUriString = existingEntry.uriString,
+        targetDisplayName = existingEntry.displayName,
+        targetExpectedSize = existingEntry.sizeBytes,
+        attemptedDestination = destination.displayPath,
+        mimeType = mimeType,
+        suggestedAlternative = suggestedAlternative,
+    )
+
+    private fun executeBackupAndTruncateWrite(
+        stagedFile: File,
+        targetUriString: String,
+        targetDisplayName: String,
+        targetExpectedSize: Long?,
+        attemptedDestination: String,
+        mimeType: String,
+        suggestedAlternative: String,
     ): SafSaveOutcome {
         if (!recoveryBackupDir.exists()) {
             recoveryBackupDir.mkdirs()
@@ -1084,9 +1206,8 @@ class SafSaveRepository(
 
         // Prepare durable safety backup of original BEFORE touching destination with "wt"
         val backupSize = try {
-            val copied = gateway.copyDocumentToLocalFile(existingEntry.uriString, partFile)
-            val expectedOrigSize = existingEntry.sizeBytes
-            if (!partFile.exists() || partFile.length() != copied || (expectedOrigSize != null && copied != expectedOrigSize)) {
+            val copied = gateway.copyDocumentToLocalFile(targetUriString, partFile)
+            if (!partFile.exists() || partFile.length() != copied || (targetExpectedSize != null && copied != targetExpectedSize)) {
                 throw IllegalStateException("Safety backup byte count verification failed.")
             }
             if (!partFile.renameTo(backupFile)) {
@@ -1102,7 +1223,7 @@ class SafSaveRepository(
             partFile.delete()
             backupFile.delete()
             return SafSaveOutcome.ReplaceUnsupported(
-                existingFileName = existingEntry.displayName,
+                existingFileName = targetDisplayName,
                 suggestedFileName = suggestedAlternative,
                 reason = "Could not create a safety backup before overwriting. Original file remains untouched.",
             )
@@ -1113,10 +1234,10 @@ class SafSaveRepository(
         val preWriteRecord = RecoveryBackupRecord(
             recoveryId = recoveryId,
             backupFileName = internalBackupName,
-            originalFileName = existingEntry.displayName,
+            originalFileName = targetDisplayName,
             mimeType = mimeType,
-            attemptedDestination = destination.displayPath,
-            explanation = "Replacement of \"${existingEntry.displayName}\" was interrupted before completion. A recovery copy of the original file was preserved in app recovery storage.",
+            attemptedDestination = attemptedDestination,
+            explanation = "Replacement of \"$targetDisplayName\" was interrupted before completion. A recovery copy of the original file was preserved in app recovery storage.",
             failureKind = RecoveryFailureKind.INTERRUPTED_REPLACEMENT,
             createdAtMillis = createdAt,
             sizeBytes = backupSize,
@@ -1128,7 +1249,7 @@ class SafSaveRepository(
         } catch (_: Throwable) {
             backupFile.delete()
             return SafSaveOutcome.ReplaceUnsupported(
-                existingFileName = existingEntry.displayName,
+                existingFileName = targetDisplayName,
                 suggestedFileName = suggestedAlternative,
                 reason = "Could not persist a safety backup record before overwriting. Original file remains untouched.",
             )
@@ -1138,10 +1259,10 @@ class SafSaveRepository(
             val expectedNewSize = stagedFile.length()
             val written = gateway.copyLocalFileToDocument(
                 localFile = stagedFile,
-                destUriString = existingEntry.uriString,
+                destUriString = targetUriString,
                 strictTruncate = true,
             )
-            val refreshed = runCatching { gateway.queryDocumentMetadata(existingEntry.uriString) }.getOrNull()
+            val refreshed = runCatching { gateway.queryDocumentMetadata(targetUriString) }.getOrNull()
             val reportedNewSize = refreshed?.sizeBytes
             if (written != expectedNewSize || (reportedNewSize != null && reportedNewSize != expectedNewSize)) {
                 throw IllegalStateException(
@@ -1152,9 +1273,9 @@ class SafSaveRepository(
             recoveryStore.removeRecord(recoveryId)
             backupFile.delete()
             SafSaveOutcome.Success(
-                savedFileName = refreshed?.displayName?.ifBlank { existingEntry.displayName } ?: existingEntry.displayName,
-                displayPath = destination.displayPath,
-                documentUriString = refreshed?.uriString ?: existingEntry.uriString,
+                savedFileName = refreshed?.displayName?.ifBlank { targetDisplayName } ?: targetDisplayName,
+                displayPath = attemptedDestination,
+                documentUriString = refreshed?.uriString ?: targetUriString,
                 bytesWritten = written,
                 replaced = true,
             )
@@ -1162,7 +1283,7 @@ class SafSaveRepository(
             recoveryStore.removeRecord(recoveryId)
             backupFile.delete()
             SafSaveOutcome.ReplaceUnsupported(
-                existingFileName = existingEntry.displayName,
+                existingFileName = targetDisplayName,
                 suggestedFileName = suggestedAlternative,
                 reason = unsupported.message ?: "Provider does not guarantee safe truncating replace.",
             )
@@ -1172,10 +1293,10 @@ class SafSaveRepository(
             val restoredOk = try {
                 val restoredBytes = gateway.copyLocalFileToDocument(
                     localFile = backupFile,
-                    destUriString = existingEntry.uriString,
+                    destUriString = targetUriString,
                     strictTruncate = true,
                 )
-                val restoredMeta = runCatching { gateway.queryDocumentMetadata(existingEntry.uriString) }.getOrNull()
+                val restoredMeta = runCatching { gateway.queryDocumentMetadata(targetUriString) }.getOrNull()
                 val restoredMetaSize = restoredMeta?.sizeBytes
                 restoredBytes == expectedBackupSize && (restoredMetaSize == null || restoredMetaSize == expectedBackupSize)
             } catch (_: Throwable) {
@@ -1193,7 +1314,7 @@ class SafSaveRepository(
             } else {
                 // Keep backupFile on disk + update recovery metadata for user export!
                 val actualSize = if (backupFile.exists()) backupFile.length() else backupSize
-                val explanation = "Replacement failed and automatic restore of \"${existingEntry.displayName}\" did not complete. A recovery copy of the original file has been preserved in app recovery storage."
+                val explanation = "Replacement failed and automatic restore of \"$targetDisplayName\" did not complete. A recovery copy of the original file has been preserved in app recovery storage."
                 recoveryStore.upsertRecord(
                     preWriteRecord.copy(
                         explanation = explanation,
@@ -1205,8 +1326,8 @@ class SafSaveRepository(
                 )
                 SafSaveOutcome.RecoveryFailed(
                     recoveryId = recoveryId,
-                    originalFileName = existingEntry.displayName,
-                    attemptedDestination = destination.displayPath,
+                    originalFileName = targetDisplayName,
+                    attemptedDestination = attemptedDestination,
                     errorMessage = explanation,
                     failureKind = RecoveryFailureKind.REPLACE_WRITE_AND_RESTORE_FAILED,
                     backupAvailable = backupFile.exists(),
@@ -1284,5 +1405,15 @@ class SafSaveRepository(
 
     companion object {
         const val DEFAULT_STAGING_MAX_AGE_MILLIS = 6L * 60L * 60L * 1000L
+
+        fun createDefault(context: Context): SafSaveRepository {
+            val appContext = context.applicationContext
+            return SafSaveRepository(
+                storage = SharedPrefsSafDestinationStorage(appContext),
+                gateway = AndroidSafTreeGateway(appContext),
+                stagingDir = File(appContext.cacheDir, "saf_save_staging"),
+                recoveryBackupDir = File(appContext.filesDir, "saf_recovery_backups"),
+            )
+        }
     }
 }

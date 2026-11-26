@@ -176,4 +176,85 @@ class QuadStabilizerTest {
         assertTrue(relocated2.isLocked)
         assertEquals(outlier.topLeft.x, relocated2.overlayQuad!!.topLeft.x, 1e-4f)
     }
+
+    @Test
+    fun `completes auto-capture despite small hand jitter brief dropout and transient confidence dip`() {
+        val stabilizer = QuadStabilizer(
+            StabilizerConfig(
+                autoCaptureHoldDurationMs = 900L,
+            )
+        )
+
+        // Initial lock
+        repeat(3) { i ->
+            stabilizer.update(docQuad, 0.80f, goodQuality, true, (i + 1) * 60L)
+        }
+
+        // Small hand jitter across consecutive frames (<= 0.015f) must NOT reset countdown
+        val jitterA = NormalizedQuad(
+            topLeft = NormalizedPoint(0.158f, 0.156f),
+            topRight = NormalizedPoint(0.856f, 0.154f),
+            bottomRight = NormalizedPoint(0.855f, 0.857f),
+            bottomLeft = NormalizedPoint(0.157f, 0.855f),
+        )
+        val jitterB = NormalizedQuad(
+            topLeft = NormalizedPoint(0.146f, 0.148f),
+            topRight = NormalizedPoint(0.847f, 0.152f),
+            bottomRight = NormalizedPoint(0.848f, 0.846f),
+            bottomLeft = NormalizedPoint(0.147f, 0.849f),
+        )
+
+        val f1 = stabilizer.update(jitterA, 0.78f, goodQuality, true, 240L)
+        assertTrue(f1.isLocked)
+
+        val f2 = stabilizer.update(jitterB, 0.40f, goodQuality, true, 640L)
+        assertTrue("Confidence hysteresis (0.40 >= 0.34) should keep lock", f2.isLocked)
+        assertTrue("Progress should advance despite small hand jitter", f2.autoCaptureProgress > 0.3f)
+
+        // Single-frame detection dropout pauses progress without restarting hold from 0
+        val dropout = stabilizer.update(null, 0f, goodQuality, true, 760L)
+        assertTrue(dropout.isLocked)
+        assertFalse(dropout.shouldTriggerAutoCapture)
+        assertTrue("Brief dropout should preserve hold progress", dropout.autoCaptureProgress > 0.3f)
+
+        // Resume + brief 1-frame motion blip should not discard countdown
+        val blip = stabilizer.update(jitterA, 0.75f, goodQuality.copy(motionDelta = 0.08f), true, 880L)
+        assertTrue(blip.isLocked)
+        assertFalse(blip.shouldTriggerAutoCapture)
+        assertTrue(blip.autoCaptureProgress > 0.3f)
+
+        // Hold completes cleanly once hand settles back
+        val steadyAgain = stabilizer.update(docQuad, 0.82f, goodQuality, true, 1220L)
+        assertTrue("Auto-capture should complete after small hand jitter & brief dropout", steadyAgain.shouldTriggerAutoCapture)
+    }
+
+    @Test
+    fun `genuine large movement and actual document loss reset auto-capture hold`() {
+        val stabilizer = QuadStabilizer(StabilizerConfig(autoCaptureHoldDurationMs = 800L))
+        repeat(3) { i ->
+            stabilizer.update(docQuad, 0.85f, goodQuality, true, (i + 1) * 50L)
+        }
+        val building = stabilizer.update(docQuad, 0.85f, goodQuality, true, 550L)
+        assertTrue(building.autoCaptureProgress > 0.4f)
+
+        // Genuine large corner shift (> autoCaptureMaxFrameJump) resets countdown immediately
+        val largeShift = NormalizedQuad(
+            topLeft = NormalizedPoint(0.22f, 0.15f),
+            topRight = NormalizedPoint(0.92f, 0.15f),
+            bottomRight = NormalizedPoint(0.92f, 0.85f),
+            bottomLeft = NormalizedPoint(0.22f, 0.85f),
+        )
+        val afterMove = stabilizer.update(largeShift, 0.85f, goodQuality, true, 650L)
+        assertTrue(afterMove.isLocked)
+        assertFalse(afterMove.shouldTriggerAutoCapture)
+        assertEquals(0f, afterMove.autoCaptureProgress, 1e-5f)
+
+        // Actual document loss (> maxMissFrames) clears overlay and lock
+        stabilizer.update(null, 0f, goodQuality, true, 700L)
+        stabilizer.update(null, 0f, goodQuality, true, 750L)
+        val lost = stabilizer.update(null, 0f, goodQuality, true, 800L)
+        assertFalse(lost.isLocked)
+        assertNull(lost.overlayQuad)
+        assertEquals(0f, lost.autoCaptureProgress, 1e-5f)
+    }
 }

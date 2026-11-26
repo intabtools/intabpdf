@@ -5,7 +5,7 @@ import type { OpenedFile } from './types';
 
 export type ScanFilter = 'auto' | 'original' | 'color' | 'grayscale' | 'bw';
 export type ScanQuality = 'low' | 'balanced' | 'high';
-export type ScanPostExportAction = 'save' | 'view' | 'share';
+export type ScanPostExportAction = 'save' | 'share';
 
 export interface StartScanOptions {
   defaultFilter?: ScanFilter;
@@ -106,9 +106,7 @@ export async function scanDocumentToOpenedFile(
     const rawName = result.fileName?.trim() || 'scan.pdf';
     const fileName = rawName.toLowerCase().endsWith('.pdf') ? rawName : `${rawName}.pdf`;
     const action: ScanPostExportAction =
-      result.action === 'save' || result.action === 'share' || result.action === 'view'
-        ? result.action
-        : 'view';
+      result.action === 'share' ? 'share' : 'save';
     return {
       status: 'completed',
       action,

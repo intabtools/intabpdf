@@ -106,6 +106,32 @@ describe('DocumentScanner Capacitor bridge', () => {
     });
   });
 
+  it('defaults action to save rather than view when native result omits action', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+    pluginMocks.startScan.mockResolvedValue({
+      status: 'completed',
+      pdfFileUrl: 'file:///data/user/0/org.intabtools.intabpdf/cache/scanner_outputs/scan_2.pdf',
+      fileName: 'Scan_20261126.pdf',
+      pageCount: 1,
+    });
+    pluginMocks.cleanupOutput.mockResolvedValue({ deleted: true });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => pdfBytes.buffer,
+      }),
+    );
+
+    const res = await scanDocumentToOpenedFile();
+    expect(res.status).toBe('completed');
+    if (res.status === 'completed') {
+      expect(res.action).toBe('save');
+    }
+  });
+
   it('still triggers cleanup when reading the returned PDF fails', async () => {
     mockIsNative = true;
     mockPlatformType = 'android';

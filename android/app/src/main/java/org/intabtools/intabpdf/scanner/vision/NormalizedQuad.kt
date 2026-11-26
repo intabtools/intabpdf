@@ -106,8 +106,8 @@ data class NormalizedQuad(
     fun isValidConvex(
         minAreaFraction: Float = 0.04f,
         maxAreaFraction: Float = 0.98f,
-        minAngleDeg: Float = 32f,
-        maxAngleDeg: Float = 148f,
+        minAngleDeg: Float = 22f,
+        maxAngleDeg: Float = 158f,
         minEdgeLength: Float = 0.06f,
     ): Boolean {
         val pts = points()

@@ -76,7 +76,7 @@ describe('Android-only Document Scanner UI entry points and Viewer handoff', () 
     expect(aboutHtml).toContain('libjpeg-turbo');
   });
 
-  it('opens completed PDF in Viewer and handles cancellation, errors, and non-Android platforms safely', async () => {
+  it('never opens PDF Viewer from scanner handoff and handles cancellation, errors, and non-Android platforms safely', async () => {
     const loadFile = vi.fn();
     const setIsLoading = vi.fn();
     const showToast = vi.fn();
@@ -107,9 +107,14 @@ describe('Android-only Document Scanner UI entry points and Viewer handoff', () 
     expect(loadFile).not.toHaveBeenCalled();
     expect(showToast).not.toHaveBeenCalled();
 
-    // Completed scan with action='view' loads PDF file directly into Viewer
+    // Completed scan with save action routes to Save without opening Viewer
     const scannedFile = { name: 'Scan_1.pdf', bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]) };
-    const saveFile = vi.fn();
+    const saveFile = vi.fn().mockResolvedValue({
+      saved: true,
+      outcome: 'saved',
+      fileName: 'Scan_1.pdf',
+      displayPath: 'Documents/InTabPDF',
+    });
     const sharePdf = vi.fn();
     expect(
       await runScanToViewerHandoff({
@@ -118,12 +123,12 @@ describe('Android-only Document Scanner UI entry points and Viewer handoff', () 
         showToast,
         saveFile,
         sharePdf,
-        scanFn: async () => ({ status: 'completed', action: 'view', file: scannedFile, pageCount: 2 }),
+        scanFn: async () => ({ status: 'completed', action: 'save', file: scannedFile, pageCount: 2 }),
         platform: 'android',
       }),
-    ).toBe('completed');
-    expect(loadFile).toHaveBeenCalledWith(scannedFile);
-    expect(saveFile).not.toHaveBeenCalled();
+    ).toBe('saved');
+    expect(loadFile).not.toHaveBeenCalled();
+    expect(saveFile).toHaveBeenCalledWith(scannedFile.bytes, 'Scan_1.pdf', 'application/pdf');
     expect(sharePdf).not.toHaveBeenCalled();
 
     // Failed scan or inaccessible URI surfaces toast and clears loading state
@@ -140,6 +145,7 @@ describe('Android-only Document Scanner UI entry points and Viewer handoff', () 
     ).toBe('error');
     expect(setIsLoading).toHaveBeenCalledWith(false);
     expect(showToast).toHaveBeenCalledWith('Could not read scanned PDF (HTTP 404).');
+    expect(loadFile).not.toHaveBeenCalled();
   });
 
   it('routes Save PDF through SAF saveFile without opening Viewer or Share, and handles cancel/recovery/error', async () => {

@@ -7,7 +7,6 @@ import java.io.File
 
 enum class PostExportAction(val wireValue: String) {
     SAVE("save"),
-    VIEW("view"),
     SHARE("share");
 
     companion object {

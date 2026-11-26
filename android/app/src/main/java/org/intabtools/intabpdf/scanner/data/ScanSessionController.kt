@@ -144,6 +144,18 @@ class ScanSessionController(
         }
     }
 
+    fun setStatusMessage(message: String?) {
+        enqueueMutation {
+            _uiState.update { it.copy(statusMessage = message) }
+        }
+    }
+
+    fun consumeCompletedExport() {
+        enqueueMutation {
+            _uiState.update { it.copy(completedExport = null) }
+        }
+    }
+
     fun onCameraPageCaptured(source: ScannedPageSource, replacedPageId: String?) {
         enqueueMutation {
             val existingPagesBefore = pipeline.orderedRecords()
@@ -549,11 +561,15 @@ class ScanSessionController(
         val selectedIdx = state.selectedPageIndex.coerceIn(0, pages.lastIndex)
         val selected = pages[selectedIdx]
 
-        val indicesToRender = listOf(selectedIdx, selectedIdx + 1, selectedIdx - 1)
+        val priorityIndices = listOf(selectedIdx, selectedIdx + 1, selectedIdx - 1)
             .distinct()
             .filter { it in pages.indices }
+        val remainingIndices = pages.indices.filter { it !in priorityIndices }
 
-        for (idx in indicesToRender) {
+        for (idx in priorityIndices) {
+            ensureRendered(pages[idx])
+        }
+        for (idx in remainingIndices) {
             ensureRendered(pages[idx])
         }
 

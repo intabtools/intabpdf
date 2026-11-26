@@ -1354,4 +1354,83 @@ class SafSaveRepositoryTest {
         assertArrayEquals(originalBytes, originalNode.data)
         assertEquals(1, gateway.nodes.values.count { !it.isDirectory })
     }
+
+    @Test
+    fun saveLocalFileToDocumentUriWritesNewDocumentAndHandlesConflictsAndReplaceSafely() {
+        val (repo, _, gateway) = newRepo()
+        val root = gateway.seedRoot("primary:Documents", "Documents")
+        val payloadBytes = "%PDF-1.4\nSCANNED_BYTES".toByteArray()
+        val sourcePdf = tempFolder.newFile("Scan_20261126_170000.pdf").apply {
+            writeBytes(payloadBytes)
+        }
+
+        // 1. Newly created empty ACTION_CREATE_DOCUMENT target saves cleanly
+        val createdEmpty = gateway.seedFile(root.documentId, "Scan_20261126_170000.pdf", ByteArray(0))
+        val createdUri = gateway.buildDocumentUriUsingTree(gateway.treeUri, createdEmpty.documentId)
+        val saved = repo.saveLocalFileToDocumentUri(
+            sourceFile = sourcePdf,
+            destUriString = createdUri,
+            destDisplayName = "Scan_20261126_170000.pdf",
+        )
+        assertTrue(saved is SafSaveOutcome.Success)
+        saved as SafSaveOutcome.Success
+        assertEquals("Scan_20261126_170000.pdf", saved.savedFileName)
+        assertFalse(saved.replaced)
+        assertArrayEquals(payloadBytes, createdEmpty.data)
+
+        // 2. Existing non-empty target returns ConflictDetected without overwriting when replaceExisting=false
+        val existingBytes = "EXISTING_PDF_CONTENT".toByteArray()
+        val existingDoc = gateway.seedFile(root.documentId, "Invoice.pdf", existingBytes)
+        val existingUri = gateway.buildDocumentUriUsingTree(gateway.treeUri, existingDoc.documentId)
+        val conflict = repo.saveLocalFileToDocumentUri(
+            sourceFile = sourcePdf,
+            destUriString = existingUri,
+            destDisplayName = "Invoice.pdf",
+            replaceExisting = false,
+        )
+        assertTrue(conflict is SafSaveOutcome.ConflictDetected)
+        conflict as SafSaveOutcome.ConflictDetected
+        assertEquals("Invoice.pdf", conflict.existingFileName)
+        assertEquals("Invoice (1).pdf", conflict.suggestedFileName)
+        assertArrayEquals(existingBytes, existingDoc.data)
+
+        // 3. Explicit replaceExisting=true safely backs up original, overwrites with "wt", and cleans backup
+        val replaced = repo.saveLocalFileToDocumentUri(
+            sourceFile = sourcePdf,
+            destUriString = existingUri,
+            destDisplayName = "Invoice.pdf",
+            replaceExisting = true,
+        )
+        assertTrue(replaced is SafSaveOutcome.Success)
+        assertTrue((replaced as SafSaveOutcome.Success).replaced)
+        assertArrayEquals(payloadBytes, existingDoc.data)
+        assertTrue(repo.listRecoveryBackups().isEmpty())
+
+        // 4. Provider without FLAG_SUPPORTS_WRITE returns ReplaceUnsupported and keeps original intact
+        val readOnlyBytes = "READ_ONLY_EXISTING".toByteArray()
+        val readOnlyDoc = gateway.seedFile(root.documentId, "LockedScan.pdf", readOnlyBytes, flags = 0)
+        val readOnlyUri = gateway.buildDocumentUriUsingTree(gateway.treeUri, readOnlyDoc.documentId)
+        val unsupported = repo.saveLocalFileToDocumentUri(
+            sourceFile = sourcePdf,
+            destUriString = readOnlyUri,
+            destDisplayName = "LockedScan.pdf",
+            replaceExisting = true,
+        )
+        assertTrue(unsupported is SafSaveOutcome.ReplaceUnsupported)
+        assertEquals("LockedScan (1).pdf", (unsupported as SafSaveOutcome.ReplaceUnsupported).suggestedFileName)
+        assertArrayEquals(readOnlyBytes, readOnlyDoc.data)
+
+        // 5. Short-write failure on newly created 0-byte document deletes broken target cleanly
+        val brokenEmpty = gateway.seedFile(root.documentId, "Broken.pdf", ByteArray(0))
+        val brokenUri = gateway.buildDocumentUriUsingTree(gateway.treeUri, brokenEmpty.documentId)
+        gateway.overrideWriteByteCount = { docId -> if (docId == brokenEmpty.documentId) 3L else null }
+        val failed = repo.saveLocalFileToDocumentUri(
+            sourceFile = sourcePdf,
+            destUriString = brokenUri,
+            destDisplayName = "Broken.pdf",
+        )
+        assertTrue(failed is SafSaveOutcome.Failed)
+        assertEquals("WRITE_VERIFY_FAILED", (failed as SafSaveOutcome.Failed).code)
+        assertFalse(gateway.nodes.containsKey(brokenEmpty.documentId))
+    }
 }
