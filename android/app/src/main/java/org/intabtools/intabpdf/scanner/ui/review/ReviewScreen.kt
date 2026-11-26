@@ -882,7 +882,7 @@ private fun PageThumbnailStrip(
         modifier = modifier
             .fillMaxWidth()
             .background(InTabColors.DarkSurface)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (pages.size > 1) {
@@ -912,23 +912,23 @@ private fun PageThumbnailStrip(
                     "page_thumb_src_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
                 }
                 var thumbBitmap by remember(page.pageId) {
-                    mutableStateOf(bitmapLoader.getCachedDisplayBitmap(cacheKey, 32_000L))
+                    mutableStateOf(bitmapLoader.getCachedDisplayBitmap(cacheKey, 48_000L))
                 }
                 LaunchedEffect(cacheKey, page.sourceFilePath, page.quadVersion, page.rotationDegrees) {
-                    bitmapLoader.getCachedDisplayBitmap(cacheKey, 32_000L)?.let { cached ->
+                    bitmapLoader.getCachedDisplayBitmap(cacheKey, 48_000L)?.let { cached ->
                         thumbBitmap = cached
                         return@LaunchedEffect
                     }
                     val loaded = bitmapLoader.loadDisplayBitmap(
                         file = thumbFile,
                         cacheKey = cacheKey,
-                        maxPixels = 32_000L,
+                        maxPixels = 48_000L,
                     ) ?: if (renderedFile != null) {
                         val fallbackKey = "page_thumb_src_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
                         bitmapLoader.loadDisplayBitmap(
                             file = java.io.File(page.sourceFilePath),
                             cacheKey = fallbackKey,
-                            maxPixels = 32_000L,
+                            maxPixels = 48_000L,
                         )
                     } else {
                         null
@@ -940,7 +940,7 @@ private fun PageThumbnailStrip(
 
                 Box(
                     modifier = Modifier
-                        .size(width = 44.dp, height = 54.dp)
+                        .size(width = 52.dp, height = 64.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(InTabColors.DarkBackground)
                         .testTag("review_page_thumb_$idx")
@@ -1012,7 +1012,7 @@ private fun PageThumbnailStrip(
                     color = InTabColors.DarkSurfaceVariant,
                     border = BorderStroke(1.dp, InTabColors.DarkBorder),
                     modifier = Modifier
-                        .size(width = 44.dp, height = 54.dp)
+                        .size(width = 52.dp, height = 64.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .testTag("review_add_page_tile")
                         .semantics(mergeDescendants = true) {

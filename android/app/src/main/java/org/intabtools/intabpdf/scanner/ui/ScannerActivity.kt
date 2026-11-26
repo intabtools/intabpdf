@@ -12,6 +12,7 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -32,6 +33,8 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.intabtools.intabpdf.platform.ActivityScreenWakeFlagTarget
+import org.intabtools.intabpdf.platform.KeepScreenAwakeController
 import org.intabtools.intabpdf.save.SafSaveOutcome
 import org.intabtools.intabpdf.save.SafSaveRepository
 import org.intabtools.intabpdf.scanner.data.PostExportAction
@@ -66,6 +69,7 @@ class ScannerActivity : ComponentActivity() {
     private lateinit var sessionController: ScanSessionController
     private lateinit var bitmapLoader: ScanBitmapLoader
     private lateinit var safSaveRepository: SafSaveRepository
+    private lateinit var screenAwakeController: KeepScreenAwakeController
     private var hasCameraPermission by mutableStateOf(false)
     private var isPermissionPermanentlyDenied by mutableStateOf(false)
     private var hasRequestedPermissionOnce = false
@@ -122,6 +126,7 @@ class ScannerActivity : ComponentActivity() {
         val store = StillCaptureStore(applicationContext, detector, sessionId = sessionId)
         bitmapLoader = ScanBitmapLoader(applicationContext)
         safSaveRepository = SafSaveRepository.createDefault(applicationContext)
+        screenAwakeController = KeepScreenAwakeController(ActivityScreenWakeFlagTarget(this))
         sessionController = ScanSessionController(
             context = applicationContext,
             captureStore = store,
@@ -179,6 +184,12 @@ class ScannerActivity : ComponentActivity() {
         setContent {
             InTabScannerTheme(darkTheme = true) {
                 val sessionState by sessionController.uiState.collectAsState()
+                val isScannerProcessing = sessionState.isExportingPdf ||
+                    sessionState.isImportingGallery ||
+                    isSavingToSaf
+                LaunchedEffect(isScannerProcessing) {
+                    screenAwakeController.setActive(TOKEN_SCANNER_PROCESSING, isScannerProcessing)
+                }
                 LaunchedEffect(sessionState.pages.size) {
                     cameraController.syncCapturedCount(sessionState.pages.size)
                 }
@@ -300,9 +311,23 @@ class ScannerActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (::screenAwakeController.isInitialized) {
+            screenAwakeController.onStart()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         refreshCameraPermissionState()
+    }
+
+    override fun onStop() {
+        if (::screenAwakeController.isInitialized) {
+            screenAwakeController.onStop()
+        }
+        super.onStop()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -353,6 +378,9 @@ class ScannerActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (::screenAwakeController.isInitialized) {
+            screenAwakeController.onDestroy()
+        }
         if (::sessionController.isInitialized) {
             sessionController.shutdown()
         }
@@ -642,7 +670,16 @@ class ScannerActivity : ComponentActivity() {
     @androidx.annotation.VisibleForTesting
     internal fun sessionControllerForTest() = sessionController
 
+    @androidx.annotation.VisibleForTesting
+    internal fun hasKeepScreenOnFlagForTest(): Boolean =
+        (window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0
+
+    @androidx.annotation.VisibleForTesting
+    internal fun isScreenAwakeControllerActiveForTest(): Boolean =
+        ::screenAwakeController.isInitialized && screenAwakeController.isScreenAwake()
+
     private companion object {
+        const val TOKEN_SCANNER_PROCESSING = "scanner_processing"
         const val KEY_SESSION_ID = "scanner_session_id"
         const val KEY_AUTO_CAPTURE = "scanner_auto_capture"
         const val KEY_ASKED_PERM = "scanner_asked_permission"

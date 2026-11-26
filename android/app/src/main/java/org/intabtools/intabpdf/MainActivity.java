@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.webkit.JavascriptInterface;
 import com.getcapacitor.BridgeActivity;
+import org.intabtools.intabpdf.platform.ScreenAwakePlugin;
 import org.intabtools.intabpdf.save.DocumentSavePlugin;
 import org.intabtools.intabpdf.scanner.bridge.DocumentScannerPlugin;
 import org.json.JSONObject;
@@ -25,6 +26,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(DocumentScannerPlugin.class);
         registerPlugin(DocumentSavePlugin.class);
+        registerPlugin(ScreenAwakePlugin.class);
         super.onCreate(savedInstanceState);
         if (!isProcessInitialized) {
             isProcessInitialized = true;

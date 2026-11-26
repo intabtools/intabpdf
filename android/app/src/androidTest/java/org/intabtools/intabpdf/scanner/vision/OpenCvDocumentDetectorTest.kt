@@ -380,4 +380,300 @@ class OpenCvDocumentDetectorTest {
             scene.release()
         }
     }
+
+    @Test
+    fun detectOpenBookLeftPageWithLeftStaircaseUnderlyingSheets() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(64.0, 52.0, 42.0, 255.0))
+        try {
+            // Notebook cover framing the open book (extending near right frame edge)
+            Imgproc.rectangle(scene, Point(44.0, 50.0), Point(628.0, 434.0), Scalar(30.0, 32.0, 38.0, 255.0), -1)
+
+            // Partially visible opposite right page beyond the centre binding gutter
+            val rightPage = MatOfPoint(Point(476.0, 72.0), Point(618.0, 70.0), Point(618.0, 412.0), Point(476.0, 410.0))
+            Imgproc.fillPoly(scene, listOf(rightPage), Scalar(230.0, 228.0, 224.0, 255.0))
+            rightPage.release()
+
+            // Staircase of 3 exposed underlying sheets protruding left of target x = 132
+            for ((idx, leftX) in listOf(102.0, 112.0, 122.0).withIndex()) {
+                val shade = 198.0 + idx * 16.0
+                val sheet = MatOfPoint(
+                    Point(leftX, 70.0),
+                    Point(454.0, 72.0),
+                    Point(454.0, 410.0),
+                    Point(leftX, 412.0),
+                )
+                Imgproc.fillPoly(scene, listOf(sheet), Scalar(shade, shade - 2.0, shade - 4.0, 255.0))
+                Imgproc.line(scene, Point(leftX + 1.0, 71.0), Point(leftX + 1.0, 411.0), Scalar(88.0, 88.0, 92.0, 255.0), 2)
+                sheet.release()
+            }
+
+            // Topmost target left page: left = 132 (0.206), right spine = 454 (0.709)
+            val topPage = MatOfPoint(Point(132.0, 70.0), Point(454.0, 72.0), Point(454.0, 410.0), Point(132.0, 412.0))
+            Imgproc.fillPoly(scene, listOf(topPage), Scalar(246.0, 244.0, 240.0, 255.0))
+            Imgproc.line(scene, Point(130.0, 71.0), Point(130.0, 411.0), Scalar(92.0, 92.0, 96.0, 255.0), 2)
+            topPage.release()
+
+            // Centre binding gutter shadow + ruled notes on target page
+            Imgproc.rectangle(scene, Point(454.0, 70.0), Point(474.0, 412.0), Scalar(44.0, 44.0, 48.0, 255.0), -1)
+            for (row in 0 until 5) {
+                val y = 120.0 + row * 48.0
+                Imgproc.line(scene, Point(165.0, y), Point(422.0, y), Scalar(120.0, 130.0, 145.0, 255.0), 2)
+            }
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on open book left page", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue(
+                "Expected left edge near topmost page (~0.206), not outer stack (~0.159); TL.x=${quad.topLeft.x}, BL.x=${quad.bottomLeft.x}",
+                quad.topLeft.x in 0.185f..0.24f && quad.bottomLeft.x in 0.185f..0.24f,
+            )
+            assertTrue(
+                "Expected centre binding preserved (~0.709); TR.x=${quad.topRight.x}, BR.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.67f..0.745f && quad.bottomRight.x in 0.67f..0.745f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectOpenBookRightPageWithRightStaircaseUnderlyingSheets() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(64.0, 52.0, 42.0, 255.0))
+        try {
+            // Notebook cover framing the open book (extending near left frame edge)
+            Imgproc.rectangle(scene, Point(12.0, 50.0), Point(596.0, 434.0), Scalar(30.0, 32.0, 38.0, 255.0), -1)
+
+            // Partially visible opposite left page beyond the centre binding gutter
+            val leftPage = MatOfPoint(Point(22.0, 72.0), Point(164.0, 74.0), Point(164.0, 410.0), Point(22.0, 412.0))
+            Imgproc.fillPoly(scene, listOf(leftPage), Scalar(230.0, 228.0, 224.0, 255.0))
+            leftPage.release()
+
+            // Staircase of 3 exposed underlying sheets protruding right of target x = 506
+            for ((idx, rightX) in listOf(538.0, 528.0, 518.0).withIndex()) {
+                val shade = 198.0 + idx * 16.0
+                val sheet = MatOfPoint(
+                    Point(188.0, 72.0),
+                    Point(rightX, 70.0),
+                    Point(rightX, 412.0),
+                    Point(188.0, 410.0),
+                )
+                Imgproc.fillPoly(scene, listOf(sheet), Scalar(shade, shade - 2.0, shade - 4.0, 255.0))
+                Imgproc.line(scene, Point(rightX - 1.0, 71.0), Point(rightX - 1.0, 411.0), Scalar(88.0, 88.0, 92.0, 255.0), 2)
+                sheet.release()
+            }
+
+            // Topmost target right page: left spine = 188 (0.294), right = 508 (0.794)
+            val topPage = MatOfPoint(Point(188.0, 72.0), Point(508.0, 70.0), Point(508.0, 412.0), Point(188.0, 410.0))
+            Imgproc.fillPoly(scene, listOf(topPage), Scalar(246.0, 244.0, 240.0, 255.0))
+            Imgproc.line(scene, Point(510.0, 71.0), Point(510.0, 411.0), Scalar(92.0, 92.0, 96.0, 255.0), 2)
+            topPage.release()
+
+            // Centre binding gutter shadow + ruled notes on target page
+            Imgproc.rectangle(scene, Point(166.0, 70.0), Point(188.0, 412.0), Scalar(44.0, 44.0, 48.0, 255.0), -1)
+            for (row in 0 until 5) {
+                val y = 120.0 + row * 48.0
+                Imgproc.line(scene, Point(220.0, y), Point(474.0, y), Scalar(120.0, 130.0, 145.0, 255.0), 2)
+            }
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on open book right page", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue(
+                "Expected right edge near topmost page (~0.794), not outer stack (~0.841); TR.x=${quad.topRight.x}, BR.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.76f..0.818f && quad.bottomRight.x in 0.76f..0.818f,
+            )
+            assertTrue(
+                "Expected centre binding preserved (~0.294); TL.x=${quad.topLeft.x}, BL.x=${quad.bottomLeft.x}",
+                quad.topLeft.x in 0.26f..0.33f && quad.bottomLeft.x in 0.26f..0.33f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectOpenBookWithStaircaseSheetsOnBothLeftAndRightSides() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(58.0, 48.0, 40.0, 255.0))
+        try {
+            // Dark book cover
+            Imgproc.rectangle(scene, Point(84.0, 50.0), Point(556.0, 434.0), Scalar(28.0, 30.0, 36.0, 255.0), -1)
+
+            // 3 underlying staircase sheets exposed on BOTH left (118..146) and right (494..522)
+            for (idx in 0 until 3) {
+                val leftX = 118.0 + idx * 10.0
+                val rightX = 522.0 - idx * 10.0
+                val shade = 196.0 + idx * 17.0
+                val sheet = MatOfPoint(
+                    Point(leftX, 72.0),
+                    Point(rightX, 72.0),
+                    Point(rightX, 408.0),
+                    Point(leftX, 408.0),
+                )
+                Imgproc.fillPoly(scene, listOf(sheet), Scalar(shade, shade - 2.0, shade - 4.0, 255.0))
+                Imgproc.line(scene, Point(leftX + 1.0, 73.0), Point(leftX + 1.0, 407.0), Scalar(88.0, 88.0, 92.0, 255.0), 2)
+                Imgproc.line(scene, Point(rightX - 1.0, 73.0), Point(rightX - 1.0, 407.0), Scalar(88.0, 88.0, 92.0, 255.0), 2)
+                sheet.release()
+            }
+
+            // Topmost target page: x = 154..486 (0.241 .. 0.759)
+            val topPage = MatOfPoint(Point(154.0, 72.0), Point(486.0, 72.0), Point(486.0, 408.0), Point(154.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(topPage), Scalar(246.0, 244.0, 240.0, 255.0))
+            Imgproc.line(scene, Point(152.0, 73.0), Point(152.0, 407.0), Scalar(90.0, 90.0, 94.0, 255.0), 2)
+            Imgproc.line(scene, Point(488.0, 73.0), Point(488.0, 407.0), Scalar(90.0, 90.0, 94.0, 255.0), 2)
+            topPage.release()
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on open book with staircase on both sides", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue(
+                "Expected left edge on topmost page (~0.241), not outer (~0.184); TL.x=${quad.topLeft.x}, BL.x=${quad.bottomLeft.x}",
+                quad.topLeft.x in 0.21f..0.275f && quad.bottomLeft.x in 0.21f..0.275f,
+            )
+            assertTrue(
+                "Expected right edge on topmost page (~0.759), not outer (~0.816); TR.x=${quad.topRight.x}, BR.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.725f..0.79f && quad.bottomRight.x in 0.725f..0.79f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectTiltedOpenBookPageWithStaircaseAndUnevenLighting() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(58.0, 50.0, 44.0, 255.0))
+        try {
+            // Dark tilted book cover
+            val cover = MatOfPoint(Point(16.0, 62.0), Point(558.0, 88.0), Point(588.0, 424.0), Point(16.0, 404.0))
+            Imgproc.fillPoly(scene, listOf(cover), Scalar(28.0, 30.0, 36.0, 255.0))
+            cover.release()
+
+            // Opposite tilted left page partially visible beyond spine gutter
+            val oppLeft = MatOfPoint(Point(22.0, 80.0), Point(146.0, 90.0), Point(130.0, 384.0), Point(22.0, 374.0))
+            Imgproc.fillPoly(scene, listOf(oppLeft), Scalar(228.0, 226.0, 222.0, 255.0))
+            oppLeft.release()
+
+            // Tilted underlying staircase sheets on the right (+28, +18, +8 px)
+            for ((idx, shift) in listOf(28.0, 18.0, 8.0).withIndex()) {
+                val shade = 198.0 + idx * 16.0
+                val sheet = MatOfPoint(
+                    Point(168.0, 90.0),
+                    Point(476.0 + shift, 114.0),
+                    Point(516.0 + shift, 396.0),
+                    Point(150.0, 382.0),
+                )
+                Imgproc.fillPoly(scene, listOf(sheet), Scalar(shade, shade - 2.0, shade - 4.0, 255.0))
+                Imgproc.line(scene, Point(475.0 + shift, 115.0), Point(515.0 + shift, 395.0), Scalar(90.0, 90.0, 94.0, 255.0), 2)
+                sheet.release()
+            }
+
+            // Tilted trapezoidal topmost target page: TL(168,90)..TR(476,114)=0.744, BR(516,396)=0.806
+            val targetPage = MatOfPoint(
+                Point(168.0, 90.0),
+                Point(476.0, 114.0),
+                Point(516.0, 396.0),
+                Point(150.0, 382.0),
+            )
+            Imgproc.fillPoly(scene, listOf(targetPage), Scalar(246.0, 244.0, 240.0, 255.0))
+            Imgproc.line(scene, Point(478.0, 115.0), Point(518.0, 395.0), Scalar(92.0, 92.0, 96.0, 255.0), 2)
+            targetPage.release()
+
+            // Dark binding gutter between oppLeft and targetPage
+            val gutter = MatOfPoint(Point(148.0, 88.0), Point(168.0, 90.0), Point(150.0, 382.0), Point(130.0, 384.0))
+            Imgproc.fillPoly(scene, listOf(gutter), Scalar(44.0, 44.0, 48.0, 255.0))
+            gutter.release()
+
+            // Uneven lighting shading across the frame
+            for (x in 0 until width) {
+                val factor = if (x < 260) 1.0 else (1.0 - ((x - 260.0) / 380.0) * 0.24)
+                if (factor < 1.0) {
+                    val col = scene.col(x)
+                    org.opencv.core.Core.multiply(col, Scalar(factor, factor, factor, 1.0), col)
+                    col.release()
+                }
+            }
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid tilted open-book quad", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected trapezoidal foreshortening (top < bottom)", quad.topLeft.distanceTo(quad.topRight) < quad.bottomLeft.distanceTo(quad.bottomRight))
+            assertTrue(
+                "Expected tilted right edge on topmost page (~0.744 / ~0.806), not outer staircase (~0.788 / ~0.850); TR.x=${quad.topRight.x}, BR.x=${quad.bottomRight.x}",
+                quad.topRight.x in 0.70f..0.775f && quad.bottomRight.x in 0.76f..0.832f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectOpenBookCentreBindingAndTopBottomEdgesPreserved() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(64.0, 52.0, 42.0, 255.0))
+        try {
+            // Dark cover
+            Imgproc.rectangle(scene, Point(12.0, 50.0), Point(588.0, 434.0), Scalar(30.0, 32.0, 38.0, 255.0), -1)
+
+            // Partially visible opposite left page
+            val leftPage = MatOfPoint(Point(22.0, 74.0), Point(164.0, 74.0), Point(164.0, 408.0), Point(22.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(leftPage), Scalar(230.0, 228.0, 224.0, 255.0))
+            leftPage.release()
+
+            // Right underlying staircase sheets protruding slightly beyond x = 504
+            for ((idx, rightX) in listOf(530.0, 517.0).withIndex()) {
+                val shade = 202.0 + idx * 18.0
+                val sheet = MatOfPoint(Point(188.0, 74.0), Point(rightX, 74.0), Point(rightX, 408.0), Point(188.0, 408.0))
+                Imgproc.fillPoly(scene, listOf(sheet), Scalar(shade, shade - 2.0, shade - 4.0, 255.0))
+                Imgproc.line(scene, Point(rightX - 1.0, 75.0), Point(rightX - 1.0, 407.0), Scalar(90.0, 90.0, 94.0, 255.0), 2)
+                sheet.release()
+            }
+
+            // Target right page: topY = 74 (0.154), bottomY = 408 (0.850), left spine = 188 (0.294), right = 504 (0.7875)
+            val targetRight = MatOfPoint(Point(188.0, 74.0), Point(504.0, 74.0), Point(504.0, 408.0), Point(188.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(targetRight), Scalar(246.0, 244.0, 240.0, 255.0))
+            Imgproc.line(scene, Point(506.0, 75.0), Point(506.0, 407.0), Scalar(92.0, 92.0, 96.0, 255.0), 2)
+            targetRight.release()
+
+            // Binding gutter shadow
+            Imgproc.rectangle(scene, Point(166.0, 72.0), Point(188.0, 410.0), Scalar(44.0, 44.0, 48.0, 255.0), -1)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad", quad)
+            quad!!
+            // Exact top/bottom preservation + centre binding preserved
+            assertTrue("Top edge preserved (~0.154): TL.y=${quad.topLeft.y}, TR.y=${quad.topRight.y}", quad.topLeft.y in 0.125f..0.185f && quad.topRight.y in 0.125f..0.185f)
+            assertTrue("Bottom edge preserved (~0.850): BL.y=${quad.bottomLeft.y}, BR.y=${quad.bottomRight.y}", quad.bottomLeft.y in 0.82f..0.88f && quad.bottomRight.y in 0.82f..0.88f)
+            assertTrue("Centre binding preserved (~0.294): TL.x=${quad.topLeft.x}, BL.x=${quad.bottomLeft.x}", quad.topLeft.x in 0.26f..0.33f && quad.bottomLeft.x in 0.26f..0.33f)
+            assertTrue("Right edge accurate (~0.788): TR.x=${quad.topRight.x}, BR.x=${quad.bottomRight.x}", quad.topRight.x in 0.755f..0.812f && quad.bottomRight.x in 0.755f..0.812f)
+        } finally {
+            scene.release()
+        }
+    }
 }

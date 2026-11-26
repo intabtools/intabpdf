@@ -1,14 +1,17 @@
-import { Component, Suspense, lazy } from 'react';
+import { Component, Suspense, lazy, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import ShellContainer from './components/ShellContainer';
 import { ToastProvider } from './components/ToastContext';
 import { ProcessingProvider } from './components/ProcessingContext';
+import { ProcessingContext } from './components/processingContextDef';
 import { FileConflictProvider } from './components/FileConflictDialog';
 import { SaveRecoveryProvider } from './components/SaveRecoveryDialog';
 import { ViewerProvider } from './viewer/ViewerContext';
+import { ViewerContext } from './viewer/viewerContextDef';
 import { getInitialDestination, isScreenEnabled, resolveDestination } from './config/screens';
 import { getPlatformType } from './platform';
+import { setKeepScreenAwake } from './platform/screenAwake';
 
 // On-demand lazy-loaded screen components for optimal startup bundle size
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -91,6 +94,24 @@ function ToolRouteGuard() {
   return <ToolPage key={location.pathname} />;
 }
 
+function ScreenAwakeSync(): null {
+  const processing = useContext(ProcessingContext);
+  const viewer = useContext(ViewerContext);
+  const isBusy = Boolean(processing?.isProcessing || viewer?.isLoading);
+
+  useEffect(() => {
+    void setKeepScreenAwake(isBusy);
+  }, [isBusy]);
+
+  useEffect(() => {
+    return () => {
+      void setKeepScreenAwake(false);
+    };
+  }, []);
+
+  return null;
+}
+
 export default function App(): ReactNode {
   const platform = getPlatformType();
   const initialDest = getInitialDestination(platform);
@@ -101,6 +122,7 @@ export default function App(): ReactNode {
         <FileConflictProvider>
           <SaveRecoveryProvider>
             <ViewerProvider>
+            <ScreenAwakeSync />
             <ShellContainer>
               <ScreenErrorBoundary>
                 <Suspense fallback={<PageSuspenseFallback />}>

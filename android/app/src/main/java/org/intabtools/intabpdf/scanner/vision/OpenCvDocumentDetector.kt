@@ -89,7 +89,8 @@ class OpenCvDocumentDetector : DocumentDetector {
 
             val candidateMaps = buildCandidateMaps(gray, labChannels, mode, morphKernel, closeKernel, dilateKernel)
             val best = evaluateCandidates(candidateMaps, grayBytes, gradBytes, wInt, hInt, width, height, frameArea)
-            val refined = best?.let { refineQuadSidesToGradientRidge(it, grayBytes, gradBytes, wInt, hInt) }
+            val ridgeRefined = best?.let { refineQuadSidesToGradientRidge(it, grayBytes, gradBytes, wInt, hInt) }
+            val refined = ridgeRefined?.let { refineLateralStaircaseBoundaries(it, grayBytes, gradBytes, wInt, hInt) }
 
             candidateMaps.forEach { it.release() }
             labChannels.forEach { it.release() }
@@ -770,6 +771,230 @@ class OpenCvDocumentDetector : DocumentDetector {
         }
     }
 
+    /**
+     * Separates the topmost open-book target sheet from protruding staircase-like underlying
+     * sheets along ONLY the lateral (left/right) boundaries. Top and bottom edges remain
+     * untouched, and centre-binding edges remain anchored on the spine shadow.
+     */
+    private fun refineLateralStaircaseBoundaries(
+        candidate: ScoredCandidate,
+        grayBytes: ByteArray,
+        gradBytes: ByteArray,
+        w: Int,
+        h: Int,
+    ): ScoredCandidate {
+        fun sampleGray(gx: Double, gy: Double): Double {
+            val ix = gx.roundToInt().coerceIn(0, w - 1)
+            val iy = gy.roundToInt().coerceIn(0, h - 1)
+            return (grayBytes[iy * w + ix].toInt() and 0xFF).toDouble()
+        }
+
+        val pts = candidate.quad.points()
+        val lines = ArrayList<Pair<Point, Point>>(4)
+        var anyRefined = false
+        val samplesPerSide = 19
+
+        for (i in 0 until 4) {
+            val a = pts[i]
+            val b = pts[(i + 1) % 4]
+            val ax = a.x * w.toDouble()
+            val ay = a.y * h.toDouble()
+            val bx = b.x * w.toDouble()
+            val by = b.y * h.toDouble()
+            val originalLine = Point(ax, ay) to Point(bx, by)
+
+            // Leave Top (0) and Bottom (2) edges untouched
+            if (i != 1 && i != 3) {
+                lines += originalLine
+                continue
+            }
+
+            // Only treat as lateral left/right edge when predominantly vertical-ish
+            if (abs(by - ay) <= abs(bx - ax) * 1.15) {
+                lines += originalLine
+                continue
+            }
+
+            val oppA = pts[(i + 2) % 4]
+            val oppB = pts[(i + 3) % 4]
+            val midX = (ax + bx) * 0.5
+            val midY = (ay + by) * 0.5
+            val oppMidX = ((oppA.x + oppB.x) * 0.5) * w.toDouble()
+            val oppMidY = ((oppA.y + oppB.y) * 0.5) * h.toDouble()
+            val span = hypot(oppMidX - midX, oppMidY - midY)
+            val maxScan = min((w * 0.12).roundToInt(), (span * 0.22).roundToInt())
+            if (maxScan < 6) {
+                lines += originalLine
+                continue
+            }
+
+            val nx = -(b.y - a.y)
+            val ny = (b.x - a.x)
+            val len = hypot(nx.toDouble(), ny.toDouble()).coerceAtLeast(1e-5)
+            val ux = nx / len
+            val uy = ny / len
+
+            // Reference brightness well inside the page vs immediately outside the initial quad
+            var interiorSum = 0.0
+            var outsideSum = 0.0
+            for (k in 0 until samplesPerSide) {
+                val t = 0.10 + 0.80 * (k.toDouble() / (samplesPerSide - 1))
+                val baseX = ax + (bx - ax) * t
+                val baseY = ay + (by - ay) * t
+                interiorSum += sampleGray(baseX + ux * (maxScan - 1).coerceAtLeast(6), baseY + uy * (maxScan - 1).coerceAtLeast(6))
+                outsideSum += sampleGray(baseX - ux * 5.0, baseY - uy * 5.0)
+            }
+            val interiorRef = interiorSum / samplesPerSide
+            val outsideBg = outsideSum / samplesPerSide
+            if (interiorRef <= outsideBg + 10.0 || interiorRef < 90.0) {
+                lines += originalLine
+                continue
+            }
+
+            var bestStairS = -1
+            for (s in 5..maxScan) {
+                val outerSamples = intArrayOf(
+                    2,
+                    2 + ((s - 5) / 2).coerceAtLeast(0),
+                    (s - 3).coerceAtLeast(2),
+                )
+                val innerEnd = min(s + 7, maxScan)
+                if (innerEnd < s + 3) continue
+                val innerSamples = intArrayOf(
+                    s + 2,
+                    (s + 4).coerceAtMost(innerEnd),
+                    innerEnd,
+                )
+
+                var outerBandSum = 0.0
+                var innerBandSum = 0.0
+                var supportCount = 0
+                var stepSum = 0.0
+                var creaseSum = 0.0
+
+                for (k in 0 until samplesPerSide) {
+                    val t = 0.10 + 0.80 * (k.toDouble() / (samplesPerSide - 1))
+                    val baseX = ax + (bx - ax) * t
+                    val baseY = ay + (by - ay) * t
+
+                    for (dOut in outerSamples) {
+                        outerBandSum += sampleGray(baseX + ux * dOut, baseY + uy * dOut)
+                    }
+                    for (dIn in innerSamples) {
+                        innerBandSum += sampleGray(baseX + ux * dIn, baseY + uy * dIn)
+                    }
+
+                    var bestLocalEdge = Double.NEGATIVE_INFINITY
+                    var bestStep4 = 0.0
+                    var bestValley = 0.0
+                    var bestInVsOut = 0.0
+
+                    for (delta in -1..1) {
+                        val sLoc = (s + delta).toDouble()
+                        val vC = sampleGray(baseX + ux * sLoc, baseY + uy * sLoc)
+                        val vO2 = sampleGray(baseX + ux * (sLoc - 2.5), baseY + uy * (sLoc - 2.5))
+                        val vI2 = sampleGray(baseX + ux * (sLoc + 2.5), baseY + uy * (sLoc + 2.5))
+                        val vO4 = sampleGray(baseX + ux * (sLoc - 4.5), baseY + uy * (sLoc - 4.5))
+                        val vI4 = sampleGray(baseX + ux * (sLoc + 4.5), baseY + uy * (sLoc + 4.5))
+
+                        val step2 = vI2 - vO2
+                        val valley = min(vI2, vO2) - vC
+                        val edgeSig = max(step2, valley * 1.4)
+                        if (edgeSig > bestLocalEdge) {
+                            bestLocalEdge = edgeSig
+                            bestStep4 = vI4 - vO4
+                            bestValley = valley
+                            bestInVsOut = vI4 - vO4
+                        }
+                    }
+
+                    stepSum += bestStep4
+                    creaseSum += bestValley
+                    if (bestInVsOut >= -4.0 && bestLocalEdge >= 7.5) {
+                        supportCount++
+                    }
+                }
+
+                val outerBandMean = outerBandSum / (samplesPerSide * outerSamples.size)
+                val innerBandMean = innerBandSum / (samplesPerSide * innerSamples.size)
+                val supportFraction = supportCount.toDouble() / samplesPerSide
+                val avgStep = stepSum / samplesPerSide
+                val avgCrease = creaseSum / samplesPerSide
+
+                val outerIsPaper = outerBandMean >= interiorRef * 0.58
+                val stepsOntoBrighterTarget = innerBandMean >= outerBandMean + 4.0
+                val validRidge = supportFraction >= 0.72 && (avgStep >= 3.0 || (avgCrease >= 6.5 && avgStep >= 0.5))
+
+                if (outerIsPaper && stepsOntoBrighterTarget && validRidge) {
+                    bestStairS = s
+                }
+            }
+
+            if (bestStairS > 0) {
+                val ridgePoints = ArrayList<Point>(samplesPerSide)
+                for (k in 0 until samplesPerSide) {
+                    val t = 0.10 + 0.80 * (k.toDouble() / (samplesPerSide - 1))
+                    val baseX = ax + (bx - ax) * t
+                    val baseY = ay + (by - ay) * t
+
+                    var bestOffset = bestStairS.toDouble()
+                    var bestSig = Double.NEGATIVE_INFINITY
+                    var bestValid = false
+                    for (delta in -3..3) {
+                        val sLoc = (bestStairS + delta).coerceIn(2, maxScan).toDouble()
+                        val vC = sampleGray(baseX + ux * sLoc, baseY + uy * sLoc)
+                        val vO2 = sampleGray(baseX + ux * (sLoc - 2.5), baseY + uy * (sLoc - 2.5))
+                        val vI2 = sampleGray(baseX + ux * (sLoc + 2.5), baseY + uy * (sLoc + 2.5))
+                        val vO4 = sampleGray(baseX + ux * (sLoc - 4.5), baseY + uy * (sLoc - 4.5))
+                        val vI4 = sampleGray(baseX + ux * (sLoc + 4.5), baseY + uy * (sLoc + 4.5))
+                        val edgeSig = max(vI2 - vO2, (min(vI2, vO2) - vC) * 1.4)
+                        if (vI4 - vO4 >= -4.0 && edgeSig >= 6.0 && edgeSig > bestSig) {
+                            bestSig = edgeSig
+                            bestOffset = sLoc
+                            bestValid = true
+                        }
+                    }
+                    if (bestValid) {
+                        ridgePoints += Point(baseX + ux * bestOffset, baseY + uy * bestOffset)
+                    }
+                }
+
+                val fittedLine = if (ridgePoints.size >= 10) {
+                    fitOrthogonalLine(ridgePoints)
+                } else {
+                    null
+                } ?: (Point(ax + ux * bestStairS, ay + uy * bestStairS) to Point(bx + ux * bestStairS, by + uy * bestStairS))
+
+                lines += fittedLine
+                anyRefined = true
+            } else {
+                lines += originalLine
+            }
+        }
+
+        if (!anyRefined) return candidate
+
+        val intersections = ArrayList<NormalizedPoint>(4)
+        for (i in 0 until 4) {
+            val l1 = lines[(i + 3) % 4]
+            val l2 = lines[i]
+            val inter = intersectLines(l1.first, l1.second, l2.first, l2.second) ?: return candidate
+            val nx = (inter.x / w).toFloat()
+            val ny = (inter.y / h).toFloat()
+            if (!nx.isFinite() || !ny.isFinite() || nx < -0.02f || ny < -0.02f || nx > 1.02f || ny > 1.02f) {
+                return candidate
+            }
+            intersections += NormalizedPoint(nx, ny).clamped()
+        }
+        val refinedQuad = NormalizedQuad.orderClockwise(intersections) ?: return candidate
+        if (!refinedQuad.isValidConvex()) return candidate
+
+        val rescored = scoreQuad(refinedQuad, grayBytes, gradBytes, w, h)
+        // Preserve usable confidence even when adjacent underlying sheets reduce local contrast vs desk
+        val effectiveScore = maxOf(rescored, candidate.score * 0.88f).coerceIn(0f, 1f)
+        return ScoredCandidate(refinedQuad, effectiveScore)
+    }
+
     private fun scoreQuad(
         quad: NormalizedQuad,
         grayBytes: ByteArray,
@@ -855,8 +1080,17 @@ class OpenCvDocumentDetector : DocumentDetector {
         val perspectiveScore = computePerspectiveGeometryScore(pts)
 
         val marginPenalty = if (quad.touchesOuterMargin(margin = 0.01f)) 0.80f else 1.0f
+        // An off-center small sliver near the left/right border of the camera frame is usually
+        // a partially visible opposite notebook page rather than the primary framed page.
+        val cx = pts.sumOf { it.x.toDouble() }.toFloat() / 4f
+        val centerOffset = abs(cx - 0.5f)
+        val sliverPenalty = if (area < 0.24f && centerOffset > 0.20f) {
+            (1f - ((centerOffset - 0.20f) / 0.30f).coerceIn(0f, 1f) * 0.32f)
+        } else {
+            1.0f
+        }
         val rawScore = (edgeScore * 0.45f) + (contrastScore * 0.25f) + (areaScore * 0.20f) + (perspectiveScore * 0.10f)
-        return (rawScore * marginPenalty).coerceIn(0f, 1f)
+        return (rawScore * marginPenalty * sliverPenalty).coerceIn(0f, 1f)
     }
 
     /**

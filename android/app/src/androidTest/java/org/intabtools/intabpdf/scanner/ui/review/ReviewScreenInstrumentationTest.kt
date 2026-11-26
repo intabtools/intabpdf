@@ -17,6 +17,7 @@ import org.intabtools.intabpdf.scanner.data.ScannerRoute
 import org.intabtools.intabpdf.scanner.imaging.OpenCvRuntime
 import org.intabtools.intabpdf.scanner.ui.ScannerActivity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -111,12 +112,21 @@ class ReviewScreenInstrumentationTest {
                 val cropRect = Rect().also { cropBtn!!.getBoundsInScreen(it) }
                 val deleteRect = Rect().also { deleteBtn!!.getBoundsInScreen(it) }
 
-                assertTrue("Main preview must be large (> 38% of screen height)", previewRect.height() > screenHeight * 0.38f)
+                val density = context.resources.displayMetrics.density
+                assertTrue("Thumbnails should be enlarged (>= 58dp tall)", thumb1Rect.height() >= (58f * density).toInt())
+                assertTrue("Main preview must remain large (> 40% of screen height)", previewRect.height() > screenHeight * 0.40f)
                 assertTrue("Top bar above main preview", saveRect.bottom <= previewRect.top + 24)
                 assertTrue("Main preview above filter selector", previewRect.bottom <= filterRect.top + 24)
                 assertTrue("Filter selector above thumbnail strip", filterRect.bottom <= thumb1Rect.top + 24)
                 assertTrue("Thumbnail strip above editing toolbar", thumb1Rect.bottom <= cropRect.top + 24)
                 assertTrue("Editing toolbar must not clip below screen", deleteRect.bottom <= screenHeight)
+
+                for (filterLabel in listOf("Auto", "Original", "Color", "Gray", "B&W")) {
+                    val fNode = waitForNodeByContentDesc("Filter: $filterLabel")
+                    assertNotNull("Expected plain-text filter '$filterLabel'", fNode)
+                    val fRect = Rect().also { fNode!!.getBoundsInScreen(it) }
+                    assertTrue("Filter '$filterLabel' should fit horizontally on screen", fRect.left >= 0 && fRect.right <= screenWidth)
+                }
 
                 // Top-bar overflow menu exposes Share
                 clickNode(moreOptionsNode!!)
@@ -206,12 +216,92 @@ class ReviewScreenInstrumentationTest {
                 )
                 waitUntilSession(scenario, timeoutMs = 6_000L) { it.statusMessage == null }
                 assertNull("Open in Viewer must remain removed", findNodeByTextOrDesc("Open in Viewer"))
+
+                // Verify WindowManager FLAG_KEEP_SCREEN_ON is OFF while idle
+                var awakeIdle = true
+                scenario.onActivity { awakeIdle = it.hasKeepScreenOnFlagForTest() }
+                assertFalse("Screen must not stay awake when scanner Review is idle", awakeIdle)
             }
         } finally {
             img1.delete()
             img2.delete()
             img3.delete()
         }
+    }
+
+    @Test
+    fun screenAwakeActiveDuringScannerProcessingAndClearedOnCancelAndStop() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.CAMERA,
+        )
+
+        val images = (1..12).map { idx ->
+            writeSamplePageImage(
+                context = context,
+                name = "awake_p$idx.jpg",
+                color = Scalar(240.0, 238.0, 234.0),
+                width = 1600,
+                height = 1200,
+            )
+        }
+
+        try {
+            val intent = ScannerLaunchOptions(autoCaptureDefault = false)
+                .applyToIntent(Intent(context, ScannerActivity::class.java))
+
+            ActivityScenario.launch<ScannerActivity>(intent).use { scenario ->
+                scenario.onActivity { activity ->
+                    assertFalse("Idle activity must not hold keep-screen-on flag", activity.hasKeepScreenOnFlagForTest())
+                    activity.sessionControllerForTest().importGalleryUris(images.map { Uri.fromFile(it) })
+                }
+
+                // Wait for import completion -> returns to idle (flag must be cleared)
+                waitUntilSession(scenario, timeoutMs = 20_000L) {
+                    !it.isImportingGallery && it.route is ScannerRoute.Review && it.pages.size == 12
+                }
+                waitUntilActivity(scenario) { !it.hasKeepScreenOnFlagForTest() }
+
+                // Trigger PDF generation/export, assert keep-screen-on activates during active export, then cancel
+                scenario.onActivity { activity ->
+                    activity.sessionControllerForTest().exportPdf()
+                }
+                waitUntilActivity(scenario, timeoutMs = 8_000L) {
+                    it.currentSessionStateForTest().isExportingPdf && it.hasKeepScreenOnFlagForTest()
+                }
+                scenario.onActivity { activity ->
+                    activity.sessionControllerForTest().cancelPdfExport()
+                }
+                waitUntilActivity(scenario, timeoutMs = 6_000L) {
+                    !it.currentSessionStateForTest().isExportingPdf && !it.hasKeepScreenOnFlagForTest()
+                }
+
+                // Leaving the screen (onStop) must ensure screen-awake controller is inactive and flag stays off
+                scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+                var activeAfterStop = true
+                scenario.onActivity { activeAfterStop = it.isScreenAwakeControllerActiveForTest() }
+                assertFalse("Leaving screen must deactivate keep-screen-on controller", activeAfterStop)
+            }
+        } finally {
+            images.forEach { it.delete() }
+        }
+    }
+
+    private fun waitUntilActivity(
+        scenario: ActivityScenario<ScannerActivity>,
+        timeoutMs: Long = 5_000L,
+        predicate: (ScannerActivity) -> Boolean,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var matched = false
+        while (SystemClock.uptimeMillis() < deadline) {
+            scenario.onActivity { matched = predicate(it) }
+            if (matched) return
+            Thread.sleep(40L)
+        }
+        assertTrue("Activity condition timed out", matched)
     }
 
     private fun waitUntil(timeoutMs: Long = 5_000L, predicate: () -> Boolean) {
@@ -352,9 +442,15 @@ class ReviewScreenInstrumentationTest {
         return null
     }
 
-    private fun writeSamplePageImage(context: Context, name: String, color: Scalar): File {
+    private fun writeSamplePageImage(
+        context: Context,
+        name: String,
+        color: Scalar,
+        width: Int = 450,
+        height: Int = 600,
+    ): File {
         val file = File(context.cacheDir, name)
-        val mat = Mat(600, 450, CvType.CV_8UC3, color)
+        val mat = Mat(height, width, CvType.CV_8UC3, color)
         try {
             Imgcodecs.imwrite(file.absolutePath, mat)
         } finally {

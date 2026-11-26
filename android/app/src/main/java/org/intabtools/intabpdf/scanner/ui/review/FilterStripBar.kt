@@ -1,21 +1,22 @@
 package org.intabtools.intabpdf.scanner.ui.review
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -50,7 +51,7 @@ fun FilterStripBar(
         modifier = modifier
             .fillMaxWidth()
             .background(InTabColors.DarkSurface)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
     ) {
         if (pageCount > 1) {
             Row(
@@ -67,34 +68,18 @@ fun FilterStripBar(
                     fontWeight = FontWeight.Medium,
                 )
 
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = if (applyToAll) {
-                        InTabColors.BrandIndigoLight.copy(alpha = 0.16f)
-                    } else {
-                        InTabColors.DarkSurfaceVariant
-                    },
-                    border = BorderStroke(
-                        1.dp,
-                        if (applyToAll) {
-                            InTabColors.BrandIndigoSoftText.copy(alpha = 0.7f)
-                        } else {
-                            InTabColors.DarkBorder
-                        },
-                    ),
+                Text(
+                    text = if (applyToAll) "Apply to: All pages" else "Apply to: This page",
+                    color = if (applyToAll) InTabColors.BrandIndigoSoftText else InTabColors.DarkTextMuted,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (applyToAll) FontWeight.SemiBold else FontWeight.Medium,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .clickable { onToggleApplyToAll(!applyToAll) },
-                ) {
-                    Text(
-                        text = if (applyToAll) "Apply to: All pages" else "Apply to: This page",
-                        color = if (applyToAll) InTabColors.BrandIndigoSoftText else InTabColors.DarkText,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                    )
-                }
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onToggleApplyToAll(!applyToAll) }
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
             }
-            Spacer(modifier = Modifier.height(5.dp))
+            Spacer(modifier = Modifier.height(2.dp))
         }
 
         val displayOrder = listOf(
@@ -106,42 +91,41 @@ fun FilterStripBar(
         )
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 12.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             items(displayOrder, key = { it.wireValue }) { mode ->
                 val isSelected = mode == selectedFilter
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = if (isSelected) {
-                        InTabColors.BrandIndigoLight.copy(alpha = 0.16f)
-                    } else {
-                        InTabColors.DarkSurfaceVariant
-                    },
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isSelected) {
-                            InTabColors.BrandIndigoSoftText.copy(alpha = 0.8f)
-                        } else {
-                            InTabColors.DarkBorder
-                        },
-                    ),
+                Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 34.dp)
+                        .clip(RoundedCornerShape(4.dp))
                         .semantics(mergeDescendants = true) {
                             selected = isSelected
                             contentDescription = "Filter: ${filterDisplayName(mode)}"
                         }
-                        .clickable { onSelectFilter(mode) },
+                        .clickable { onSelectFilter(mode) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = filterDisplayName(mode),
                         color = if (isSelected) InTabColors.BrandIndigoSoftText else InTabColors.DarkTextMuted,
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(20.dp)
+                            .height(2.dp)
+                            .background(
+                                color = if (isSelected) InTabColors.BrandIndigoSoftText else Color.Transparent,
+                                shape = RoundedCornerShape(1.dp),
+                            ),
                     )
                 }
             }
