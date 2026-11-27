@@ -256,7 +256,8 @@ test.describe('Phase 4, 5, 6 & 7: PDF Viewer Selection, Rotation, Copy & Permiss
       expect(menuBounds.bottom).toBeLessThanOrEqual(menuBounds.vh);
     }
 
-    // 7. Android viewport shows bottom-anchored custom menu cleanly without crashing native selection
+    // 7. Android delegates text selection menu to native WebView ActionMode (no duplicate React menu)
+    // and keeps Ctrl+A / DOM selection scoped strictly to PDF document pages.
     await page.goto('/viewer?platform=android');
     await page.locator('input[type="file"]').first().setInputFiles({
       name: 'android-viewer.pdf',
@@ -266,8 +267,23 @@ test.describe('Phase 4, 5, 6 & 7: PDF Viewer Selection, Rotation, Copy & Permiss
     await page.waitForSelector('.pg-item[data-page="1"] .textLayer span', { timeout: 15000 });
     await page.keyboard.press('Control+a');
     await page.waitForTimeout(200);
-    await expect(page.locator('.viewer-selection-menu.is-android')).toBeVisible();
-    await expect(page.locator('.viewer-selection-menu.is-android')).toContainText('Select All on Page');
+    await expect(page.locator('.viewer-selection-menu')).toHaveCount(0);
+    const androidSelection = await page.evaluate(() => {
+      const sel = window.getSelection();
+      const anchorEl =
+        sel?.anchorNode instanceof Element ? sel.anchorNode : sel?.anchorNode?.parentElement ?? null;
+      const focusEl =
+        sel?.focusNode instanceof Element ? sel.focusNode : sel?.focusNode?.parentElement ?? null;
+      return {
+        text: sel?.toString() || '',
+        anchorInsidePdf: Boolean(anchorEl?.closest('.pg-item')),
+        focusInsidePdf: Boolean(focusEl?.closest('.pg-item')),
+      };
+    });
+    expect(androidSelection.text).toContain('FirstPage');
+    expect(androidSelection.text).not.toContain('InTab');
+    expect(androidSelection.anchorInsidePdf).toBe(true);
+    expect(androidSelection.focusInsidePdf).toBe(true);
   });
 
   test('enforces PDF PermissionFlag.COPY restriction and resets state cleanly when switching to an unrestricted PDF', async ({ page }) => {

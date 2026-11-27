@@ -45,6 +45,18 @@ enum class ScanQuality(val wireValue: String) {
     }
 }
 
+enum class ScannerThemeMode(val wireValue: String) {
+    LIGHT("light"),
+    DARK("dark");
+
+    companion object {
+        fun fromWireValue(value: String?): ScannerThemeMode {
+            val normalized = value?.trim()?.lowercase() ?: return LIGHT
+            return entries.firstOrNull { it.wireValue == normalized } ?: LIGHT
+        }
+    }
+}
+
 data class ScannedPageSource(
     val pageId: String,
     val sourceFilePath: String,
@@ -63,11 +75,13 @@ data class ScannerLaunchOptions(
     val quality: ScanQuality = ScanQuality.BALANCED,
     val autoCaptureDefault: Boolean = true,
     val suggestedFileName: String? = null,
+    val theme: ScannerThemeMode = ScannerThemeMode.LIGHT,
 ) {
     fun applyToIntent(intent: Intent): Intent = intent.apply {
         putExtra(EXTRA_DEFAULT_FILTER, defaultFilter.wireValue)
         putExtra(EXTRA_QUALITY, quality.wireValue)
         putExtra(EXTRA_AUTO_CAPTURE_DEFAULT, autoCaptureDefault)
+        putExtra(EXTRA_THEME, theme.wireValue)
         suggestedFileName?.takeIf { it.isNotBlank() }?.let {
             putExtra(EXTRA_SUGGESTED_FILE_NAME, it.trim())
         }
@@ -78,6 +92,7 @@ data class ScannerLaunchOptions(
         const val EXTRA_QUALITY = "org.intabtools.intabpdf.scanner.EXTRA_QUALITY"
         const val EXTRA_AUTO_CAPTURE_DEFAULT = "org.intabtools.intabpdf.scanner.EXTRA_AUTO_CAPTURE_DEFAULT"
         const val EXTRA_SUGGESTED_FILE_NAME = "org.intabtools.intabpdf.scanner.EXTRA_SUGGESTED_FILE_NAME"
+        const val EXTRA_THEME = "org.intabtools.intabpdf.scanner.EXTRA_THEME"
 
         const val EXTRA_PDF_FILE_URL = "org.intabtools.intabpdf.scanner.EXTRA_PDF_FILE_URL"
         const val EXTRA_FILE_NAME = "org.intabtools.intabpdf.scanner.EXTRA_FILE_NAME"
@@ -94,6 +109,7 @@ data class ScannerLaunchOptions(
                 quality = ScanQuality.fromWireValue(intent.getStringExtra(EXTRA_QUALITY)),
                 autoCaptureDefault = intent.getBooleanExtra(EXTRA_AUTO_CAPTURE_DEFAULT, true),
                 suggestedFileName = intent.getStringExtra(EXTRA_SUGGESTED_FILE_NAME)?.takeIf { it.isNotBlank() },
+                theme = ScannerThemeMode.fromWireValue(intent.getStringExtra(EXTRA_THEME)),
             )
         }
     }

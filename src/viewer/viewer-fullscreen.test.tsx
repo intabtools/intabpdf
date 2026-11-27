@@ -7,6 +7,8 @@ import { ShellContext } from '../components/shellContextDef';
 import { ViewerProvider } from './ViewerContext';
 import ViewerPage from './ViewerPage';
 import ViewerToolbar from './ViewerToolbar';
+import ViewerFullscreenControls from './ViewerFullscreenControls';
+import ViewerPageNavigation from './ViewerPageNavigation';
 import type { PdfDocument } from './renderPage';
 
 // Mock renderPage functions for unit tests
@@ -437,6 +439,148 @@ describe('Stage 2 — PDF Viewer Overhaul & Fullscreen Controls', () => {
       scheduleHide(3000);
       vi.advanceTimersByTime(3100);
       expect(controlsVisible).toBe(false); // hides after leaving
+    });
+
+    it('keeps Share PDF in normal ViewerToolbar and omits it from ViewerFullscreenControls', () => {
+      const mockDoc = { numPages: 500 } as unknown as PdfDocument;
+      const normalToolbarHtml = renderToString(
+        <ViewerToolbar
+          pdfDoc={mockDoc}
+          isLoading={false}
+          onOpenClick={() => {}}
+          onOpenPalette={() => {}}
+          onCloseDocument={() => {}}
+          showThumbnails={false}
+          mobileThumbnailsOpen={false}
+          onToggleThumbnails={() => {}}
+          numPages={500}
+          currentPage={500}
+          onJumpToPage={() => {}}
+          isEditingPage={false}
+          setIsEditingPage={() => {}}
+          pageInputRef={{ current: null }}
+          pageInputValue="500"
+          setPageInputValue={() => {}}
+          onPageJumpSubmit={() => {}}
+          onStartPageEdit={() => {}}
+          zoom={100}
+          onZoomIn={() => {}}
+          onZoomOut={() => {}}
+          isFitToWidth={false}
+          fitScale={1}
+          onToggleFitOrZoom={() => {}}
+          isSearchOpen={false}
+          onToggleSearch={() => {}}
+          isFullscreen={false}
+          onToggleFullscreen={() => {}}
+          autoHideControls={false}
+          onToggleAutoHide={() => {}}
+          isDistractionFree={false}
+          onToggleDistractionFree={() => {}}
+          onSharePdf={() => {}}
+        />
+      );
+      expect(normalToolbarHtml).toContain('aria-label="Share PDF"');
+
+      const fullscreenControlsHtml = renderToString(
+        <ViewerFullscreenControls
+          controlsVisible
+          onPointerEnter={() => {}}
+          onPointerLeave={() => {}}
+          onFocus={() => {}}
+          onBlur={() => {}}
+          onExitFullscreen={() => {}}
+          isSearchOpen={false}
+          onToggleSearch={() => {}}
+          showThumbnails={false}
+          mobileThumbnailsOpen={false}
+          setShowThumbnails={() => {}}
+          setMobileThumbnailsOpen={() => {}}
+          currentPage={500}
+          numPages={500}
+          onJumpToPage={() => {}}
+          isEditingPage={false}
+          setIsEditingPage={() => {}}
+          pageInputRef={{ current: null }}
+          pageInputValue="500"
+          setPageInputValue={() => {}}
+          onPageJumpSubmit={() => {}}
+          onStartPageEdit={() => {}}
+          zoom={100}
+          onZoomIn={() => {}}
+          onZoomOut={() => {}}
+          isFitToWidth
+          fitScale={0.85}
+          onToggleFitOrZoom={() => {}}
+        />
+      );
+      expect(fullscreenControlsHtml).not.toContain('Share PDF');
+      expect(fullscreenControlsHtml).toContain('Exit full screen (Esc or F)');
+      expect(fullscreenControlsHtml).toContain('Find text in document (Ctrl+F)');
+      expect(fullscreenControlsHtml).toContain('Toggle thumbnails');
+      expect(fullscreenControlsHtml).toContain('500 / 500');
+      expect(fullscreenControlsHtml).toContain('Fit (85%)');
+    });
+
+    it('adapts --vtb-page-digits CSS property for large page counts in normal and fullscreen navigation', () => {
+      for (const [numPages, expectedDigits] of [
+        [9, 2],
+        [40, 2],
+        [100, 3],
+        [500, 3],
+        [1000, 4],
+      ] as const) {
+        const navHtml = renderToString(
+          <ViewerPageNavigation
+            currentPage={numPages}
+            numPages={numPages}
+            onJumpToPage={() => {}}
+            isEditingPage
+            setIsEditingPage={() => {}}
+            pageInputRef={{ current: null }}
+            pageInputValue={String(numPages)}
+            setPageInputValue={() => {}}
+            onPageJumpSubmit={() => {}}
+            onStartPageEdit={() => {}}
+          />
+        );
+        expect(navHtml).toContain(`--vtb-page-digits:${expectedDigits}`);
+        expect(navHtml.replace(/<!-- -->/g, '')).toContain(`/ ${numPages}`);
+
+        const fsHtml = renderToString(
+          <ViewerFullscreenControls
+            controlsVisible
+            onPointerEnter={() => {}}
+            onPointerLeave={() => {}}
+            onFocus={() => {}}
+            onBlur={() => {}}
+            onExitFullscreen={() => {}}
+            isSearchOpen={false}
+            onToggleSearch={() => {}}
+            showThumbnails={false}
+            mobileThumbnailsOpen={false}
+            setShowThumbnails={() => {}}
+            setMobileThumbnailsOpen={() => {}}
+            currentPage={numPages}
+            numPages={numPages}
+            onJumpToPage={() => {}}
+            isEditingPage
+            setIsEditingPage={() => {}}
+            pageInputRef={{ current: null }}
+            pageInputValue={String(numPages)}
+            setPageInputValue={() => {}}
+            onPageJumpSubmit={() => {}}
+            onStartPageEdit={() => {}}
+            zoom={100}
+            onZoomIn={() => {}}
+            onZoomOut={() => {}}
+            isFitToWidth={false}
+            fitScale={1}
+            onToggleFitOrZoom={() => {}}
+          />
+        );
+        expect(fsHtml).toContain(`--vtb-page-digits:${expectedDigits}`);
+      }
     });
   });
 

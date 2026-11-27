@@ -1,11 +1,55 @@
 package org.intabtools.intabpdf.scanner.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.intabtools.intabpdf.scanner.data.ScannerThemeMode
+
+/**
+ * Holds the active scanner session's explicit light/dark theme sourced from the React UI.
+ * Never defaults to or follows Android's system dark mode independently.
+ */
+object ScannerThemeController {
+    private var sessionActive = false
+    private val _liveTheme = MutableStateFlow<ScannerThemeMode?>(null)
+    val liveTheme: StateFlow<ScannerThemeMode?> = _liveTheme.asStateFlow()
+
+    @Synchronized
+    fun beginSession(theme: ScannerThemeMode) {
+        sessionActive = true
+        _liveTheme.value = theme
+    }
+
+    @Synchronized
+    fun attachActivity(intentTheme: ScannerThemeMode, isRestoringState: Boolean) {
+        if (!sessionActive) {
+            sessionActive = true
+            _liveTheme.value = intentTheme
+            return
+        }
+        if (!isRestoringState || _liveTheme.value == null) {
+            _liveTheme.value = intentTheme
+        }
+    }
+
+    @Synchronized
+    fun updateActiveTheme(theme: ScannerThemeMode): Boolean {
+        if (!sessionActive) return false
+        _liveTheme.value = theme
+        return true
+    }
+
+    @Synchronized
+    fun clearSession() {
+        sessionActive = false
+        _liveTheme.value = null
+    }
+}
 
 object InTabColors {
     val BrandIndigo = Color(0xFF0B2EA8)
@@ -62,7 +106,7 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun InTabScannerTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(

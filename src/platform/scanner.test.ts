@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const pluginMocks = vi.hoisted(() => ({
   isAvailable: vi.fn(),
   startScan: vi.fn(),
+  setTheme: vi.fn(),
   cleanupOutput: vi.fn(),
 }));
 
@@ -21,7 +22,13 @@ vi.mock('./index', () => ({
   getPlatformType: () => mockPlatformType,
 }));
 
-import { cleanupScannerOutput, isDocumentScannerAvailable, scanDocumentToOpenedFile } from './scanner';
+import {
+  cleanupScannerOutput,
+  getActiveReactTheme,
+  isDocumentScannerAvailable,
+  scanDocumentToOpenedFile,
+  syncDocumentScannerTheme,
+} from './scanner';
 
 describe('DocumentScanner Capacitor bridge', () => {
   beforeEach(() => {
@@ -174,5 +181,88 @@ describe('DocumentScanner Capacitor bridge', () => {
     expect(pluginMocks.cleanupOutput).toHaveBeenCalledWith({
       pdfFileUrl: 'file:///cache/scanner_outputs/not_a_pdf.pdf',
     });
+  });
+
+  it('resolves React explicit dataset theme over system prefers-color-scheme and syncs live changes only while scan is active', async () => {
+    mockIsNative = true;
+    mockPlatformType = 'android';
+    pluginMocks.setTheme.mockResolvedValue({ updated: true });
+
+    let observedAttrs: Record<string, string> = { 'data-theme': 'light' };
+    const observerCallbacks: Array<() => void> = [];
+    const disconnectSpy = vi.fn();
+
+    class FakeMutationObserver {
+      private cb: () => void;
+      constructor(cb: () => void) {
+        this.cb = cb;
+        observerCallbacks.push(cb);
+      }
+      observe() {}
+      disconnect() {
+        const idx = observerCallbacks.indexOf(this.cb);
+        if (idx >= 0) observerCallbacks.splice(idx, 1);
+        disconnectSpy();
+      }
+    }
+
+    vi.stubGlobal('MutationObserver', FakeMutationObserver);
+    vi.stubGlobal('window', {
+      matchMedia: () => ({ matches: true }),
+    });
+    vi.stubGlobal('document', {
+      documentElement: {
+        dataset: {
+          get theme() {
+            return observedAttrs['data-theme'];
+          },
+        },
+      },
+    });
+
+    // React says light even though matchMedia dark is true
+    expect(getActiveReactTheme()).toBe('light');
+
+    let resolveScan!: (val: { status: 'cancelled' }) => void;
+    pluginMocks.startScan.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveScan = resolve;
+        }),
+    );
+
+    const scanPromise = scanDocumentToOpenedFile({ autoCaptureDefault: true });
+    expect(pluginMocks.startScan).toHaveBeenCalledWith(
+      expect.objectContaining({ autoCaptureDefault: true, theme: 'light' }),
+    );
+
+    // Live theme switch from light -> dark while scanner is active
+    observedAttrs = { 'data-theme': 'dark' };
+    observerCallbacks.forEach((cb) => cb());
+    expect(pluginMocks.setTheme).toHaveBeenCalledWith({ theme: 'dark' });
+
+    // Live theme switch back dark -> light while scanner is active
+    observedAttrs = { 'data-theme': 'light' };
+    observerCallbacks.forEach((cb) => cb());
+    expect(pluginMocks.setTheme).toHaveBeenCalledWith({ theme: 'light' });
+    expect(pluginMocks.setTheme).toHaveBeenCalledTimes(2);
+
+    // Complete scan -> observer disconnects and later toggles do not trigger setTheme
+    resolveScan({ status: 'cancelled' });
+    await expect(scanPromise).resolves.toEqual({ status: 'cancelled' });
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+
+    // Next launch passes updated React theme ('dark')
+    observedAttrs = { 'data-theme': 'dark' };
+    pluginMocks.startScan.mockResolvedValueOnce({ status: 'cancelled' });
+    await expect(scanDocumentToOpenedFile()).resolves.toEqual({ status: 'cancelled' });
+    expect(pluginMocks.startScan).toHaveBeenLastCalledWith(
+      expect.objectContaining({ theme: 'dark' }),
+    );
+
+    // Non-Android sync is a clean no-op
+    mockPlatformType = 'web';
+    await syncDocumentScannerTheme('dark');
+    expect(pluginMocks.setTheme).toHaveBeenCalledTimes(2);
   });
 });

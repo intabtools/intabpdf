@@ -6,12 +6,14 @@ import type { OpenedFile } from './types';
 export type ScanFilter = 'auto' | 'original' | 'color' | 'grayscale' | 'bw';
 export type ScanQuality = 'low' | 'balanced' | 'high';
 export type ScanPostExportAction = 'save' | 'share';
+export type ScannerTheme = 'light' | 'dark';
 
 export interface StartScanOptions {
   defaultFilter?: ScanFilter;
   quality?: ScanQuality;
   autoCaptureDefault?: boolean;
   suggestedFileName?: string;
+  theme?: ScannerTheme;
 }
 
 export interface ScannerAvailability {
@@ -32,6 +34,7 @@ export interface ScanResult {
 export interface DocumentScannerPlugin {
   isAvailable(): Promise<ScannerAvailability>;
   startScan(options?: StartScanOptions): Promise<ScanResult>;
+  setTheme(options: { theme: ScannerTheme }): Promise<{ updated?: boolean; theme?: ScannerTheme }>;
   cleanupOutput(options: { pdfFileUrl: string }): Promise<{ deleted?: boolean }>;
 }
 
@@ -39,6 +42,42 @@ const DocumentScanner = registerPlugin<DocumentScannerPlugin>('DocumentScanner')
 
 function isAndroidRuntime(): boolean {
   return getPlatformType() === 'android' && Capacitor.isNativePlatform();
+}
+
+/**
+ * Resolves the React application's current explicit light/dark theme from its single source of truth
+ * (`document.documentElement.dataset.theme` / `localStorage['intab.theme']`).
+ */
+export function getActiveReactTheme(): ScannerTheme {
+  if (typeof document !== 'undefined') {
+    const attr = document.documentElement?.dataset?.theme;
+    if (attr === 'dark') return 'dark';
+    if (attr === 'light') return 'light';
+  }
+  try {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('intab.theme') : null;
+    if (saved === 'dark') return 'dark';
+    if (saved === 'light') return 'light';
+  } catch {
+    // Ignore storage access errors
+  }
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  ) {
+    return 'dark';
+  }
+  return 'light';
+}
+
+export async function syncDocumentScannerTheme(theme: ScannerTheme = getActiveReactTheme()): Promise<void> {
+  if (!isAndroidRuntime()) return;
+  try {
+    await DocumentScanner.setTheme({ theme });
+  } catch {
+    // Best-effort live theme sync while the native scanner Activity is active
+  }
 }
 
 export async function isDocumentScannerAvailable(): Promise<ScannerAvailability> {
@@ -83,7 +122,39 @@ export async function scanDocumentToOpenedFile(
     throw new Error('Document scanner is only available on Android.');
   }
 
-  const result = await DocumentScanner.startScan(options);
+  const initialTheme: ScannerTheme = options?.theme ?? getActiveReactTheme();
+  const resolvedOptions: StartScanOptions = {
+    ...options,
+    theme: initialTheme,
+  };
+
+  let lastSentTheme: ScannerTheme = initialTheme;
+  let themeObserver: MutationObserver | null = null;
+  if (
+    typeof document !== 'undefined' &&
+    document.documentElement &&
+    typeof MutationObserver === 'function'
+  ) {
+    themeObserver = new MutationObserver(() => {
+      const nextTheme = getActiveReactTheme();
+      if (nextTheme !== lastSentTheme) {
+        lastSentTheme = nextTheme;
+        void syncDocumentScannerTheme(nextTheme);
+      }
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+  }
+
+  let result: ScanResult;
+  try {
+    result = await DocumentScanner.startScan(resolvedOptions);
+  } finally {
+    themeObserver?.disconnect();
+  }
+
   if (result.status === 'cancelled') {
     return { status: 'cancelled' };
   }

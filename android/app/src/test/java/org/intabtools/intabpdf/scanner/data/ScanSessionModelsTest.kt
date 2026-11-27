@@ -1,7 +1,9 @@
 package org.intabtools.intabpdf.scanner.data
 
+import org.intabtools.intabpdf.scanner.ui.theme.ScannerThemeController
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,5 +31,35 @@ class ScanSessionModelsTest {
 
         val disabled = ScannerLaunchOptions(autoCaptureDefault = false)
         assertFalse(disabled.autoCaptureDefault)
+        assertEquals(ScannerThemeMode.LIGHT, defaults.theme)
+    }
+
+    @Test
+    fun `theme wire parsing defaults safely to light and controller clears stale session state`() {
+        assertEquals(ScannerThemeMode.LIGHT, ScannerThemeMode.fromWireValue(null))
+        assertEquals(ScannerThemeMode.LIGHT, ScannerThemeMode.fromWireValue("system"))
+        assertEquals(ScannerThemeMode.LIGHT, ScannerThemeMode.fromWireValue("light"))
+        assertEquals(ScannerThemeMode.DARK, ScannerThemeMode.fromWireValue(" DARK "))
+
+        ScannerThemeController.clearSession()
+        assertFalse(ScannerThemeController.updateActiveTheme(ScannerThemeMode.DARK))
+        assertNull(ScannerThemeController.liveTheme.value)
+
+        ScannerThemeController.beginSession(ScannerThemeMode.LIGHT)
+        assertEquals(ScannerThemeMode.LIGHT, ScannerThemeController.liveTheme.value)
+
+        assertTrue(ScannerThemeController.updateActiveTheme(ScannerThemeMode.DARK))
+        assertEquals(ScannerThemeMode.DARK, ScannerThemeController.liveTheme.value)
+
+        assertTrue(ScannerThemeController.updateActiveTheme(ScannerThemeMode.LIGHT))
+        assertEquals(ScannerThemeMode.LIGHT, ScannerThemeController.liveTheme.value)
+
+        ScannerThemeController.clearSession()
+        assertNull(ScannerThemeController.liveTheme.value)
+        assertFalse(ScannerThemeController.updateActiveTheme(ScannerThemeMode.DARK))
+
+        ScannerThemeController.beginSession(ScannerThemeMode.DARK)
+        assertEquals(ScannerThemeMode.DARK, ScannerThemeController.liveTheme.value)
+        ScannerThemeController.clearSession()
     }
 }

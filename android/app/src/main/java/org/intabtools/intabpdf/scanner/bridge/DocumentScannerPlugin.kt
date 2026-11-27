@@ -19,7 +19,9 @@ import org.intabtools.intabpdf.scanner.data.ScanFilter
 import org.intabtools.intabpdf.scanner.data.ScanQuality
 import org.intabtools.intabpdf.scanner.data.ScannerLaunchOptions
 import org.intabtools.intabpdf.scanner.data.ScannerPaths
+import org.intabtools.intabpdf.scanner.data.ScannerThemeMode
 import org.intabtools.intabpdf.scanner.ui.ScannerActivity
+import org.intabtools.intabpdf.scanner.ui.theme.ScannerThemeController
 import java.io.File
 
 @CapacitorPlugin(
@@ -49,6 +51,7 @@ class DocumentScannerPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         activeCallId = null
+        ScannerThemeController.clearSession()
         super.handleOnDestroy()
     }
 
@@ -87,23 +90,44 @@ class DocumentScannerPlugin : Plugin() {
             quality = ScanQuality.fromWireValue(call.getString("quality")),
             autoCaptureDefault = call.getBoolean("autoCaptureDefault", true) ?: true,
             suggestedFileName = call.getString("suggestedFileName"),
+            theme = ScannerThemeMode.fromWireValue(call.getString("theme")),
         )
 
         val intent = Intent(context, ScannerActivity::class.java).apply {
             options.applyToIntent(this)
         }
+        ScannerThemeController.beginSession(options.theme)
         activeCallId = call.callbackId
         try {
             startActivityForResult(call, intent, "handleScanResult")
         } catch (ex: Throwable) {
             activeCallId = null
+            ScannerThemeController.clearSession()
             call.reject("Failed to launch document scanner: ${ex.localizedMessage ?: "unknown error"}", "LAUNCH_FAILED")
         }
+    }
+
+    @PluginMethod
+    fun setTheme(call: PluginCall) {
+        val rawTheme = call.getString("theme")?.trim()?.lowercase()
+        if (rawTheme != ScannerThemeMode.LIGHT.wireValue && rawTheme != ScannerThemeMode.DARK.wireValue) {
+            call.reject("Expected theme to be 'light' or 'dark'.", "INVALID_THEME")
+            return
+        }
+        val mode = ScannerThemeMode.fromWireValue(rawTheme)
+        val updated = ScannerThemeController.updateActiveTheme(mode)
+        call.resolve(
+            JSObject().apply {
+                put("updated", updated)
+                put("theme", mode.wireValue)
+            },
+        )
     }
 
     @ActivityCallback
     fun handleScanResult(call: PluginCall?, result: ActivityResult) {
         activeCallId = null
+        ScannerThemeController.clearSession()
         if (call == null) return
 
         val data = result.data

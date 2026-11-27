@@ -9,12 +9,16 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.core.view.WindowCompat
 import org.intabtools.intabpdf.scanner.data.ScanFilter
 import org.intabtools.intabpdf.scanner.data.ScannerLaunchOptions
 import org.intabtools.intabpdf.scanner.data.ScannerRoute
+import org.intabtools.intabpdf.scanner.data.ScannerThemeMode
 import org.intabtools.intabpdf.scanner.ui.camera.CameraBindState
 import org.intabtools.intabpdf.scanner.ui.camera.CaptureFeedbackState
+import org.intabtools.intabpdf.scanner.ui.theme.ScannerThemeController
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -96,6 +100,65 @@ class ScannerActivityLifecycleTest {
         }
     }
 
+    @Test
+    fun scannerFollowsExplicitThemeOnOpenLiveUpdatesAndReopen() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.CAMERA,
+        )
+
+        val lightIntent = ScannerLaunchOptions(
+            autoCaptureDefault = false,
+            theme = ScannerThemeMode.LIGHT,
+        ).applyToIntent(Intent(context, ScannerActivity::class.java))
+
+        ActivityScenario.launchActivityForResult<ScannerActivity>(lightIntent).use { lightScenario ->
+            waitUntilCamera(lightScenario) { it.bindState is CameraBindState.Ready }
+            lightScenario.onActivity { activity ->
+                assertEquals(ScannerThemeMode.LIGHT, activity.currentThemeModeForTest())
+                val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                assertTrue("Light scanner mode should use light status bars", insetsController.isAppearanceLightStatusBars)
+            }
+
+            // Live change light -> dark while scanner is active
+            assertTrue(ScannerThemeController.updateActiveTheme(ScannerThemeMode.DARK))
+            val becameDarkBars = waitUntilActivity(lightScenario, timeoutMs = 3_000L) { activity ->
+                val ic = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                activity.currentThemeModeForTest() == ScannerThemeMode.DARK && !ic.isAppearanceLightStatusBars
+            }
+            assertTrue("Dark scanner mode should clear light status bars", becameDarkBars)
+
+            // Live change dark -> light while scanner is active
+            assertTrue(ScannerThemeController.updateActiveTheme(ScannerThemeMode.LIGHT))
+            val becameLightBars = waitUntilActivity(lightScenario, timeoutMs = 3_000L) { activity ->
+                val ic = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                activity.currentThemeModeForTest() == ScannerThemeMode.LIGHT && ic.isAppearanceLightStatusBars
+            }
+            assertTrue("Light scanner mode should restore light status bars", becameLightBars)
+
+            lightScenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            assertEquals(Activity.RESULT_CANCELED, lightScenario.result.resultCode)
+        }
+
+        // Reopen in explicit dark mode without leaking prior light state
+        val darkIntent = ScannerLaunchOptions(
+            autoCaptureDefault = false,
+            theme = ScannerThemeMode.DARK,
+        ).applyToIntent(Intent(context, ScannerActivity::class.java))
+
+        ActivityScenario.launchActivityForResult<ScannerActivity>(darkIntent).use { darkScenario ->
+            waitUntilCamera(darkScenario) { it.bindState is CameraBindState.Ready }
+            darkScenario.onActivity { activity ->
+                assertEquals(ScannerThemeMode.DARK, activity.currentThemeModeForTest())
+                val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                assertFalse("Reopened dark scanner must stay dark", insetsController.isAppearanceLightStatusBars)
+                activity.onBackPressedDispatcher.onBackPressed()
+            }
+            assertEquals(Activity.RESULT_CANCELED, darkScenario.result.resultCode)
+        }
+    }
+
     private fun waitUntilCamera(
         scenario: ActivityScenario<ScannerActivity>,
         timeoutMs: Long = 10_000L,
@@ -124,5 +187,20 @@ class ScannerActivityLifecycleTest {
             Thread.sleep(100L)
         }
         return latest
+    }
+
+    private fun waitUntilActivity(
+        scenario: ActivityScenario<ScannerActivity>,
+        timeoutMs: Long = 3_000L,
+        predicate: (ScannerActivity) -> Boolean,
+    ): Boolean {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            var matched = false
+            scenario.onActivity { matched = predicate(it) }
+            if (matched) return true
+            Thread.sleep(50L)
+        }
+        return false
     }
 }

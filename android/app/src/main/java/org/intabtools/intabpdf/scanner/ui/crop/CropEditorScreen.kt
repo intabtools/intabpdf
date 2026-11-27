@@ -140,7 +140,7 @@ fun CropEditorScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(InTabColors.DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .displayCutoutPadding(),
@@ -155,13 +155,13 @@ fun CropEditorScreen(
         ) {
             Text(
                 text = "Adjust Corners",
-                color = InTabColors.DarkText,
+                color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = "Drag corners to align page",
-                color = InTabColors.DarkTextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -171,13 +171,13 @@ fun CropEditorScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .onSizeChanged { canvasSize = it },
             contentAlignment = Alignment.Center,
         ) {
             val bmp = imageBitmap
             if (bmp == null) {
-                CircularProgressIndicator(color = InTabColors.BrandIndigoSoftText)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else {
                 val imageAspect = bmp.width.toFloat() / bmp.height.coerceAtLeast(1).toFloat()
                 val touchRadiusPx = with(density) { 52.dp.toPx() }
@@ -354,7 +354,7 @@ fun CropEditorScreen(
 
         // Bottom Controls: Utilities (Undo, Fit All, Reset Auto) + Commit (Cancel, Apply)
         Surface(
-            color = InTabColors.DarkSurface,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -482,10 +482,10 @@ private fun CropUtilityChip(
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = InTabColors.DarkSurfaceVariant,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(
             1.dp,
-            if (enabled) InTabColors.DarkBorder else InTabColors.DarkBorder.copy(alpha = 0.4f),
+            if (enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
         ),
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
@@ -497,7 +497,7 @@ private fun CropUtilityChip(
         ) {
             Text(
                 text = label,
-                color = if (enabled) InTabColors.DarkText else InTabColors.DarkTextMuted.copy(alpha = 0.4f),
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
             )

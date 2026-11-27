@@ -1,5 +1,5 @@
 // Floating pill controls for distraction-free and fullscreen reading modes.
-import type { Dispatch, FocusEvent, ReactNode, RefObject, SetStateAction } from 'react';
+import type { CSSProperties, Dispatch, FocusEvent, ReactNode, RefObject, SetStateAction } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,7 +8,6 @@ import {
   Minus,
   Plus,
   Search,
-  Share2,
 } from 'lucide-react';
 
 interface ViewerFullscreenControlsProps {
@@ -20,7 +19,6 @@ interface ViewerFullscreenControlsProps {
   onExitFullscreen: () => void;
   isSearchOpen: boolean;
   onToggleSearch: () => void;
-  onSharePdf?: () => void;
   showThumbnails: boolean;
   mobileThumbnailsOpen: boolean;
   setShowThumbnails: Dispatch<SetStateAction<boolean>>;
@@ -52,7 +50,6 @@ export default function ViewerFullscreenControls({
   onExitFullscreen,
   isSearchOpen,
   onToggleSearch,
-  onSharePdf,
   showThumbnails,
   mobileThumbnailsOpen,
   setShowThumbnails,
@@ -74,6 +71,8 @@ export default function ViewerFullscreenControls({
   fitScale,
   onToggleFitOrZoom,
 }: ViewerFullscreenControlsProps): ReactNode {
+  const pageDigits = Math.max(2, String(numPages).length);
+
   return (
     <>
       {/* Top-Left: Exit Fullscreen */}
@@ -91,7 +90,7 @@ export default function ViewerFullscreenControls({
           aria-label="Exit full screen (Esc or F)"
           title="Exit full screen (Esc or F)"
         >
-          <Minimize2 size={16} strokeWidth={1.8} />
+          <Minimize2 size={15} strokeWidth={1.8} />
           <span className="viewer-pill-label">Exit</span>
         </button>
       </div>
@@ -111,19 +110,8 @@ export default function ViewerFullscreenControls({
           aria-label="Find text in document (Ctrl+F)"
           title="Find text in document (Ctrl+F)"
         >
-          <Search size={16} strokeWidth={1.8} />
+          <Search size={15} strokeWidth={1.8} />
         </button>
-        {onSharePdf && (
-          <button
-            type="button"
-            className="viewer-pill-btn"
-            onClick={onSharePdf}
-            aria-label="Share PDF"
-            title="Share PDF"
-          >
-            <Share2 size={16} strokeWidth={1.8} />
-          </button>
-        )}
         <button
           type="button"
           className={`viewer-pill-btn ${showThumbnails || mobileThumbnailsOpen ? 'active' : ''}`}
@@ -137,7 +125,7 @@ export default function ViewerFullscreenControls({
           aria-label="Toggle thumbnails"
           title="Toggle thumbnails"
         >
-          <LayoutGrid size={16} strokeWidth={1.8} />
+          <LayoutGrid size={15} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -159,7 +147,7 @@ export default function ViewerFullscreenControls({
           aria-label="Previous page"
           title="Previous page"
         >
-          <ChevronLeft size={16} strokeWidth={1.8} />
+          <ChevronLeft size={15} strokeWidth={1.8} />
         </button>
         {isEditingPage ? (
           <form
@@ -177,6 +165,7 @@ export default function ViewerFullscreenControls({
               value={pageInputValue}
               onChange={(e) => setPageInputValue(e.target.value.replace(/[^0-9]/g, ''))}
               className="vtb-page-input"
+              style={{ '--vtb-page-digits': pageDigits } as CSSProperties}
               aria-label={`Jump to page number (1 to ${numPages})`}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -206,7 +195,7 @@ export default function ViewerFullscreenControls({
           aria-label="Next page"
           title="Next page"
         >
-          <ChevronRight size={16} strokeWidth={1.8} />
+          <ChevronRight size={15} strokeWidth={1.8} />
         </button>
       </div>
 
@@ -228,7 +217,7 @@ export default function ViewerFullscreenControls({
           aria-label="Zoom out"
           title="Zoom out"
         >
-          <Minus size={16} strokeWidth={1.8} />
+          <Minus size={15} strokeWidth={1.8} />
         </button>
         <button
           type="button"
@@ -255,7 +244,7 @@ export default function ViewerFullscreenControls({
           aria-label="Zoom in"
           title="Zoom in"
         >
-          <Plus size={16} strokeWidth={1.8} />
+          <Plus size={15} strokeWidth={1.8} />
         </button>
       </div>
     </>
