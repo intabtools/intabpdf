@@ -1,5 +1,5 @@
 // Page navigation controls with previous/next buttons and inline page jumping for the viewer toolbar.
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode, RefObject } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface ViewerPageNavigationProps {
@@ -27,6 +27,8 @@ export default function ViewerPageNavigation({
   onPageJumpSubmit,
   onStartPageEdit,
 }: ViewerPageNavigationProps): ReactNode {
+  const pageDigits = Math.max(2, String(numPages).length);
+
   return (
     <>
       <button
@@ -55,6 +57,7 @@ export default function ViewerPageNavigation({
             value={pageInputValue}
             onChange={(e) => setPageInputValue(e.target.value.replace(/[^0-9]/g, ''))}
             className="vtb-page-input"
+            style={{ '--vtb-page-digits': pageDigits } as CSSProperties}
             aria-label={`Jump to page number (1 to ${numPages})`}
             onKeyDown={(e: ReactKeyboardEvent<HTMLInputElement>) => {
               if (e.key === 'Escape') {

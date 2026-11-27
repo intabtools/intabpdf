@@ -430,7 +430,6 @@ export default function ViewerPage(): ReactNode {
           onExitFullscreen={() => void exitFullscreen()}
           isSearchOpen={isSearchOpen}
           onToggleSearch={handleToggleSearch}
-          onSharePdf={() => void handleSharePdf()}
           showThumbnails={showThumbnails}
           mobileThumbnailsOpen={mobileThumbnailsOpen}
           setShowThumbnails={setShowThumbnails}
