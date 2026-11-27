@@ -135,7 +135,7 @@ fun CameraFoundationScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(InTabColors.DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding(),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -150,7 +150,7 @@ fun CameraFoundationScreen(
         ) {
             Surface(
                 shape = CircleShape,
-                color = InTabColors.DarkSurface.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                 modifier = Modifier
                     .size(48.dp)
                     .clip(CircleShape)
@@ -160,7 +160,7 @@ fun CameraFoundationScreen(
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = "✕",
-                        color = InTabColors.DarkText,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
@@ -169,13 +169,13 @@ fun CameraFoundationScreen(
             Surface(
                 shape = RoundedCornerShape(999.dp),
                 color = if (uiState.autoCaptureEnabled) {
-                    InTabColors.BrandIndigoLight.copy(alpha = 0.28f)
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    InTabColors.DarkSurface
+                    MaterialTheme.colorScheme.surface
                 },
                 border = BorderStroke(
                     width = 1.dp,
-                    color = if (uiState.autoCaptureEnabled) InTabColors.BrandIndigoSoftText else InTabColors.DarkBorder,
+                    color = if (uiState.autoCaptureEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                 ),
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
@@ -185,7 +185,11 @@ fun CameraFoundationScreen(
             ) {
                 Text(
                     text = if (uiState.autoCaptureEnabled) "Auto-Capture: ON" else "Auto-Capture: OFF",
-                    color = InTabColors.DarkText,
+                    color = if (uiState.autoCaptureEnabled) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 )
@@ -195,9 +199,9 @@ fun CameraFoundationScreen(
                 Surface(
                     shape = CircleShape,
                     color = if (uiState.isTorchEnabled) {
-                        InTabColors.BrandIndigoLight
+                        MaterialTheme.colorScheme.primary
                     } else {
-                        InTabColors.DarkSurface.copy(alpha = 0.85f)
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
                     },
                     modifier = Modifier
                         .size(48.dp)
@@ -210,7 +214,11 @@ fun CameraFoundationScreen(
                     Box(contentAlignment = Alignment.Center) {
                         Text(
                             text = "Flash",
-                            color = Color.White.copy(alpha = if (uiState.isTorchEnabled) 1f else 0.72f),
+                            color = if (uiState.isTorchEnabled) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.78f)
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -288,20 +296,20 @@ fun CameraFoundationScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.85f))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
                                 .padding(24.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "Camera preview unavailable",
-                                    color = InTabColors.DarkText,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     style = MaterialTheme.typography.titleMedium,
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = state.reason,
-                                    color = InTabColors.DarkTextMuted,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     style = MaterialTheme.typography.bodySmall,
                                 )
@@ -328,11 +336,12 @@ fun CameraFoundationScreen(
                 }
 
                 if (feedbackBannerText != null) {
+                    val isFailure = uiState.captureFeedback is CaptureFeedbackState.Failure
                     Surface(
-                        color = if (uiState.captureFeedback is CaptureFeedbackState.Failure) {
-                            InTabColors.Danger.copy(alpha = 0.92f)
+                        color = if (isFailure) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.94f)
                         } else {
-                            InTabColors.DarkSurface.copy(alpha = 0.92f)
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                         },
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
@@ -341,7 +350,7 @@ fun CameraFoundationScreen(
                     ) {
                         Text(
                             text = feedbackBannerText,
-                            color = Color.White,
+                            color = if (isFailure) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -353,7 +362,7 @@ fun CameraFoundationScreen(
 
         // Bottom control bar with Auto-Capture countdown ring & page counter
         Surface(
-            color = InTabColors.DarkSurface,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
@@ -364,7 +373,7 @@ fun CameraFoundationScreen(
             ) {
                 Text(
                     text = if (isRetakeMode) "Retaking page • Capture replacement" else hintMessage(uiState),
-                    color = if (isRetakeMode) InTabColors.BrandIndigoSoftText else InTabColors.DarkTextMuted,
+                    color = if (isRetakeMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                 )
@@ -377,8 +386,8 @@ fun CameraFoundationScreen(
                     Box(modifier = Modifier.size(width = 96.dp, height = 56.dp), contentAlignment = Alignment.CenterStart) {
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = InTabColors.DarkSurfaceVariant,
-                            border = BorderStroke(1.dp, InTabColors.DarkBorder),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .clickable(enabled = !isImportingGallery, onClick = onOpenGallery)
@@ -386,7 +395,7 @@ fun CameraFoundationScreen(
                         ) {
                             Text(
                                 text = if (isImportingGallery) "Loading…" else "Gallery",
-                                color = InTabColors.DarkText,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             )
@@ -407,7 +416,7 @@ fun CameraFoundationScreen(
                         if (effectiveCount > 0 && !isRetakeMode) {
                             Surface(
                                 shape = RoundedCornerShape(999.dp),
-                                color = InTabColors.BrandIndigoLight,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(999.dp))
                                     .clickable(onClick = onOpenReview)
@@ -415,7 +424,7 @@ fun CameraFoundationScreen(
                             ) {
                                 Text(
                                     text = "Review ($effectiveCount)",
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -448,7 +457,7 @@ private fun ShutterButtonWithProgress(
         if (animatedSweep > 1f) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 drawArc(
-                    color = InTabColors.BrandIndigoSoftText,
+                    color = InTabColors.BrandIndigoLight,
                     startAngle = -90f,
                     sweepAngle = animatedSweep,
                     useCenter = false,
@@ -460,11 +469,11 @@ private fun ShutterButtonWithProgress(
             modifier = Modifier
                 .size(68.dp)
                 .clip(CircleShape)
-                .border(3.5.dp, Color.White, CircleShape)
+                .border(3.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                 .padding(6.dp)
                 .clip(CircleShape)
                 .background(
-                    if (enabled) InTabColors.BrandIndigoLight else InTabColors.DarkSurfaceVariant
+                    if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                 )
                 .clickable(enabled = enabled, onClick = onCapture)
                 .semantics { contentDescription = "Capture page" },
@@ -585,7 +594,7 @@ fun CameraPermissionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(InTabColors.DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(24.dp),
@@ -594,14 +603,14 @@ fun CameraPermissionScreen(
     ) {
         Text(
             text = "Camera access required",
-            color = InTabColors.DarkText,
+            color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "InTab PDF scans documents locally on your device. Grant camera permission to preview and capture pages.",
-            color = InTabColors.DarkTextMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )

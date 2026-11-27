@@ -79,7 +79,6 @@ import org.intabtools.intabpdf.scanner.data.ReversiblePageRecord
 import org.intabtools.intabpdf.scanner.data.ScanFilter
 import org.intabtools.intabpdf.scanner.data.ScannerSessionUiState
 import org.intabtools.intabpdf.scanner.imaging.ScanBitmapLoader
-import org.intabtools.intabpdf.scanner.ui.theme.InTabColors
 
 data class SaveConflictPrompt(
     val destUriString: String,
@@ -135,7 +134,7 @@ fun ReviewScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(InTabColors.DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
@@ -155,7 +154,7 @@ fun ReviewScreen(
                 ) {
                     Text(
                         text = "Close",
-                        color = InTabColors.DarkTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         softWrap = false,
                     )
@@ -167,7 +166,7 @@ fun ReviewScreen(
                     } else {
                         "Page ${uiState.selectedPageIndex + 1} of ${uiState.pages.size}"
                     },
-                    color = InTabColors.DarkText,
+                    color = MaterialTheme.colorScheme.onBackground,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -186,7 +185,7 @@ fun ReviewScreen(
                     if (uiState.pages.isNotEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = InTabColors.BrandIndigoLight,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .semantics(mergeDescendants = true) {
@@ -199,7 +198,7 @@ fun ReviewScreen(
                         ) {
                             Text(
                                 text = "Save PDF",
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onPrimary,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -224,7 +223,7 @@ fun ReviewScreen(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 MoreVertIcon(
-                                    tint = InTabColors.DarkText,
+                                    tint = MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
@@ -232,13 +231,13 @@ fun ReviewScreen(
                             DropdownMenu(
                                 expanded = showOverflowMenu,
                                 onDismissRequest = { showOverflowMenu = false },
-                                modifier = Modifier.background(InTabColors.DarkSurface),
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                             ) {
                                 DropdownMenuItem(
                                     text = {
                                         Text(
                                             text = "Share",
-                                            color = InTabColors.DarkText,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             style = MaterialTheme.typography.bodyMedium,
                                         )
                                     },
@@ -267,11 +266,11 @@ fun ReviewScreen(
                 ) {
                     if (uiState.isImportingGallery) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = InTabColors.BrandIndigoSoftText)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
                                 text = "Importing gallery image(s)…",
-                                color = InTabColors.DarkText,
+                                color = MaterialTheme.colorScheme.onBackground,
                                 style = MaterialTheme.typography.titleSmall,
                                 textAlign = TextAlign.Center,
                             )
@@ -280,14 +279,14 @@ fun ReviewScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "No pages in this scan yet",
-                                color = InTabColors.DarkText,
+                                color = MaterialTheme.colorScheme.onBackground,
                                 style = MaterialTheme.typography.titleMedium,
                                 textAlign = TextAlign.Center,
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Capture a document page with the camera or import photos from your gallery.",
-                                color = InTabColors.DarkTextMuted,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                                 textAlign = TextAlign.Center,
                             )
@@ -378,7 +377,7 @@ fun ReviewScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(Color.Black)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .testTag("review_main_preview"),
             ) {
                 HorizontalPager(
@@ -398,7 +397,7 @@ fun ReviewScreen(
                 if (uiState.isImportingGallery) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = InTabColors.DarkSurface.copy(alpha = 0.92f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = 12.dp),
@@ -409,7 +408,7 @@ fun ReviewScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Text("Importing gallery image(s)…", color = InTabColors.DarkText, style = MaterialTheme.typography.bodySmall)
+                            Text("Importing gallery image(s)…", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -418,8 +417,8 @@ fun ReviewScreen(
                     val isSaveError = saveErrorMessage != null
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = InTabColors.DarkSurface,
-                        border = BorderStroke(1.dp, InTabColors.DangerDark),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
@@ -428,14 +427,14 @@ fun ReviewScreen(
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = if (isSaveError) "Could not save PDF" else "Could not create PDF",
-                                color = InTabColors.DangerDark,
+                                color = MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = saveErrorMessage ?: uiState.exportErrorMessage.orEmpty(),
-                                color = InTabColors.DarkText,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -467,8 +466,8 @@ fun ReviewScreen(
                 if (statusMessage != null) {
                     Surface(
                         shape = RoundedCornerShape(999.dp),
-                        color = InTabColors.DarkSurface.copy(alpha = 0.92f),
-                        border = BorderStroke(1.dp, InTabColors.DarkBorder),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = 16.dp, vertical = 10.dp)
@@ -476,7 +475,7 @@ fun ReviewScreen(
                     ) {
                         Text(
                             text = statusMessage,
-                            color = InTabColors.DarkText,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -497,7 +496,7 @@ fun ReviewScreen(
                     onSelectFilter = onSelectFilter,
                     modifier = Modifier.testTag("review_filter_selector"),
                 )
-                HorizontalDivider(color = InTabColors.DarkBorder, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
             }
 
             // 3. Compact Page-Thumbnail Strip + Add Page Tile
@@ -516,11 +515,11 @@ fun ReviewScreen(
 
             // 4. Compact Editing Toolbar (icon-above-label, borderless)
             if (activePage != null) {
-                HorizontalDivider(color = InTabColors.DarkBorder, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(InTabColors.DarkSurface)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                         .testTag("review_edit_toolbar"),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -529,28 +528,28 @@ fun ReviewScreen(
                     ReviewToolbarAction(
                         label = "Crop",
                         iconKind = ReviewToolIconKind.CROP,
-                        tint = InTabColors.DarkText,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         onClick = { onCropPage(activePage.pageId) },
                         modifier = Modifier.weight(1f),
                     )
                     ReviewToolbarAction(
                         label = "Rotate",
                         iconKind = ReviewToolIconKind.ROTATE,
-                        tint = InTabColors.DarkText,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         onClick = onRotateSelected,
                         modifier = Modifier.weight(1f),
                     )
                     ReviewToolbarAction(
                         label = "Retake",
                         iconKind = ReviewToolIconKind.RETAKE,
-                        tint = InTabColors.DarkText,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         onClick = { onRetakePage(activePage.pageId) },
                         modifier = Modifier.weight(1f),
                     )
                     ReviewToolbarAction(
                         label = "Delete",
                         iconKind = ReviewToolIconKind.DELETE,
-                        tint = InTabColors.DangerDark,
+                        tint = MaterialTheme.colorScheme.error,
                         onClick = { pendingDeletePageId = activePage.pageId },
                         modifier = Modifier.weight(1f),
                     )
@@ -568,8 +567,8 @@ fun ReviewScreen(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = InTabColors.DarkSurface,
-                    border = BorderStroke(1.dp, InTabColors.DarkBorder),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 32.dp),
@@ -580,7 +579,7 @@ fun ReviewScreen(
                     ) {
                         Text(
                             text = "Creating PDF…",
-                            color = InTabColors.DarkText,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -589,15 +588,15 @@ fun ReviewScreen(
                         val done = uiState.exportProgressCompleted.coerceIn(0, total)
                         Text(
                             text = "Processing page $done of $total",
-                            color = InTabColors.DarkTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                         LinearProgressIndicator(
                             progress = { done.toFloat() / total.toFloat() },
                             modifier = Modifier.fillMaxWidth(),
-                            color = InTabColors.BrandIndigoLight,
-                            trackColor = InTabColors.DarkSurfaceVariant,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                         OutlinedButton(onClick = onCancelExport) {
@@ -617,8 +616,8 @@ fun ReviewScreen(
             ) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = InTabColors.DarkSurface,
-                    border = BorderStroke(1.dp, InTabColors.DarkBorder),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 32.dp),
@@ -631,11 +630,11 @@ fun ReviewScreen(
                         CircularProgressIndicator(
                             modifier = Modifier.size(22.dp),
                             strokeWidth = 2.5.dp,
-                            color = InTabColors.BrandIndigoSoftText,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = "Saving PDF…",
-                            color = InTabColors.DarkText,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -647,9 +646,9 @@ fun ReviewScreen(
         if (conflictPrompt != null) {
             AlertDialog(
                 onDismissRequest = onConflictCancel,
-                containerColor = InTabColors.DarkSurface,
-                titleContentColor = InTabColors.DarkText,
-                textContentColor = InTabColors.DarkTextMuted,
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 title = {
                     Text(
                         text = "File already exists",
@@ -662,13 +661,13 @@ fun ReviewScreen(
                         Text(
                             text = "A file named \"${conflictPrompt.existingFileName}\" already exists at the selected location.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = InTabColors.DarkText,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (conflictPrompt.replaceDisabledReason != null) {
                             Text(
                                 text = conflictPrompt.replaceDisabledReason,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = InTabColors.DangerDark,
+                                color = MaterialTheme.colorScheme.error,
                             )
                         }
                     }
@@ -693,14 +692,14 @@ fun ReviewScreen(
                                     onClick = onConflictReplace,
                                     modifier = Modifier.weight(1f),
                                 ) {
-                                    Text("Replace", color = InTabColors.DangerDark)
+                                    Text("Replace", color = MaterialTheme.colorScheme.error)
                                 }
                             }
                             TextButton(
                                 onClick = onConflictCancel,
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Text("Cancel", color = InTabColors.DarkTextMuted)
+                                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -711,9 +710,9 @@ fun ReviewScreen(
         if (showAddPageChooser) {
             AlertDialog(
                 onDismissRequest = { showAddPageChooser = false },
-                containerColor = InTabColors.DarkSurface,
-                titleContentColor = InTabColors.DarkText,
-                textContentColor = InTabColors.DarkTextMuted,
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 title = {
                     Text(
                         text = "Add page",
@@ -726,7 +725,7 @@ fun ReviewScreen(
                         Text(
                             text = "Choose how to add the next page to this scan.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = InTabColors.DarkTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
                             onClick = {
@@ -756,7 +755,7 @@ fun ReviewScreen(
                 confirmButton = {},
                 dismissButton = {
                     TextButton(onClick = { showAddPageChooser = false }) {
-                        Text("Cancel", color = InTabColors.DarkTextMuted)
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
             )
@@ -769,9 +768,9 @@ fun ReviewScreen(
                 ?.plus(1)
             AlertDialog(
                 onDismissRequest = { pendingDeletePageId = null },
-                containerColor = InTabColors.DarkSurface,
-                titleContentColor = InTabColors.DarkText,
-                textContentColor = InTabColors.DarkTextMuted,
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 title = {
                     Text(
                         text = if (pageNumber != null) "Delete page $pageNumber?" else "Delete page?",
@@ -783,7 +782,7 @@ fun ReviewScreen(
                     Text(
                         text = "This removes the page from the current scan.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = InTabColors.DarkTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 },
                 confirmButton = {
@@ -794,12 +793,12 @@ fun ReviewScreen(
                         },
                         modifier = Modifier.testTag("review_confirm_delete"),
                     ) {
-                        Text("Delete", color = InTabColors.DangerDark, fontWeight = FontWeight.SemiBold)
+                        Text("Delete", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { pendingDeletePageId = null }) {
-                        Text("Cancel", color = InTabColors.DarkTextMuted)
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
             )
@@ -859,13 +858,13 @@ private fun PagePreviewCanvas(
                     },
             )
         } else {
-            CircularProgressIndicator(color = InTabColors.BrandIndigoSoftText)
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
 
         if (isRendering) {
             Surface(
                 shape = RoundedCornerShape(999.dp),
-                color = InTabColors.DarkSurface.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 10.dp),
@@ -878,11 +877,11 @@ private fun PagePreviewCanvas(
                     CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
                         strokeWidth = 2.dp,
-                        color = InTabColors.BrandIndigoSoftText,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         text = "Enhancing page…",
-                        color = InTabColors.DarkText,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -933,7 +932,7 @@ private fun PageThumbnailStrip(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(InTabColors.DarkSurface)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -968,8 +967,8 @@ private fun PageThumbnailStrip(
             item(key = "add_page_tile") {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = InTabColors.DarkSurfaceVariant,
-                    border = BorderStroke(1.dp, InTabColors.DarkBorder),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
                         .size(width = 52.dp, height = 64.dp)
                         .clip(RoundedCornerShape(8.dp))
@@ -985,13 +984,13 @@ private fun PageThumbnailStrip(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         PlusIcon(
-                            tint = if (canAddPage) InTabColors.BrandIndigoSoftText else InTabColors.DarkTextMuted.copy(alpha = 0.4f),
+                            tint = if (canAddPage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Add",
-                            color = if (canAddPage) InTabColors.DarkTextMuted else InTabColors.DarkTextMuted.copy(alpha = 0.4f),
+                            color = if (canAddPage) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             fontSize = 10.sp,
                             lineHeight = 11.sp,
                             fontWeight = FontWeight.Medium,
@@ -1059,7 +1058,7 @@ private fun PageThumbnailTile(
         modifier = Modifier
             .size(width = 52.dp, height = 64.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(InTabColors.DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .testTag("review_page_thumb_$pageIndex")
             .selectable(selected = isSelected, onClick = onSelect)
             .semantics {
@@ -1069,10 +1068,10 @@ private fun PageThumbnailTile(
     ) {
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = InTabColors.DarkBackground,
+            color = MaterialTheme.colorScheme.background,
             border = BorderStroke(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) InTabColors.BrandIndigoSoftText else InTabColors.DarkBorder,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
             ),
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -1094,7 +1093,7 @@ private fun PageThumbnailTile(
                 } else {
                     Text(
                         text = "${pageIndex + 1}",
-                        color = InTabColors.DarkTextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -1102,7 +1101,7 @@ private fun PageThumbnailTile(
                 Surface(
                     shape = RoundedCornerShape(4.dp),
                     color = if (isSelected) {
-                        InTabColors.BrandIndigoLight
+                        MaterialTheme.colorScheme.primary
                     } else {
                         Color.Black.copy(alpha = 0.68f)
                     },
@@ -1112,7 +1111,7 @@ private fun PageThumbnailTile(
                 ) {
                     Text(
                         text = "${pageIndex + 1}",
-                        color = Color.White,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
@@ -1133,7 +1132,7 @@ private fun ReorderPageButton(
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = InTabColors.DarkSurfaceVariant,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .semantics(mergeDescendants = true) {
@@ -1148,12 +1147,12 @@ private fun ReorderPageButton(
         ) {
             Text(
                 text = symbol,
-                color = if (enabled) InTabColors.DarkText else InTabColors.DarkTextMuted.copy(alpha = 0.35f),
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                 style = MaterialTheme.typography.labelMedium,
             )
             Text(
                 text = "Move",
-                color = if (enabled) InTabColors.DarkTextMuted else InTabColors.DarkTextMuted.copy(alpha = 0.35f),
+                color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                 fontSize = 9.sp,
                 lineHeight = 10.sp,
             )

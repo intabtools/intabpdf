@@ -30,7 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.intabtools.intabpdf.scanner.data.ScanFilter
 import org.intabtools.intabpdf.scanner.imaging.ScanBitmapLoader
-import org.intabtools.intabpdf.scanner.ui.theme.InTabColors
 import java.io.File
 
 @Suppress("UNUSED_PARAMETER")
@@ -50,7 +49,7 @@ fun FilterStripBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(InTabColors.DarkSurface)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 4.dp),
     ) {
         if (pageCount > 1) {
@@ -63,14 +62,14 @@ fun FilterStripBar(
             ) {
                 Text(
                     text = "Filter",
-                    color = InTabColors.DarkTextMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                 )
 
                 Text(
                     text = if (applyToAll) "Apply to: All pages" else "Apply to: This page",
-                    color = if (applyToAll) InTabColors.BrandIndigoSoftText else InTabColors.DarkTextMuted,
+                    color = if (applyToAll) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = if (applyToAll) FontWeight.SemiBold else FontWeight.Medium,
                     modifier = Modifier
@@ -112,7 +111,7 @@ fun FilterStripBar(
                 ) {
                     Text(
                         text = filterDisplayName(mode),
-                        color = if (isSelected) InTabColors.BrandIndigoSoftText else InTabColors.DarkTextMuted,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1,
@@ -123,7 +122,7 @@ fun FilterStripBar(
                             .width(20.dp)
                             .height(2.dp)
                             .background(
-                                color = if (isSelected) InTabColors.BrandIndigoSoftText else Color.Transparent,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                 shape = RoundedCornerShape(1.dp),
                             ),
                     )

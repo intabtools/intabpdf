@@ -16,6 +16,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
@@ -26,9 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,6 +45,7 @@ import org.intabtools.intabpdf.scanner.data.ScanSessionController
 import org.intabtools.intabpdf.scanner.data.ScannerLaunchOptions
 import org.intabtools.intabpdf.scanner.data.ScannerPaths
 import org.intabtools.intabpdf.scanner.data.ScannerRoute
+import org.intabtools.intabpdf.scanner.data.ScannerThemeMode
 import org.intabtools.intabpdf.scanner.data.StillCaptureStore
 import org.intabtools.intabpdf.scanner.imaging.ScanBitmapLoader
 import org.intabtools.intabpdf.scanner.pdf.PdfExportResult
@@ -52,7 +56,9 @@ import org.intabtools.intabpdf.scanner.ui.camera.CameraPreviewController
 import org.intabtools.intabpdf.scanner.ui.crop.CropEditorScreen
 import org.intabtools.intabpdf.scanner.ui.review.ReviewScreen
 import org.intabtools.intabpdf.scanner.ui.review.SaveConflictPrompt
+import org.intabtools.intabpdf.scanner.ui.theme.InTabColors
 import org.intabtools.intabpdf.scanner.ui.theme.InTabScannerTheme
+import org.intabtools.intabpdf.scanner.ui.theme.ScannerThemeController
 import org.intabtools.intabpdf.scanner.vision.OpenCvDocumentDetector
 import java.io.File
 import java.util.UUID
@@ -114,9 +120,16 @@ class ScannerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
 
         val options = ScannerLaunchOptions.fromIntent(intent)
+        val initialTheme = savedInstanceState?.getString(KEY_THEME)
+            ?.let(ScannerThemeMode::fromWireValue)
+            ?: options.theme
+        ScannerThemeController.attachActivity(
+            intentTheme = initialTheme,
+            isRestoringState = savedInstanceState != null,
+        )
+        applyScannerSystemBars(ScannerThemeController.liveTheme.value ?: initialTheme)
         sessionId = savedInstanceState?.getString(KEY_SESSION_ID) ?: UUID.randomUUID().toString()
         val autoCaptureInitial = savedInstanceState?.getBoolean(KEY_AUTO_CAPTURE, options.autoCaptureDefault)
             ?: options.autoCaptureDefault
@@ -182,7 +195,13 @@ class ScannerActivity : ComponentActivity() {
         )
 
         setContent {
-            InTabScannerTheme(darkTheme = true) {
+            val liveTheme by ScannerThemeController.liveTheme.collectAsState()
+            val activeTheme = liveTheme ?: initialTheme
+            val isDarkTheme = activeTheme == ScannerThemeMode.DARK
+            LaunchedEffect(activeTheme) {
+                applyScannerSystemBars(activeTheme)
+            }
+            InTabScannerTheme(darkTheme = isDarkTheme) {
                 val sessionState by sessionController.uiState.collectAsState()
                 val isScannerProcessing = sessionState.isExportingPdf ||
                     sessionState.isImportingGallery ||
@@ -356,6 +375,10 @@ class ScannerActivity : ComponentActivity() {
         outState.putBoolean(KEY_ASKED_PERM, hasRequestedPermissionOnce)
         outState.putString(KEY_PENDING_SAVE_PATH, pendingSaveFilePath)
         outState.putString(KEY_PENDING_SAVE_NAME, pendingSaveFileName)
+        outState.putString(
+            KEY_THEME,
+            (ScannerThemeController.liveTheme.value ?: ScannerLaunchOptions.fromIntent(intent).theme).wireValue,
+        )
         saveConflictPrompt?.let { conflict ->
             outState.putString(KEY_CONFLICT_URI, conflict.destUriString)
             outState.putString(KEY_CONFLICT_EXISTING, conflict.existingFileName)
@@ -393,6 +416,28 @@ class ScannerActivity : ComponentActivity() {
         if (shouldDeleteSessionDirOnDestroy && !isChangingConfigurations && ::sessionId.isInitialized) {
             runCatching {
                 ScannerPaths.sessionDir(applicationContext, sessionId).deleteRecursively()
+            }
+        }
+        if (isFinishing && !isChangingConfigurations) {
+            ScannerThemeController.clearSession()
+        }
+    }
+
+    private fun applyScannerSystemBars(theme: ScannerThemeMode) {
+        val isDark = theme == ScannerThemeMode.DARK
+        val barStyle = if (isDark) {
+            SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
+        window?.let { win ->
+            win.decorView.setBackgroundColor(
+                (if (isDark) InTabColors.DarkBackground else InTabColors.LightBackground).toArgb(),
+            )
+            WindowCompat.getInsetsController(win, win.decorView).apply {
+                isAppearanceLightStatusBars = !isDark
+                isAppearanceLightNavigationBars = !isDark
             }
         }
     }
@@ -678,8 +723,13 @@ class ScannerActivity : ComponentActivity() {
     internal fun isScreenAwakeControllerActiveForTest(): Boolean =
         ::screenAwakeController.isInitialized && screenAwakeController.isScreenAwake()
 
+    @androidx.annotation.VisibleForTesting
+    internal fun currentThemeModeForTest(): ScannerThemeMode =
+        ScannerThemeController.liveTheme.value ?: ScannerLaunchOptions.fromIntent(intent).theme
+
     private companion object {
         const val TOKEN_SCANNER_PROCESSING = "scanner_processing"
+        const val KEY_THEME = "scanner_theme_mode"
         const val KEY_SESSION_ID = "scanner_session_id"
         const val KEY_AUTO_CAPTURE = "scanner_auto_capture"
         const val KEY_ASKED_PERM = "scanner_asked_permission"
