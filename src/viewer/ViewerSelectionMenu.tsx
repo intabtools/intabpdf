@@ -65,7 +65,8 @@ export default function ViewerSelectionMenu({
   const isAndroid = getPlatformType() === 'android';
 
   const updateSelection = useCallback(() => {
-    if (!allowCopying) {
+    // Android uses WebView's single native floating ActionMode menu instead of a second React toolbar
+    if (isAndroid || !allowCopying) {
       setSelectionState(null);
       return;
     }
@@ -148,10 +149,11 @@ export default function ViewerSelectionMenu({
     } catch {
       setSelectionState(null);
     }
-  }, [allowCopying, containerRef, isFullscreen]);
+  }, [allowCopying, isAndroid, containerRef, isFullscreen]);
 
   // Mark selection origin as select-all when triggered via Ctrl+A or context menu
   useEffect(() => {
+    if (isAndroid) return;
     if (selectAllSignal !== prevSignalRef.current) {
       prevSignalRef.current = selectAllSignal;
       if (selectAllSignal > 0) {
@@ -160,10 +162,10 @@ export default function ViewerSelectionMenu({
         return () => clearTimeout(timer);
       }
     }
-  }, [selectAllSignal, updateSelection]);
+  }, [isAndroid, selectAllSignal, updateSelection]);
 
   useEffect(() => {
-    if (!allowCopying) {
+    if (isAndroid || !allowCopying) {
       return;
     }
 
@@ -225,7 +227,7 @@ export default function ViewerSelectionMenu({
       window.removeEventListener('scroll', handleScrollOrResize, true);
       window.removeEventListener('resize', handleScrollOrResize);
     };
-  }, [allowCopying, updateSelection]);
+  }, [isAndroid, allowCopying, updateSelection]);
 
   // Measure actual rendered menu width after mount so wide labels never overflow viewport bounds
   useLayoutEffect(() => {
@@ -242,7 +244,7 @@ export default function ViewerSelectionMenu({
     }
   }, [allowCopying, isAndroid, selectionState]);
 
-  if (!allowCopying || !selectionState || !selectionState.visible) {
+  if (isAndroid || !allowCopying || !selectionState || !selectionState.visible) {
     return null;
   }
 

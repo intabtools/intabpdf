@@ -1,6 +1,7 @@
 package org.intabtools.intabpdf.scanner.vision
 
 import android.os.SystemClock
+import org.intabtools.intabpdf.scanner.imaging.OpenCvRuntime
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -9,6 +10,7 @@ import org.opencv.core.MatOfPoint2f
 import org.opencv.core.Point
 import org.opencv.core.Scalar
 import org.opencv.core.Size
+import org.opencv.imgproc.CLAHE
 import org.opencv.imgproc.Imgproc
 import kotlin.math.abs
 import kotlin.math.acos
@@ -22,137 +24,374 @@ import kotlin.math.sin
 
 /**
  * Clean-room Apache-2.0 OpenCV document quadrilateral detector.
- * Combines Otsu-guided luminance & Lab chroma edge maps, foreground region segmentation,
+ * Combines Otsu-guided luminance & Lab chroma edge maps, conditional low-light &
+ * illumination-normalized candidate maps, foreground region segmentation,
  * dense contour orientation-clustered least-squares line fitting, convex-hull polygon
  * simplification, and directional edge-support + contrast scoring.
  */
 class OpenCvDocumentDetector : DocumentDetector {
 
-    override fun detect(sourceRgbaMat: Mat, mode: DetectionMode): DetectionResult {
-        val startMs = SystemClock.elapsedRealtime()
-        if (sourceRgbaMat.empty() || sourceRgbaMat.cols() < 32 || sourceRgbaMat.rows() < 32) {
-            return DetectionResult.empty(0L)
-        }
-
-        val maxWorkingDim = if (mode == DetectionMode.LIVE_PREVIEW) 360.0 else 960.0
+    private class Workspace {
         val bgr = Mat()
         val resized = Mat()
         val gray = Mat()
         val lab = Mat()
+        val denoisedGray = Mat()
+        val stretchedGray = Mat()
+        val claheGray = Mat()
+        val shadowNormGray = Mat()
+        val illumSmall = Mat()
+        val illumBlurSmall = Mat()
+        val illumUpscaled = Mat()
+        val grayFloat = Mat()
+        val illumFloat = Mat()
+        val ratioFloat = Mat()
         val gradMag = Mat()
-        val morphKernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(7.0, 7.0))
-        val closeKernel = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(9.0, 9.0))
-        val dilateKernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
-
-        try {
-            when (sourceRgbaMat.channels()) {
-                4 -> Imgproc.cvtColor(sourceRgbaMat, bgr, Imgproc.COLOR_RGBA2BGR)
-                3 -> sourceRgbaMat.copyTo(bgr)
-                else -> Imgproc.cvtColor(sourceRgbaMat, bgr, Imgproc.COLOR_GRAY2BGR)
-            }
-
-            val maxDim = max(bgr.cols(), bgr.rows()).toDouble()
-            val scale = if (maxDim > maxWorkingDim) maxWorkingDim / maxDim else 1.0
-            if (scale < 1.0) {
-                Imgproc.resize(
-                    bgr,
-                    resized,
-                    Size(
-                        max(32, (bgr.cols() * scale).roundToInt()).toDouble(),
-                        max(32, (bgr.rows() * scale).roundToInt()).toDouble(),
-                    ),
-                    0.0,
-                    0.0,
-                    Imgproc.INTER_AREA,
-                )
-            } else {
-                bgr.copyTo(resized)
-            }
-
-            val width = resized.cols().toFloat()
-            val height = resized.rows().toFloat()
-            val frameArea = width * height
-
-            Imgproc.cvtColor(resized, gray, Imgproc.COLOR_BGR2GRAY)
-            Imgproc.cvtColor(resized, lab, Imgproc.COLOR_BGR2Lab)
-            val labChannels = ArrayList<Mat>(3)
-            Core.split(lab, labChannels)
-
-            buildGradientMagnitudeMap(gray, gradMag)
-            val wInt = gray.cols()
-            val hInt = gray.rows()
-            val totalPixels = wInt * hInt
-            val grayBytes = ByteArray(totalPixels)
-            val gradBytes = ByteArray(totalPixels)
-            gray.get(0, 0, grayBytes)
-            gradMag.get(0, 0, gradBytes)
-
-            val candidateMaps = buildCandidateMaps(gray, labChannels, mode, morphKernel, closeKernel, dilateKernel)
-            val best = evaluateCandidates(candidateMaps, grayBytes, gradBytes, wInt, hInt, width, height, frameArea)
-            val ridgeRefined = best?.let { refineQuadSidesToGradientRidge(it, grayBytes, gradBytes, wInt, hInt) }
-            val refined = ridgeRefined?.let { refineLateralStaircaseBoundaries(it, grayBytes, gradBytes, wInt, hInt) }
-
-            candidateMaps.forEach { it.release() }
-            labChannels.forEach { it.release() }
-
-            val elapsed = SystemClock.elapsedRealtime() - startMs
-            if (refined == null) {
-                return DetectionResult.empty(elapsed)
-            }
-
-            val quad = refined.quad
-            return DetectionResult(
-                normalizedQuad = quad,
-                confidence = refined.score.coerceIn(0f, 1f),
-                areaFraction = quad.areaFraction(),
-                touchesOuterMargin = quad.touchesOuterMargin(),
-                inferenceTimeMs = elapsed,
-            )
-        } catch (_: Throwable) {
-            val elapsed = SystemClock.elapsedRealtime() - startMs
-            return DetectionResult.empty(elapsed)
-        } finally {
-            bgr.release()
-            resized.release()
-            gray.release()
-            lab.release()
-            gradMag.release()
-            morphKernel.release()
-            closeKernel.release()
-            dilateKernel.release()
-        }
-    }
-
-    private fun buildGradientMagnitudeMap(gray: Mat, outGrad: Mat) {
-        val blur = Mat()
+        val gradBlur = Mat()
         val gx = Mat()
         val gy = Mat()
         val absX = Mat()
         val absY = Mat()
-        try {
-            Imgproc.GaussianBlur(gray, blur, Size(5.0, 5.0), 0.0)
-            Imgproc.Sobel(blur, gx, CvType.CV_16S, 1, 0, 3)
-            Imgproc.Sobel(blur, gy, CvType.CV_16S, 0, 1, 3)
-            Core.convertScaleAbs(gx, absX, 0.25)
-            Core.convertScaleAbs(gy, absY, 0.25)
-            Core.addWeighted(absX, 0.5, absY, 0.5, 0.0, outGrad)
-        } finally {
-            blur.release()
-            gx.release()
-            gy.release()
-            absX.release()
-            absY.release()
+
+        val morphKernel7: Mat = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(7.0, 7.0))
+        val closeKernel9: Mat = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(9.0, 9.0))
+        val closeKernel5: Mat = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
+        val smallClose3: Mat = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(3.0, 3.0))
+        val dilateKernel3: Mat = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
+        val clahe: CLAHE = Imgproc.createCLAHE(1.8, Size(8.0, 8.0))
+        val hist = IntArray(256)
+
+        var rawGrayBytes = ByteArray(0)
+        var workGrayBytes = ByteArray(0)
+        var workGradBytes = ByteArray(0)
+
+        fun ensureByteBuffers(totalPixels: Int, reuseRawAsWork: Boolean) {
+            if (rawGrayBytes.size != totalPixels) {
+                rawGrayBytes = ByteArray(totalPixels)
+            }
+            if (reuseRawAsWork) {
+                if (workGradBytes.size != totalPixels) {
+                    workGradBytes = ByteArray(totalPixels)
+                }
+            } else {
+                if (workGrayBytes.size != totalPixels) {
+                    workGrayBytes = ByteArray(totalPixels)
+                }
+                if (workGradBytes.size != totalPixels) {
+                    workGradBytes = ByteArray(totalPixels)
+                }
+            }
         }
     }
 
+    private data class LightingStats(
+        val p2: Int,
+        val p10: Int,
+        val p90: Int,
+        val p98: Int,
+        val mean: Float,
+        val quadSpread: Float,
+    ) {
+        val span98: Int get() = p98 - p2
+        val span90: Int get() = p90 - p10
+    }
+
+    private val workspace by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { Workspace() }
+
+    override fun detect(sourceRgbaMat: Mat, mode: DetectionMode): DetectionResult {
+        val startMs = SystemClock.elapsedRealtime()
+        if (!OpenCvRuntime.ensureInitialized() ||
+            sourceRgbaMat.empty() ||
+            sourceRgbaMat.cols() < 32 ||
+            sourceRgbaMat.rows() < 32
+        ) {
+            return DetectionResult.empty(0L)
+        }
+
+        val maxWorkingDim = if (mode == DetectionMode.LIVE_PREVIEW) 360.0 else 960.0
+        synchronized(workspace) {
+            val bgr = workspace.bgr
+            val resized = workspace.resized
+            val gray = workspace.gray
+            val lab = workspace.lab
+            val gradMag = workspace.gradMag
+            val labChannels = ArrayList<Mat>(3)
+
+            try {
+                when (sourceRgbaMat.channels()) {
+                    4 -> Imgproc.cvtColor(sourceRgbaMat, bgr, Imgproc.COLOR_RGBA2BGR)
+                    3 -> sourceRgbaMat.copyTo(bgr)
+                    else -> Imgproc.cvtColor(sourceRgbaMat, bgr, Imgproc.COLOR_GRAY2BGR)
+                }
+
+                val maxDim = max(bgr.cols(), bgr.rows()).toDouble()
+                val scale = if (maxDim > maxWorkingDim) maxWorkingDim / maxDim else 1.0
+                if (scale < 1.0) {
+                    Imgproc.resize(
+                        bgr,
+                        resized,
+                        Size(
+                            max(32, (bgr.cols() * scale).roundToInt()).toDouble(),
+                            max(32, (bgr.rows() * scale).roundToInt()).toDouble(),
+                        ),
+                        0.0,
+                        0.0,
+                        Imgproc.INTER_AREA,
+                    )
+                } else {
+                    bgr.copyTo(resized)
+                }
+
+                val width = resized.cols().toFloat()
+                val height = resized.rows().toFloat()
+                val frameArea = width * height
+
+                Imgproc.cvtColor(resized, gray, Imgproc.COLOR_BGR2GRAY)
+                Imgproc.cvtColor(resized, lab, Imgproc.COLOR_BGR2Lab)
+                Core.split(lab, labChannels)
+
+                val wInt = gray.cols()
+                val hInt = gray.rows()
+                val totalPixels = wInt * hInt
+                workspace.ensureByteBuffers(totalPixels, reuseRawAsWork = false)
+                val rawGrayBytes = workspace.rawGrayBytes
+                gray.get(0, 0, rawGrayBytes)
+
+                val stats = analyzeLightingStats(rawGrayBytes, wInt, hInt, step = if (mode == DetectionMode.LIVE_PREVIEW) 2 else 3)
+                val isFlatEmpty = stats.span98 < 14
+                // Activate full contrast-stretch + CLAHE only for genuinely dim captures so normal
+                // indoor AE frames (or white paper on a dark desk) retain natural contrast & thresholds.
+                val needsLowLightEnhance = !isFlatEmpty && (stats.p90 < 130 || (stats.mean < 85f && stats.p90 < 150))
+                val needsShadowNorm = !isFlatEmpty && (stats.quadSpread >= 24f || needsLowLightEnhance)
+
+                val workGray: Mat
+                val workGrayBytes: ByteArray
+                if (needsLowLightEnhance) {
+                    prepareLowLightEnhancedGray(gray, stats, workspace)
+                    workGray = workspace.claheGray
+                    workGray.get(0, 0, workspace.workGrayBytes)
+                    workGrayBytes = workspace.workGrayBytes
+                } else {
+                    workGray = gray
+                    workGrayBytes = rawGrayBytes
+                }
+
+                val shadowNormGray: Mat? = if (needsShadowNorm) {
+                    val illumSource = if (needsLowLightEnhance) workspace.denoisedGray else gray
+                    prepareShadowNormalizedGray(illumSource, wInt, hInt, workspace)
+                    workspace.shadowNormGray
+                } else {
+                    null
+                }
+
+                buildGradientMagnitudeMap(workGray, gradMag, workspace)
+                val workGradBytes = workspace.workGradBytes
+                gradMag.get(0, 0, workGradBytes)
+
+                val candidateMaps = buildCandidateMaps(
+                    workGray = workGray,
+                    shadowNormGray = shadowNormGray,
+                    labChannels = labChannels,
+                    mode = mode,
+                    isLowLight = needsLowLightEnhance,
+                    workspace = workspace,
+                )
+                val best = evaluateCandidates(
+                    candidateMaps = candidateMaps,
+                    workGrayBytes = workGrayBytes,
+                    workGradBytes = workGradBytes,
+                    rawGrayBytes = rawGrayBytes,
+                    useRawFloorGuard = needsLowLightEnhance,
+                    imgW = wInt,
+                    imgH = hInt,
+                    width = width,
+                    height = height,
+                    frameArea = frameArea,
+                )
+                val ridgeRefined = best?.let {
+                    refineQuadSidesToGradientRidge(
+                        candidate = it,
+                        grayBytes = workGrayBytes,
+                        gradBytes = workGradBytes,
+                        rawGrayBytes = rawGrayBytes,
+                        useRawFloorGuard = needsLowLightEnhance,
+                        w = wInt,
+                        h = hInt,
+                    )
+                }
+                val refined = ridgeRefined?.let {
+                    refineLateralStaircaseBoundaries(
+                        candidate = it,
+                        grayBytes = workGrayBytes,
+                        gradBytes = workGradBytes,
+                        rawGrayBytes = rawGrayBytes,
+                        useRawFloorGuard = needsLowLightEnhance,
+                        w = wInt,
+                        h = hInt,
+                    )
+                }
+
+                candidateMaps.forEach { it.release() }
+                labChannels.forEach { it.release() }
+
+                val elapsed = SystemClock.elapsedRealtime() - startMs
+                if (refined == null) {
+                    return DetectionResult.empty(elapsed)
+                }
+
+                val quad = refined.quad
+                return DetectionResult(
+                    normalizedQuad = quad,
+                    confidence = refined.score.coerceIn(0f, 1f),
+                    areaFraction = quad.areaFraction(),
+                    touchesOuterMargin = quad.touchesOuterMargin(),
+                    inferenceTimeMs = elapsed,
+                )
+            } catch (_: Throwable) {
+                candidateMapsSafeRelease(labChannels)
+                val elapsed = SystemClock.elapsedRealtime() - startMs
+                return DetectionResult.empty(elapsed)
+            }
+        }
+    }
+
+    private fun candidateMapsSafeRelease(mats: List<Mat>) {
+        for (m in mats) {
+            runCatching { m.release() }
+        }
+    }
+
+    private fun analyzeLightingStats(grayBytes: ByteArray, w: Int, h: Int, step: Int): LightingStats {
+        val hist = workspace.hist
+        hist.fill(0)
+        var sampleCount = 0
+        var sum = 0L
+        val halfW = w / 2
+        val halfH = h / 2
+        val qSums = LongArray(4)
+        val qCounts = IntArray(4)
+
+        var y = 0
+        while (y < h) {
+            val rowOffset = y * w
+            val yQuad = if (y < halfH) 0 else 2
+            var x = 0
+            while (x < w) {
+                val v = grayBytes[rowOffset + x].toInt() and 0xFF
+                hist[v]++
+                sampleCount++
+                sum += v
+                val qIdx = yQuad + if (x < halfW) 0 else 1
+                qSums[qIdx] += v
+                qCounts[qIdx]++
+                x += step
+            }
+            y += step
+        }
+
+        if (sampleCount == 0) {
+            return LightingStats(0, 0, 255, 255, 128f, 0f)
+        }
+
+        val t2 = (sampleCount * 0.02).roundToInt().coerceAtLeast(1)
+        val t10 = (sampleCount * 0.10).roundToInt().coerceAtLeast(1)
+        val t90 = (sampleCount * 0.90).roundToInt().coerceAtLeast(1)
+        val t98 = (sampleCount * 0.98).roundToInt().coerceAtLeast(1)
+        var p2 = 0
+        var p10 = 0
+        var p90 = 255
+        var p98 = 255
+        var cum = 0
+        var found2 = false
+        var found10 = false
+        var found90 = false
+
+        for (v in 0..255) {
+            cum += hist[v]
+            if (!found2 && cum >= t2) {
+                p2 = v
+                found2 = true
+            }
+            if (!found10 && cum >= t10) {
+                p10 = v
+                found10 = true
+            }
+            if (!found90 && cum >= t90) {
+                p90 = v
+                found90 = true
+            }
+            if (cum >= t98) {
+                p98 = v
+                break
+            }
+        }
+
+        var minQ = Float.MAX_VALUE
+        var maxQ = 0f
+        for (q in 0 until 4) {
+            if (qCounts[q] > 0) {
+                val qMean = qSums[q].toFloat() / qCounts[q].toFloat()
+                if (qMean < minQ) minQ = qMean
+                if (qMean > maxQ) maxQ = qMean
+            }
+        }
+        val quadSpread = if (minQ <= maxQ) (maxQ - minQ) else 0f
+
+        return LightingStats(
+            p2 = p2,
+            p10 = p10,
+            p90 = p90,
+            p98 = p98,
+            mean = sum.toFloat() / sampleCount.toFloat(),
+            quadSpread = quadSpread,
+        )
+    }
+
+    private fun prepareLowLightEnhancedGray(gray: Mat, stats: LightingStats, ws: Workspace) {
+        // Edge-preserving bilateral filter damps dim ISO grain without blunting page corners/edges
+        Imgproc.bilateralFilter(gray, ws.denoisedGray, 5, 22.0, 12.0)
+
+        val span = max(24.0, (stats.p98 - stats.p2).toDouble())
+        val alpha = min(4.2, 236.0 / span)
+        val beta = 8.0 - stats.p2 * alpha
+        Core.convertScaleAbs(ws.denoisedGray, ws.stretchedGray, alpha, beta)
+        ws.clahe.apply(ws.stretchedGray, ws.claheGray)
+    }
+
+    private fun prepareShadowNormalizedGray(sourceGray: Mat, w: Int, h: Int, ws: Workspace) {
+        val smallW = max(16, (w / 8.0).roundToInt()).toDouble()
+        val smallH = max(16, (h / 8.0).roundToInt()).toDouble()
+        Imgproc.resize(sourceGray, ws.illumSmall, Size(smallW, smallH), 0.0, 0.0, Imgproc.INTER_AREA)
+        Imgproc.GaussianBlur(ws.illumSmall, ws.illumBlurSmall, Size(11.0, 11.0), 0.0)
+        Imgproc.resize(ws.illumBlurSmall, ws.illumUpscaled, Size(w.toDouble(), h.toDouble()), 0.0, 0.0, Imgproc.INTER_LINEAR)
+        Core.max(ws.illumUpscaled, Scalar(12.0), ws.illumUpscaled)
+
+        sourceGray.convertTo(ws.grayFloat, CvType.CV_32F)
+        ws.illumUpscaled.convertTo(ws.illumFloat, CvType.CV_32F)
+        Core.divide(ws.grayFloat, ws.illumFloat, ws.ratioFloat, 190.0)
+        Core.convertScaleAbs(ws.ratioFloat, ws.shadowNormGray, 1.0, 0.0)
+    }
+
+    private fun buildGradientMagnitudeMap(gray: Mat, outGrad: Mat, ws: Workspace) {
+        Imgproc.GaussianBlur(gray, ws.gradBlur, Size(5.0, 5.0), 0.0)
+        Imgproc.Sobel(ws.gradBlur, ws.gx, CvType.CV_16S, 1, 0, 3)
+        Imgproc.Sobel(ws.gradBlur, ws.gy, CvType.CV_16S, 0, 1, 3)
+        Core.convertScaleAbs(ws.gx, ws.absX, 0.25)
+        Core.convertScaleAbs(ws.gy, ws.absY, 0.25)
+        Core.addWeighted(ws.absX, 0.5, ws.absY, 0.5, 0.0, outGrad)
+    }
+
     private fun buildCandidateMaps(
-        gray: Mat,
+        workGray: Mat,
+        shadowNormGray: Mat?,
         labChannels: List<Mat>,
         mode: DetectionMode,
-        morphKernel: Mat,
-        closeKernel: Mat,
-        dilateKernel: Mat,
+        isLowLight: Boolean,
+        workspace: Workspace,
     ): List<Mat> {
+        val morphKernel = workspace.morphKernel7
+        val closeKernel = workspace.closeKernel9
+        val dilateKernel = workspace.dilateKernel3
         val maps = mutableListOf<Mat>()
 
         // 1. Text-suppressed Otsu-guided Canny edge map (luminance + chroma)
@@ -160,9 +399,11 @@ class OpenCvDocumentDetector : DocumentDetector {
         val blurredGray = Mat()
         val otsuDummy = Mat()
         val grayEdges = Mat()
-        val combinedEdges = Mat.zeros(gray.size(), CvType.CV_8U)
+        val combinedEdges = Mat.zeros(workGray.size(), CvType.CV_8U)
+        val chromaLower = if (isLowLight) 20.0 else 36.0
+        val chromaUpper = if (isLowLight) 62.0 else 108.0
         try {
-            Imgproc.morphologyEx(gray, closedGray, Imgproc.MORPH_CLOSE, morphKernel)
+            Imgproc.morphologyEx(workGray, closedGray, Imgproc.MORPH_CLOSE, morphKernel)
             Imgproc.GaussianBlur(closedGray, blurredGray, Size(5.0, 5.0), 0.0)
             val otsu = Imgproc.threshold(blurredGray, otsuDummy, 0.0, 255.0, Imgproc.THRESH_BINARY or Imgproc.THRESH_OTSU)
             val lower = (otsu * 0.40).coerceIn(18.0, 85.0)
@@ -177,7 +418,7 @@ class OpenCvDocumentDetector : DocumentDetector {
                 try {
                     Imgproc.morphologyEx(labChannels[chromaIdx], chromaClosed, Imgproc.MORPH_CLOSE, morphKernel)
                     Imgproc.GaussianBlur(chromaClosed, chromaBlur, Size(5.0, 5.0), 0.0)
-                    Imgproc.Canny(chromaBlur, chromaEdges, 36.0, 108.0)
+                    Imgproc.Canny(chromaBlur, chromaEdges, chromaLower, chromaUpper)
                     Core.bitwise_or(combinedEdges, chromaEdges, combinedEdges)
                 } finally {
                     chromaClosed.release()
@@ -209,13 +450,9 @@ class OpenCvDocumentDetector : DocumentDetector {
         val regionBin = Mat()
         val regionClosed = Mat()
         val regionOpened = Mat()
-        val regionCloseKernel = if (mode == DetectionMode.LIVE_PREVIEW) {
-            Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
-        } else {
-            closeKernel
-        }
+        val regionCloseKernel = if (mode == DetectionMode.LIVE_PREVIEW) workspace.closeKernel5 else closeKernel
         try {
-            Imgproc.GaussianBlur(gray, regionBlur, Size(7.0, 7.0), 0.0)
+            Imgproc.GaussianBlur(workGray, regionBlur, Size(7.0, 7.0), 0.0)
             Imgproc.threshold(regionBlur, regionBin, 0.0, 255.0, Imgproc.THRESH_BINARY or Imgproc.THRESH_OTSU)
             Imgproc.morphologyEx(regionBin, regionClosed, Imgproc.MORPH_CLOSE, regionCloseKernel)
             Imgproc.morphologyEx(regionClosed, regionOpened, Imgproc.MORPH_OPEN, morphKernel)
@@ -224,9 +461,6 @@ class OpenCvDocumentDetector : DocumentDetector {
             regionBlur.release()
             regionBin.release()
             regionClosed.release()
-            if (regionCloseKernel !== closeKernel) {
-                regionCloseKernel.release()
-            }
         }
 
         // 3. Soft luminance Canny + edge-preserving local adaptive mask (splits open notebook spreads along dark binding gutter)
@@ -235,7 +469,7 @@ class OpenCvDocumentDetector : DocumentDetector {
             val morph = Mat()
             val blur = Mat()
             try {
-                Imgproc.GaussianBlur(gray, blur, Size(7.0, 7.0), 0.0)
+                Imgproc.GaussianBlur(workGray, blur, Size(7.0, 7.0), 0.0)
                 Imgproc.adaptiveThreshold(
                     blur,
                     thresh,
@@ -255,10 +489,8 @@ class OpenCvDocumentDetector : DocumentDetector {
             val adaptGutter = Mat()
             val adaptBlur = Mat()
             val adaptClosed = Mat()
-            val smallClose = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
-            val gutterOpen = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(9.0, 9.0))
             try {
-                Imgproc.GaussianBlur(gray, adaptBlur, Size(9.0, 9.0), 0.0)
+                Imgproc.GaussianBlur(workGray, adaptBlur, Size(9.0, 9.0), 0.0)
                 Imgproc.adaptiveThreshold(
                     adaptBlur,
                     adaptGutter,
@@ -268,25 +500,25 @@ class OpenCvDocumentDetector : DocumentDetector {
                     35,
                     5.0,
                 )
-                Imgproc.morphologyEx(adaptGutter, adaptClosed, Imgproc.MORPH_CLOSE, smallClose)
+                Imgproc.morphologyEx(adaptGutter, adaptClosed, Imgproc.MORPH_CLOSE, workspace.closeKernel5)
                 val adaptOpened = Mat()
-                Imgproc.morphologyEx(adaptClosed, adaptOpened, Imgproc.MORPH_OPEN, gutterOpen)
+                Imgproc.morphologyEx(adaptClosed, adaptOpened, Imgproc.MORPH_OPEN, closeKernel)
                 maps += adaptOpened
             } finally {
                 adaptGutter.release()
                 adaptBlur.release()
                 adaptClosed.release()
-                smallClose.release()
-                gutterOpen.release()
             }
         } else {
             val softBlur = Mat()
             val softCanny = Mat()
             val softDilated = Mat()
             val softClosed = Mat()
+            val softLower = if (isLowLight) 20.0 else 28.0
+            val softUpper = if (isLowLight) 62.0 else 88.0
             try {
-                Imgproc.GaussianBlur(gray, softBlur, Size(7.0, 7.0), 0.0)
-                Imgproc.Canny(softBlur, softCanny, 28.0, 88.0)
+                Imgproc.GaussianBlur(workGray, softBlur, Size(7.0, 7.0), 0.0)
+                Imgproc.Canny(softBlur, softCanny, softLower, softUpper)
                 Imgproc.dilate(softCanny, softDilated, dilateKernel)
                 Imgproc.morphologyEx(softDilated, softClosed, Imgproc.MORPH_CLOSE, morphKernel)
                 maps += softClosed
@@ -300,10 +532,8 @@ class OpenCvDocumentDetector : DocumentDetector {
             val adaptThresh = Mat()
             val adaptClosed = Mat()
             val adaptOpened = Mat()
-            val smallClose = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(3.0, 3.0))
-            val gutterOpen = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(5.0, 5.0))
             try {
-                Imgproc.GaussianBlur(gray, adaptBlur, Size(7.0, 7.0), 0.0)
+                Imgproc.GaussianBlur(workGray, adaptBlur, Size(7.0, 7.0), 0.0)
                 Imgproc.adaptiveThreshold(
                     adaptBlur,
                     adaptThresh,
@@ -313,15 +543,42 @@ class OpenCvDocumentDetector : DocumentDetector {
                     21,
                     5.0,
                 )
-                Imgproc.morphologyEx(adaptThresh, adaptClosed, Imgproc.MORPH_CLOSE, smallClose)
-                Imgproc.morphologyEx(adaptClosed, adaptOpened, Imgproc.MORPH_OPEN, gutterOpen)
+                Imgproc.morphologyEx(adaptThresh, adaptClosed, Imgproc.MORPH_CLOSE, workspace.smallClose3)
+                Imgproc.morphologyEx(adaptClosed, adaptOpened, Imgproc.MORPH_OPEN, workspace.closeKernel5)
                 maps += adaptOpened
             } finally {
                 adaptBlur.release()
                 adaptThresh.release()
                 adaptClosed.release()
-                smallClose.release()
-                gutterOpen.release()
+            }
+        }
+
+        // 4. Conditional illumination-normalized maps for shadows & uneven lighting
+        if (shadowNormGray != null) {
+            val sBlur = Mat()
+            val sBin = Mat()
+            val sClosed = Mat()
+            val sOpened = Mat()
+            val sCanny = Mat()
+            val sCannyDilated = Mat()
+            val sCannyClosed = Mat()
+            try {
+                Imgproc.GaussianBlur(shadowNormGray, sBlur, Size(7.0, 7.0), 0.0)
+                Imgproc.threshold(sBlur, sBin, 0.0, 255.0, Imgproc.THRESH_BINARY or Imgproc.THRESH_OTSU)
+                Imgproc.morphologyEx(sBin, sClosed, Imgproc.MORPH_CLOSE, regionCloseKernel)
+                Imgproc.morphologyEx(sClosed, sOpened, Imgproc.MORPH_OPEN, morphKernel)
+                maps += sOpened
+
+                Imgproc.Canny(sBlur, sCanny, 22.0, 68.0)
+                Imgproc.dilate(sCanny, sCannyDilated, dilateKernel)
+                Imgproc.morphologyEx(sCannyDilated, sCannyClosed, Imgproc.MORPH_CLOSE, morphKernel)
+                maps += sCannyClosed
+            } finally {
+                sBlur.release()
+                sBin.release()
+                sClosed.release()
+                sCanny.release()
+                sCannyDilated.release()
             }
         }
 
@@ -335,8 +592,10 @@ class OpenCvDocumentDetector : DocumentDetector {
 
     private fun evaluateCandidates(
         candidateMaps: List<Mat>,
-        grayBytes: ByteArray,
-        gradBytes: ByteArray,
+        workGrayBytes: ByteArray,
+        workGradBytes: ByteArray,
+        rawGrayBytes: ByteArray,
+        useRawFloorGuard: Boolean,
         imgW: Int,
         imgH: Int,
         width: Float,
@@ -406,7 +665,7 @@ class OpenCvDocumentDetector : DocumentDetector {
                                         max(contourArea, quadPixelArea.toDouble())
                                     if (areaFit < 0.68) continue
                                 }
-                                val score = scoreQuad(quad, grayBytes, gradBytes, imgW, imgH)
+                                val score = scoreQuad(quad, workGrayBytes, workGradBytes, rawGrayBytes, useRawFloorGuard, imgW, imgH)
                                 if (best == null || score > best.score) {
                                     best = ScoredCandidate(quad, score)
                                 }
@@ -636,6 +895,8 @@ class OpenCvDocumentDetector : DocumentDetector {
         candidate: ScoredCandidate,
         grayBytes: ByteArray,
         gradBytes: ByteArray,
+        rawGrayBytes: ByteArray,
+        useRawFloorGuard: Boolean,
         w: Int,
         h: Int,
     ): ScoredCandidate {
@@ -763,7 +1024,7 @@ class OpenCvDocumentDetector : DocumentDetector {
         }
         val refinedQuad = NormalizedQuad.orderClockwise(intersections) ?: return candidate
         if (!refinedQuad.isValidConvex()) return candidate
-        val refinedScore = scoreQuad(refinedQuad, grayBytes, gradBytes, w, h)
+        val refinedScore = scoreQuad(refinedQuad, grayBytes, gradBytes, rawGrayBytes, useRawFloorGuard, w, h)
         return if (refinedScore >= candidate.score) {
             ScoredCandidate(refinedQuad, refinedScore)
         } else {
@@ -780,6 +1041,8 @@ class OpenCvDocumentDetector : DocumentDetector {
         candidate: ScoredCandidate,
         grayBytes: ByteArray,
         gradBytes: ByteArray,
+        rawGrayBytes: ByteArray,
+        useRawFloorGuard: Boolean,
         w: Int,
         h: Int,
     ): ScoredCandidate {
@@ -846,23 +1109,23 @@ class OpenCvDocumentDetector : DocumentDetector {
             }
             val interiorRef = interiorSum / samplesPerSide
             val outsideBg = outsideSum / samplesPerSide
+            val minOuterPaper = max(interiorRef * 0.62, outsideBg + (interiorRef - outsideBg) * 0.45)
             if (interiorRef <= outsideBg + 10.0 || interiorRef < 90.0) {
                 lines += originalLine
                 continue
             }
 
             var bestStairS = -1
-            for (s in 5..maxScan) {
-                val outerSamples = intArrayOf(
-                    2,
-                    2 + ((s - 5) / 2).coerceAtLeast(0),
-                    (s - 3).coerceAtLeast(2),
-                )
-                val innerEnd = min(s + 7, maxScan)
-                if (innerEnd < s + 3) continue
+            for (s in 8..maxScan) {
+                val outerMid = (3 + ((s - 8) / 2).coerceAtLeast(0)).coerceAtMost((s - 5).coerceAtLeast(3))
+                val outerFar = (s - 5).coerceAtLeast(3)
+                val outerSamples = intArrayOf(3, outerMid, outerFar)
+                val innerStart = (s + 4).coerceAtMost(maxScan)
+                val innerEnd = min(s + 9, maxScan)
+                if (innerEnd < innerStart + 2) continue
                 val innerSamples = intArrayOf(
-                    s + 2,
-                    (s + 4).coerceAtMost(innerEnd),
+                    innerStart,
+                    (innerStart + 2).coerceAtMost(innerEnd),
                     innerEnd,
                 )
 
@@ -870,6 +1133,7 @@ class OpenCvDocumentDetector : DocumentDetector {
                 var innerBandSum = 0.0
                 var supportCount = 0
                 var stepSum = 0.0
+                var farStepSum = 0.0
                 var creaseSum = 0.0
 
                 for (k in 0 until samplesPerSide) {
@@ -886,6 +1150,7 @@ class OpenCvDocumentDetector : DocumentDetector {
 
                     var bestLocalEdge = Double.NEGATIVE_INFINITY
                     var bestStep4 = 0.0
+                    var bestFarStep = 0.0
                     var bestValley = 0.0
                     var bestInVsOut = 0.0
 
@@ -896,6 +1161,8 @@ class OpenCvDocumentDetector : DocumentDetector {
                         val vI2 = sampleGray(baseX + ux * (sLoc + 2.5), baseY + uy * (sLoc + 2.5))
                         val vO4 = sampleGray(baseX + ux * (sLoc - 4.5), baseY + uy * (sLoc - 4.5))
                         val vI4 = sampleGray(baseX + ux * (sLoc + 4.5), baseY + uy * (sLoc + 4.5))
+                        val vO5 = sampleGray(baseX + ux * max(3.0, sLoc - 5.5), baseY + uy * max(3.0, sLoc - 5.5))
+                        val vI5 = sampleGray(baseX + ux * min(maxScan.toDouble(), sLoc + 5.5), baseY + uy * min(maxScan.toDouble(), sLoc + 5.5))
 
                         val step2 = vI2 - vO2
                         val valley = min(vI2, vO2) - vC
@@ -903,12 +1170,14 @@ class OpenCvDocumentDetector : DocumentDetector {
                         if (edgeSig > bestLocalEdge) {
                             bestLocalEdge = edgeSig
                             bestStep4 = vI4 - vO4
+                            bestFarStep = vI5 - vO5
                             bestValley = valley
                             bestInVsOut = vI4 - vO4
                         }
                     }
 
                     stepSum += bestStep4
+                    farStepSum += bestFarStep
                     creaseSum += bestValley
                     if (bestInVsOut >= -4.0 && bestLocalEdge >= 7.5) {
                         supportCount++
@@ -919,10 +1188,13 @@ class OpenCvDocumentDetector : DocumentDetector {
                 val innerBandMean = innerBandSum / (samplesPerSide * innerSamples.size)
                 val supportFraction = supportCount.toDouble() / samplesPerSide
                 val avgStep = stepSum / samplesPerSide
+                val avgFarStep = farStepSum / samplesPerSide
                 val avgCrease = creaseSum / samplesPerSide
 
-                val outerIsPaper = outerBandMean >= interiorRef * 0.58
-                val stepsOntoBrighterTarget = innerBandMean >= outerBandMean + 4.0
+                val outerIsPaper = outerBandMean >= minOuterPaper
+                // Require both the outer clean shelf and the wider step across +/-5.5px to be strictly
+                // dimmer than the inner target page so an internal printed border on a uniform page does not trigger.
+                val stepsOntoBrighterTarget = innerBandMean >= outerBandMean + 4.0 && avgFarStep >= 2.5
                 val validRidge = supportFraction >= 0.72 && (avgStep >= 3.0 || (avgCrease >= 6.5 && avgStep >= 0.5))
 
                 if (outerIsPaper && stepsOntoBrighterTarget && validRidge) {
@@ -989,7 +1261,7 @@ class OpenCvDocumentDetector : DocumentDetector {
         val refinedQuad = NormalizedQuad.orderClockwise(intersections) ?: return candidate
         if (!refinedQuad.isValidConvex()) return candidate
 
-        val rescored = scoreQuad(refinedQuad, grayBytes, gradBytes, w, h)
+        val rescored = scoreQuad(refinedQuad, grayBytes, gradBytes, rawGrayBytes, useRawFloorGuard, w, h)
         // Preserve usable confidence even when adjacent underlying sheets reduce local contrast vs desk
         val effectiveScore = maxOf(rescored, candidate.score * 0.88f).coerceIn(0f, 1f)
         return ScoredCandidate(refinedQuad, effectiveScore)
@@ -999,6 +1271,8 @@ class OpenCvDocumentDetector : DocumentDetector {
         quad: NormalizedQuad,
         grayBytes: ByteArray,
         gradBytes: ByteArray,
+        rawGrayBytes: ByteArray,
+        useRawFloorGuard: Boolean,
         w: Int,
         h: Int,
     ): Float {
@@ -1020,6 +1294,7 @@ class OpenCvDocumentDetector : DocumentDetector {
         var minSideContrast = 1.0
         var signedContrastNet = 0.0
         var absContrastTotal = 0.0
+        var rawContrastSum = 0.0
         val samplesPerSide = 14
 
         for (i in 0 until 4) {
@@ -1033,6 +1308,7 @@ class OpenCvDocumentDetector : DocumentDetector {
 
             var sideEdgeSum = 0.0
             var signedSideContrast = 0.0
+            var rawSignedSideContrast = 0.0
 
             for (step in 1..samplesPerSide) {
                 val t = step / (samplesPerSide + 1).toDouble()
@@ -1053,9 +1329,17 @@ class OpenCvDocumentDetector : DocumentDetector {
                 val inY = (py + uy * 4.5).toInt().coerceIn(0, h - 1)
                 val outX = (px - ux * 4.5).toInt().coerceIn(0, w - 1)
                 val outY = (py - uy * 4.5).toInt().coerceIn(0, h - 1)
-                val inVal = grayBytes[inY * w + inX].toInt() and 0xFF
-                val outVal = grayBytes[outY * w + outX].toInt() and 0xFF
+                val inIdx = inY * w + inX
+                val outIdx = outY * w + outX
+                val inVal = grayBytes[inIdx].toInt() and 0xFF
+                val outVal = grayBytes[outIdx].toInt() and 0xFF
                 signedSideContrast += (inVal - outVal) / 255.0
+
+                if (useRawFloorGuard) {
+                    val rawIn = rawGrayBytes[inIdx].toInt() and 0xFF
+                    val rawOut = rawGrayBytes[outIdx].toInt() and 0xFF
+                    rawSignedSideContrast += (rawIn - rawOut) / 255.0
+                }
             }
 
             val sideEdgeAvg = sideEdgeSum / samplesPerSide
@@ -1065,6 +1349,9 @@ class OpenCvDocumentDetector : DocumentDetector {
             contrastSum += sideContrastAvg
             signedContrastNet += sideSignedAvg
             absContrastTotal += sideContrastAvg
+            if (useRawFloorGuard) {
+                rawContrastSum += abs(rawSignedSideContrast / samplesPerSide)
+            }
             if (sideEdgeAvg < minSideEdge) minSideEdge = sideEdgeAvg
             if (sideContrastAvg < minSideContrast) minSideContrast = sideContrastAvg
         }
@@ -1089,8 +1376,16 @@ class OpenCvDocumentDetector : DocumentDetector {
         } else {
             1.0f
         }
+        // Prevent noise amplification from producing high confidence on empty flat dark scenes
+        // while preserving confidence on legitimate dim / partially shaded low-contrast pages.
+        val rawSignalTrust = if (useRawFloorGuard) {
+            val rawAvg = (rawContrastSum / 4.0).toFloat()
+            ((rawAvg - 0.010f) / 0.025f).coerceIn(0f, 1f)
+        } else {
+            1.0f
+        }
         val rawScore = (edgeScore * 0.45f) + (contrastScore * 0.25f) + (areaScore * 0.20f) + (perspectiveScore * 0.10f)
-        return (rawScore * marginPenalty * sliverPenalty).coerceIn(0f, 1f)
+        return (rawScore * marginPenalty * sliverPenalty * rawSignalTrust).coerceIn(0f, 1f)
     }
 
     /**

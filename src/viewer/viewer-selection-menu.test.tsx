@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import ViewerSelectionMenu from './ViewerSelectionMenu';
 import { clampSelectionMenuLeft, computeSelectionMenuPosition } from './selectionMenuPosition';
-import { selectAllTextOnPage } from './pageTextSelection';
+import {
+  clampSelectionToPdfTextLayers,
+  isSelectionInsidePdfTextLayer,
+  resolveSelectionPageNumber,
+  selectAllTextNativeInPdfPage,
+  selectAllTextOnPage,
+} from './pageTextSelection';
 import { resolveViewerNavigationTarget } from './viewerContextDef';
 import {
   beginSelectionRestorationGuard,
@@ -50,7 +56,7 @@ describe('PDF Viewer Contextual Selection Menu', () => {
     expect(html).toContain('left:100px');
   });
 
-  it('renders bottom-anchored selection actions on Android instead of suppressing the menu', () => {
+  it('suppresses the React selection bar on Android so only the native Android ActionMode menu appears', () => {
     vi.spyOn(platformModule, 'getPlatformType').mockReturnValue('android');
 
     const containerRef = { current: null };
@@ -69,11 +75,7 @@ describe('PDF Viewer Contextual Selection Menu', () => {
       </ToastProvider>
     );
 
-    expect(html).toContain('viewer-selection-menu is-android');
-    expect(html).toContain('Copy');
-    expect(html).toContain('Select All on Page');
-    expect(html).toContain('Share');
-    expect(html).toContain('Search Web');
+    expect(html).toBe('');
   });
 
   it('hides Copy, Share, and Search Web menu when PDF copying permission is restricted', () => {
@@ -217,6 +219,52 @@ describe('PDF Viewer Contextual Selection Menu', () => {
     expect(addRange).toHaveBeenCalledTimes(1);
   });
 
+  it('scopes selectAllTextOnPage range strictly to selectable text nodes inside spans (excluding <br> and .endOfContent) while preserving search <mark> text', () => {
+    const firstText = { textContent: 'Hello ' } as unknown as Text;
+    const markText = { textContent: 'world' } as unknown as Text;
+    const lastText = { textContent: '!' } as unknown as Text;
+    const span1 = { tagName: 'SPAN' } as unknown as HTMLElement;
+    const span2 = { tagName: 'SPAN' } as unknown as HTMLElement;
+
+    const mockPage1Layer = {
+      textContent: 'Hello world!',
+      querySelector: () => span1,
+      querySelectorAll: () => [span1, span2],
+    } as unknown as HTMLElement;
+
+    const fakeRoot = {
+      querySelector: (selector: string) =>
+        selector === '.pg-item[data-page="1"] .textLayer' ? mockPage1Layer : null,
+    } as unknown as ParentNode;
+
+    const setStart = vi.fn();
+    const setEnd = vi.fn();
+    const selectNodeContents = vi.fn();
+    const addRange = vi.fn();
+    const removeAllRanges = vi.fn();
+
+    vi.stubGlobal('NodeFilter', { SHOW_TEXT: 4 });
+    vi.stubGlobal('document', {
+      createRange: () => ({ setStart, setEnd, selectNodeContents }),
+      createTreeWalker: (node: unknown) => {
+        const list = node === span1 ? [firstText, markText] : [lastText];
+        let idx = 0;
+        return {
+          nextNode: () => (idx < list.length ? list[idx++] : null),
+        };
+      },
+    });
+    vi.stubGlobal('window', {
+      getSelection: () => ({ removeAllRanges, addRange }),
+    });
+
+    expect(selectAllTextOnPage(1, fakeRoot)).toBe(true);
+    expect(selectNodeContents).not.toHaveBeenCalled();
+    expect(setStart).toHaveBeenCalledWith(firstText, 0);
+    expect(setEnd).toHaveBeenCalledWith(lastText, 1);
+    expect(addRange).toHaveBeenCalledTimes(1);
+  });
+
   it('tracks transient text-layer restoration guards accurately without leaking', () => {
     expect(isRestoringTextSelection()).toBe(false);
     const release = beginSelectionRestorationGuard();
@@ -230,5 +278,171 @@ describe('PDF Viewer Contextual Selection Menu', () => {
     cancelPendingTextSelectionRestore();
     release2();
     expect(isRestoringTextSelection()).toBe(false);
+  });
+
+  it('clamps escaped selections touching InTabPDF header or toolbar back inside intersecting .vwr .textLayer nodes', () => {
+    const logoText = { nodeType: 3, textContent: 'InTabPDF', parentElement: { closest: () => null } } as unknown as Text;
+    const pdfStart = { nodeType: 3, textContent: 'Café naïve ', parentElement: null } as unknown as Text;
+    const pdfEnd = { nodeType: 3, textContent: '€100 αβγ', parentElement: null } as unknown as Text;
+    const span1 = { tagName: 'SPAN' } as unknown as HTMLElement;
+    const span2 = { tagName: 'SPAN' } as unknown as HTMLElement;
+    const textLayer = {
+      contains: (node: unknown) => node === pdfStart || node === pdfEnd,
+      querySelectorAll: () => [span1, span2],
+      closest: (sel: string) => (sel === '.pg-item[data-page]' ? { dataset: { page: '1' } } : null),
+    } as unknown as HTMLElement;
+
+    const makeParent = (inLayer: boolean) => ({
+      closest: (sel: string) => {
+        if (sel === '.markedContent, [role="img"], .endOfContent, .copy-restricted') return null;
+        if (sel === '.vwr .textLayer') return inLayer ? textLayer : null;
+        return null;
+      },
+    });
+    (pdfStart as unknown as { parentElement: unknown }).parentElement = makeParent(true);
+    (pdfEnd as unknown as { parentElement: unknown }).parentElement = makeParent(true);
+
+    const setBaseAndExtent = vi.fn();
+    const mockRange = {
+      startContainer: logoText,
+      startOffset: 0,
+      endContainer: pdfEnd,
+      endOffset: 5,
+      intersectsNode: (node: unknown) => node === textLayer,
+    };
+
+    const fakeRoot = {
+      contains: () => true,
+      querySelectorAll: (sel: string) =>
+        sel === '.vwr .textLayer:not(.copy-restricted)' ? [textLayer] : [],
+    } as unknown as ParentNode;
+
+    vi.stubGlobal('NodeFilter', { SHOW_TEXT: 4 });
+    vi.stubGlobal('document', {
+      activeElement: null,
+      createTreeWalker: (node: unknown) => {
+        const list = node === span1 ? [pdfStart] : [pdfEnd];
+        let idx = 0;
+        return { nextNode: () => (idx < list.length ? list[idx++] : null) };
+      },
+    });
+    vi.stubGlobal('window', {
+      getSelection: () => ({
+        isCollapsed: false,
+        rangeCount: 1,
+        anchorNode: logoText,
+        focusNode: pdfEnd,
+        getRangeAt: () => mockRange,
+        setBaseAndExtent,
+      }),
+    });
+
+    expect(clampSelectionToPdfTextLayers(fakeRoot)).toBe(true);
+    expect(setBaseAndExtent).toHaveBeenCalledWith(pdfStart, 0, pdfEnd, 5);
+  });
+
+  it('resolves active page number from selection inside .vwr .textLayer and leaves normal PDF selections untouched', () => {
+    const pdfText = { nodeType: 3, textContent: 'Unicode Ω≈ç' } as unknown as Text;
+    const textLayer = {
+      contains: (node: unknown) => node === pdfText,
+      closest: (sel: string) => (sel === '.pg-item[data-page]' ? { dataset: { page: '2' } } : null),
+    } as unknown as HTMLElement;
+    (pdfText as unknown as { parentElement: unknown }).parentElement = {
+      closest: (sel: string) => {
+        if (sel === '.markedContent, [role="img"], .endOfContent, .copy-restricted') return null;
+        if (sel === '.vwr .textLayer') return textLayer;
+        return null;
+      },
+    };
+
+    const setBaseAndExtent = vi.fn();
+    const mockRange = {
+      startContainer: pdfText,
+      startOffset: 0,
+      endContainer: pdfText,
+      endOffset: 7,
+    };
+    const fakeRoot = { contains: () => true } as unknown as ParentNode;
+
+    vi.stubGlobal('document', { activeElement: null });
+    vi.stubGlobal('window', {
+      getSelection: () => ({
+        isCollapsed: false,
+        rangeCount: 1,
+        anchorNode: pdfText,
+        focusNode: pdfText,
+        getRangeAt: () => mockRange,
+        setBaseAndExtent,
+      }),
+    });
+
+    expect(isSelectionInsidePdfTextLayer(fakeRoot)).toBe(true);
+    expect(resolveSelectionPageNumber(fakeRoot)).toBe(2);
+    expect(clampSelectionToPdfTextLayers(fakeRoot)).toBe(false);
+    expect(setBaseAndExtent).not.toHaveBeenCalled();
+  });
+
+  it('scopes selectAllTextNativeInPdfPage via transient contenteditable and restores DOM cleanly without leaking outside', () => {
+    const attrs = new Map<string, string>();
+    const overlay = { style: { display: 'block' } } as unknown as HTMLElement;
+    const scrollContainer = { scrollTop: 320, scrollLeft: 12 };
+    const selectedTextNode = { nodeType: 3, textContent: 'Page 2 PDF body text' } as unknown as Text;
+
+    const mockPage2Layer = {
+      textContent: 'Page 2 PDF body text',
+      style: { outline: '' },
+      classList: { contains: () => false },
+      contains: (node: unknown) => node === selectedTextNode,
+      closest: (sel: string) => (sel === '.vwr' ? scrollContainer : null),
+      querySelector: () => ({}),
+      querySelectorAll: (sel: string) =>
+        sel.includes('.endOfContent') ? [overlay] : [],
+      getAttribute: (name: string) => attrs.get(name) ?? null,
+      setAttribute: (name: string, val: string) => {
+        attrs.set(name, val);
+      },
+      removeAttribute: (name: string) => {
+        attrs.delete(name);
+      },
+      focus: vi.fn(),
+      blur: vi.fn(),
+    } as unknown as HTMLElement;
+
+    const fakeRoot = {
+      querySelector: (sel: string) =>
+        sel === '.pg-item[data-page="2"] .textLayer' ? mockPage2Layer : null,
+    } as unknown as ParentNode;
+
+    const execCommand = vi.fn(() => {
+      // Simulate scroll shift during focus/execCommand to confirm restoration
+      scrollContainer.scrollTop = 0;
+      scrollContainer.scrollLeft = 0;
+      return true;
+    });
+
+    vi.stubGlobal('document', {
+      execCommand,
+    });
+    vi.stubGlobal('window', {
+      getSelection: () => ({
+        isCollapsed: false,
+        rangeCount: 1,
+        toString: () => 'Page 2 PDF body text',
+        getRangeAt: () => ({
+          startContainer: selectedTextNode,
+          endContainer: selectedTextNode,
+        }),
+      }),
+    });
+
+    expect(selectAllTextNativeInPdfPage(2, fakeRoot)).toBe(true);
+    expect(execCommand).toHaveBeenCalledWith('selectAll');
+    expect(mockPage2Layer.focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(mockPage2Layer.blur).toHaveBeenCalled();
+    expect(attrs.has('contenteditable')).toBe(false);
+    expect(attrs.has('inputmode')).toBe(false);
+    expect(overlay.style.display).toBe('block');
+    expect(scrollContainer.scrollTop).toBe(320);
+    expect(scrollContainer.scrollLeft).toBe(12);
   });
 });

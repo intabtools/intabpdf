@@ -61,5 +61,9 @@ describe('Global Text Selection Policy (Part A)', () => {
 
     // Viewer toolbar search bar container must be non-selectable
     expect(viewerCss).toMatch(/\.viewer-search-bar\s*\{[^}]*user-select:\s*none;/);
+
+    // Header brand logo (InTabPDF) and viewer chrome must explicitly stay non-selectable
+    expect(baseCss).toMatch(/\.hb,\s*\.hb\s*\*/);
+    expect(viewerCss).toMatch(/\.app\.is-viewer\s+\.hdr/);
   });
 });

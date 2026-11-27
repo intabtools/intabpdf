@@ -23,7 +23,13 @@ import { useViewerSearch } from './useViewerSearch';
 import { useViewerShortcuts } from './useViewerShortcuts';
 import { usePdfDocumentLoader } from './usePdfDocumentLoader';
 import { useViewerScrollSync } from './useViewerScrollSync';
-import { selectAllTextOnPage } from './pageTextSelection';
+import {
+  clampSelectionToPdfTextLayers,
+  isSelectionInsidePdfTextLayer,
+  resolveSelectionPageNumber,
+  selectAllTextNativeInPdfPage,
+  selectAllTextOnPage,
+} from './pageTextSelection';
 
 export type { SearchMatch } from './types';
 
@@ -208,16 +214,17 @@ export default function ViewerPage(): ReactNode {
       showToast('Copying text is restricted by this PDF\'s permissions.');
       return;
     }
-    const selected = selectAllTextOnPage(currentPage, shellRef.current);
+    const targetPage = resolveSelectionPageNumber(shellRef.current) ?? currentPage;
+    const selected = selectAllTextOnPage(targetPage, shellRef.current);
     if (!selected) {
-      showToast(`Page ${currentPage} text is still loading…`);
+      showToast(`Page ${targetPage} text is still loading…`);
       return;
     }
 
     setSelectAllSignal((prev) => prev + 1);
 
     if (numPages > 1) {
-      showToast(`Selected text on page ${currentPage} of ${numPages}`);
+      showToast(`Selected text on page ${targetPage} of ${numPages}`);
     }
   }, [allowCopying, currentPage, numPages, showToast]);
 
@@ -245,6 +252,64 @@ export default function ViewerPage(): ReactNode {
       selectCurrentPageText();
     });
   }, [selectCurrentPageText]);
+
+  // Synchronize Android WebView ActionMode "Select all" bridge and clamp any escaped selection range
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const win = window as Window & {
+      __intabSelectAllPdfText?: () => boolean;
+      __intabHandleNativeSelectAll?: () => 'handled' | 'restricted' | 'passthrough';
+      NativeIntent?: { setPdfSelectionActive?: (active: boolean) => void };
+    };
+
+    win.__intabHandleNativeSelectAll = () => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
+        return 'passthrough';
+      }
+      if (!pdfDoc) {
+        return 'passthrough';
+      }
+      if (!allowCopying) {
+        showToast('Copying text is restricted by this PDF\'s permissions.');
+        return 'restricted';
+      }
+      const targetPage = resolveSelectionPageNumber(shellRef.current) ?? currentPage;
+      const selected = selectAllTextNativeInPdfPage(targetPage, shellRef.current);
+      if (selected) {
+        clampSelectionToPdfTextLayers(shellRef.current);
+      } else {
+        showToast(`Page ${targetPage} text is still loading…`);
+      }
+      return 'handled';
+    };
+
+    win.__intabSelectAllPdfText = () => {
+      if (!pdfDoc || !allowCopying) return false;
+      selectCurrentPageText();
+      return true;
+    };
+
+    const syncNativeSelectionState = () => {
+      clampSelectionToPdfTextLayers(shellRef.current);
+      const isActive = Boolean(pdfDoc && allowCopying && isSelectionInsidePdfTextLayer(shellRef.current));
+      win.NativeIntent?.setPdfSelectionActive?.(isActive);
+    };
+
+    syncNativeSelectionState();
+    document.addEventListener('selectionchange', syncNativeSelectionState);
+    return () => {
+      document.removeEventListener('selectionchange', syncNativeSelectionState);
+      win.NativeIntent?.setPdfSelectionActive?.(false);
+      delete win.__intabSelectAllPdfText;
+      delete win.__intabHandleNativeSelectAll;
+    };
+  }, [pdfDoc, allowCopying, currentPage, selectCurrentPageText, showToast]);
 
   useViewerShortcuts({
     isSearchOpen,

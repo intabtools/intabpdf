@@ -359,12 +359,21 @@ class ScanSessionController(
 
     fun deletePage(pageId: String) {
         enqueueMutation {
+            val selectedIdBefore = _uiState.value.selectedPage?.pageId
+            val currentIdx = _uiState.value.selectedPageIndex
             cancelRenderForPage(pageId)
             pipeline.deletePage(pageId)
             captureStore.deletePage(pageId)
             val updated = pipeline.orderedRecords()
-            val currentIdx = _uiState.value.selectedPageIndex
-            val nextIdx = if (updated.isEmpty()) 0 else currentIdx.coerceIn(0, updated.lastIndex)
+            val nextIdx = when {
+                updated.isEmpty() -> 0
+                selectedIdBefore != null && selectedIdBefore != pageId -> {
+                    updated.indexOfFirst { it.pageId == selectedIdBefore }
+                        .takeIf { it >= 0 }
+                        ?: currentIdx.coerceIn(0, updated.lastIndex)
+                }
+                else -> currentIdx.coerceIn(0, updated.lastIndex)
+            }
             val deletingActiveThumbs = _uiState.value.thumbnailCacheKey?.startsWith("${pageId}_") == true
             _uiState.update { state ->
                 state.copy(

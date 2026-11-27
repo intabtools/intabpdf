@@ -1,5 +1,6 @@
 // Platform adapter for picking PDFs and listening for OS file-open events across Web, Electron, and Android.
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import './electron';
 import type { OpenedFile, PlatformAdapter, PlatformType, SaveFileResult } from './types';
 
@@ -287,27 +288,22 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
         }
     }
 
-    // Lazily load @capacitor/app on native platform to attach intent listeners
-    void import('@capacitor/app').then(({ App }) => {
-        // Warm start: intent arrives while app is already open/in background (also handles retained cold-start event)
-        App.addListener('appUrlOpen', async (data) => {
-            if (data.url && (data.url.toLowerCase().endsWith('.pdf') || data.url.startsWith('content://') || data.url.startsWith('file://'))) {
-                await handleLaunchUri(data.url);
-            }
-        }).catch((err) => {
-            console.warn('Failed to attach appUrlOpen listener:', err);
-        });
-
-        // Cold start: App.getLaunchUrl fallback
-        App.getLaunchUrl().then(async (launchUrl) => {
-            if (launchUrl?.url && (launchUrl.url.toLowerCase().endsWith('.pdf') || launchUrl.url.startsWith('content://') || launchUrl.url.startsWith('file://'))) {
-                await handleLaunchUri(launchUrl.url);
-            }
-        }).catch((err) => {
-            console.warn('Failed to retrieve cold-start launch URL:', err);
-        });
+    // Warm start: intent arrives while app is already open/in background (also handles retained cold-start event)
+    App.addListener('appUrlOpen', async (data) => {
+        if (data.url && (data.url.toLowerCase().endsWith('.pdf') || data.url.startsWith('content://') || data.url.startsWith('file://'))) {
+            await handleLaunchUri(data.url);
+        }
     }).catch((err) => {
-        console.warn('Failed to load @capacitor/app:', err);
+        console.warn('Failed to attach appUrlOpen listener:', err);
+    });
+
+    // Cold start: App.getLaunchUrl fallback
+    App.getLaunchUrl().then(async (launchUrl) => {
+        if (launchUrl?.url && (launchUrl.url.toLowerCase().endsWith('.pdf') || launchUrl.url.startsWith('content://') || launchUrl.url.startsWith('file://'))) {
+            await handleLaunchUri(launchUrl.url);
+        }
+    }).catch((err) => {
+        console.warn('Failed to retrieve cold-start launch URL:', err);
     });
 }
 

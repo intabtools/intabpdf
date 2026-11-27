@@ -676,4 +676,562 @@ class OpenCvDocumentDetectorTest {
             scene.release()
         }
     }
+
+    @Test
+    fun detectModeratelyDimNoisyDocumentOverWoodDesk() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(28.0, 22.0, 18.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(110.0, 68.0),
+                Point(515.0, 82.0),
+                Point(530.0, 412.0),
+                Point(98.0, 400.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(88.0, 86.0, 82.0, 255.0))
+            poly.release()
+            addSensorNoise(scene, sigma = 6.5, seed = 101)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad in moderately dim noisy scene", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected topLeft near (0.17, 0.14), got ${quad.topLeft}", quad.topLeft.x in 0.12f..0.23f && quad.topLeft.y in 0.09f..0.20f)
+            assertTrue("Expected bottomRight near (0.83, 0.86), got ${quad.bottomRight}", quad.bottomRight.x in 0.78f..0.88f && quad.bottomRight.y in 0.80f..0.91f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectUnevenlyLitDocumentAcrossDiagonalLightingGradient() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(58.0, 48.0, 40.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(115.0, 72.0),
+                Point(520.0, 78.0),
+                Point(532.0, 412.0),
+                Point(104.0, 404.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(236.0, 234.0, 228.0, 255.0))
+            poly.release()
+
+            // Strong diagonal illumination falloff (top-left 1.0x -> bottom-right 0.30x)
+            val buf = ByteArray(width * height * 4)
+            scene.get(0, 0, buf)
+            for (y in 0 until height) {
+                for (x in 0 until width) {
+                    val u = (x.toDouble() / width + y.toDouble() / height) * 0.5
+                    val factor = (1.0 - 0.70 * u).coerceIn(0.28, 1.0)
+                    val idx = (y * width + x) * 4
+                    buf[idx] = ((buf[idx].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                    buf[idx + 1] = ((buf[idx + 1].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                    buf[idx + 2] = ((buf[idx + 2].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                }
+            }
+            scene.put(0, 0, buf)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad under steep uneven illumination", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected full page area (> 0.38) instead of only lit corner, got ${result.areaFraction}", result.areaFraction > 0.38f)
+            assertTrue("Expected shaded bottomRight near (0.83, 0.86), got ${quad.bottomRight}", quad.bottomRight.x in 0.77f..0.89f && quad.bottomRight.y in 0.79f..0.91f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectDocumentDespiteHardCastShadowAcrossPageBoundary() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(64.0, 52.0, 42.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(110.0, 68.0),
+                Point(524.0, 74.0),
+                Point(530.0, 412.0),
+                Point(102.0, 404.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(238.0, 236.0, 230.0, 255.0))
+            poly.release()
+
+            // Cast shadow cutting diagonally across middle of page + right edge + desk
+            val buf = ByteArray(width * height * 4)
+            scene.get(0, 0, buf)
+            for (y in 0 until height) {
+                for (x in 0 until width) {
+                    val shadowPos = (x - 160.0) * 0.65 + (y - 90.0) * 0.45
+                    val factor = when {
+                        shadowPos < 145.0 -> 1.0
+                        shadowPos < 175.0 -> 1.0 - ((shadowPos - 145.0) / 30.0) * 0.56
+                        else -> 0.44
+                    }
+                    val idx = (y * width + x) * 4
+                    buf[idx] = ((buf[idx].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                    buf[idx + 1] = ((buf[idx + 1].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                    buf[idx + 2] = ((buf[idx + 2].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                }
+            }
+            scene.put(0, 0, buf)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad across cast shadow", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected whole page (> 0.38), not bisected at shadow; area=${result.areaFraction}", result.areaFraction > 0.38f)
+            assertTrue("Expected shadowed bottomRight preserved (~0.83, ~0.86), got ${quad.bottomRight}", quad.bottomRight.x in 0.76f..0.89f && quad.bottomRight.y in 0.78f..0.91f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectLowContrastPaperUnderDimLighting() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        // Dim beige table (52, 46, 40) vs dim off-white paper (86, 83, 78) -> ΔI ≈ 34
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(52.0, 46.0, 40.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(118.0, 74.0),
+                Point(512.0, 86.0),
+                Point(524.0, 408.0),
+                Point(108.0, 396.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(86.0, 83.0, 78.0, 255.0))
+            poly.release()
+            addSensorNoise(scene, sigma = 3.5, seed = 202)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on dim low-contrast paper", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected area near true sheet (> 0.34), got ${result.areaFraction}", result.areaFraction > 0.34f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectTextHeavyDocumentUnderDimLighting() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(26.0, 22.0, 18.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(116.0, 62.0),
+                Point(524.0, 68.0),
+                Point(530.0, 418.0),
+                Point(110.0, 412.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(92.0, 90.0, 86.0, 255.0))
+            poly.release()
+
+            // Dense dark text header + paragraphs + table box inside dim sheet
+            Imgproc.rectangle(scene, Point(150.0, 96.0), Point(490.0, 126.0), Scalar(24.0, 24.0, 28.0, 255.0), -1)
+            for (row in 0 until 10) {
+                val y = 148.0 + row * 24.0
+                Imgproc.line(scene, Point(152.0, y), Point(320.0, y), Scalar(28.0, 28.0, 32.0, 255.0), 3)
+                Imgproc.line(scene, Point(342.0, y), Point(492.0, y), Scalar(30.0, 30.0, 34.0, 255.0), 3)
+            }
+            Imgproc.rectangle(scene, Point(150.0, 240.0), Point(492.0, 376.0), Scalar(32.0, 32.0, 36.0, 255.0), 2)
+            addSensorNoise(scene, sigma = 4.5, seed = 303)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on dim text-heavy page", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected outer paper boundary (> 0.36) rather than inner text box, got ${result.areaFraction}", result.areaFraction > 0.36f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectTiltedTrapezoidalPageUnderDimLighting() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(28.0, 23.0, 19.0, 255.0))
+        try {
+            val trapezoid = MatOfPoint(
+                Point(210.0, 102.0),
+                Point(440.0, 118.0),
+                Point(546.0, 392.0),
+                Point(88.0, 366.0),
+            )
+            Imgproc.fillPoly(scene, listOf(trapezoid), Scalar(88.0, 86.0, 82.0, 255.0))
+            trapezoid.release()
+            for (row in 0 until 5) {
+                val y = 166.0 + row * 36.0
+                Imgproc.line(scene, Point(190.0, y), Point(445.0, y + 6.0), Scalar(28.0, 28.0, 30.0, 255.0), 3)
+            }
+            addSensorNoise(scene, sigma = 4.5, seed = 404)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected tilted trapezoidal quad in dim lighting", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected foreshortened top edge < bottom edge", quad.topLeft.distanceTo(quad.topRight) < quad.bottomLeft.distanceTo(quad.bottomRight))
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectOpenNotebookWithUnderlyingPagesUnderDimLighting() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(26.0, 22.0, 18.0, 255.0))
+        try {
+            // Dark book cover
+            Imgproc.rectangle(scene, Point(12.0, 50.0), Point(588.0, 434.0), Scalar(14.0, 15.0, 18.0, 255.0), -1)
+
+            // Opposite left page
+            val leftPage = MatOfPoint(Point(22.0, 74.0), Point(164.0, 74.0), Point(164.0, 408.0), Point(22.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(leftPage), Scalar(78.0, 77.0, 75.0, 255.0))
+            leftPage.release()
+
+            // Underlying right staircase sheets
+            for ((idx, rightX) in listOf(532.0, 518.0).withIndex()) {
+                val shade = 70.0 + idx * 7.0
+                val sheet = MatOfPoint(Point(188.0, 74.0), Point(rightX, 74.0), Point(rightX, 408.0), Point(188.0, 408.0))
+                Imgproc.fillPoly(scene, listOf(sheet), Scalar(shade, shade - 1.0, shade - 2.0, 255.0))
+                Imgproc.line(scene, Point(rightX - 1.0, 75.0), Point(rightX - 1.0, 407.0), Scalar(34.0, 34.0, 36.0, 255.0), 2)
+                sheet.release()
+            }
+
+            // Target right page: spine x = 188 (0.294), right edge x = 504 (0.788)
+            val targetRight = MatOfPoint(Point(188.0, 74.0), Point(504.0, 74.0), Point(504.0, 408.0), Point(188.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(targetRight), Scalar(94.0, 92.0, 90.0, 255.0))
+            Imgproc.line(scene, Point(506.0, 75.0), Point(506.0, 407.0), Scalar(36.0, 36.0, 38.0, 255.0), 2)
+            targetRight.release()
+
+            // Spine gutter + dim ruled notes
+            Imgproc.rectangle(scene, Point(166.0, 72.0), Point(188.0, 410.0), Scalar(20.0, 20.0, 22.0, 255.0), -1)
+            for (row in 0 until 5) {
+                val y = 122.0 + row * 48.0
+                Imgproc.line(scene, Point(220.0, y), Point(470.0, y), Scalar(44.0, 46.0, 52.0, 255.0), 2)
+            }
+            addSensorNoise(scene, sigma = 3.5, seed = 505)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on dim open notebook", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Centre binding preserved (~0.294): TL.x=${quad.topLeft.x}, BL.x=${quad.bottomLeft.x}", quad.topLeft.x in 0.25f..0.34f && quad.bottomLeft.x in 0.25f..0.34f)
+            assertTrue("Right staircase trimmed (~0.788): TR.x=${quad.topRight.x}, BR.x=${quad.bottomRight.x}", quad.topRight.x in 0.745f..0.822f && quad.bottomRight.x in 0.745f..0.822f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun rejectsBlankDarkEmptyFrameWithoutFalseDocumentLock() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(24.0, 24.0, 24.0, 255.0))
+        try {
+            addSensorNoise(scene, sigma = 6.0, seed = 606)
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            assertTrue(
+                "Noisy flat dark frame must not exceed lock threshold (< 0.45), got confidence=${result.confidence}",
+                result.normalizedQuad == null || result.confidence < 0.45f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun benchmarkLivePreviewDetectionThroughputNormalVsDimLight() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val detector = OpenCvDocumentDetector()
+        val normal = Mat(480, 640, CvType.CV_8UC4, Scalar(64.0, 52.0, 42.0, 255.0))
+        val dim = Mat(480, 640, CvType.CV_8UC4, Scalar(28.0, 23.0, 19.0, 255.0))
+        try {
+            val poly = MatOfPoint(Point(110.0, 68.0), Point(520.0, 82.0), Point(530.0, 412.0), Point(98.0, 400.0))
+            Imgproc.fillPoly(normal, listOf(poly), Scalar(242.0, 240.0, 236.0, 255.0))
+            Imgproc.fillPoly(dim, listOf(poly), Scalar(88.0, 86.0, 82.0, 255.0))
+            poly.release()
+            addSensorNoise(dim, sigma = 5.0, seed = 707)
+
+            // Warmup
+            repeat(2) {
+                detector.detect(normal, DetectionMode.LIVE_PREVIEW)
+                detector.detect(dim, DetectionMode.LIVE_PREVIEW)
+            }
+
+            val iterations = 15
+            var normalTotalMs = 0L
+            repeat(iterations) {
+                normalTotalMs += detector.detect(normal, DetectionMode.LIVE_PREVIEW).inferenceTimeMs
+            }
+            var dimTotalMs = 0L
+            repeat(iterations) {
+                dimTotalMs += detector.detect(dim, DetectionMode.LIVE_PREVIEW).inferenceTimeMs
+            }
+
+            val normalAvgMs = normalTotalMs.toDouble() / iterations
+            val dimAvgMs = dimTotalMs.toDouble() / iterations
+            val normalFps = if (normalAvgMs > 0.0) 1000.0 / normalAvgMs else 999.0
+            val dimFps = if (dimAvgMs > 0.0) 1000.0 / dimAvgMs else 999.0
+            android.util.Log.i(
+                "ScannerPerf",
+                "LIVE_PREVIEW normalAvg=${"%.1f".format(normalAvgMs)}ms (${"%.1f".format(normalFps)} FPS) dimAvg=${"%.1f".format(dimAvgMs)}ms (${"%.1f".format(dimFps)} FPS)",
+            )
+            assertTrue("Expected normal-light detection under 120ms/frame, got ${normalAvgMs}ms", normalAvgMs < 120.0)
+            assertTrue("Expected dim-light detection under 150ms/frame, got ${dimAvgMs}ms", dimAvgMs < 150.0)
+        } finally {
+            normal.release()
+            dim.release()
+        }
+    }
+
+    @Test
+    fun detectNormalIndoorExposureDocumentWithThinTextAndWoodGrain() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        val scene = Mat(height, width, CvType.CV_8UC4)
+        try {
+            for (y in 0 until height) {
+                val row = ByteArray(width * 4)
+                for (x in 0 until width) {
+                    val grain = (kotlin.math.sin(y * 0.22 + kotlin.math.sin(x * 0.06) * 2.0) * 10.0).toInt()
+                    row[x * 4] = (108 + grain).coerceIn(0, 255).toByte()
+                    row[x * 4 + 1] = (92 + grain).coerceIn(0, 255).toByte()
+                    row[x * 4 + 2] = (74 + grain).coerceIn(0, 255).toByte()
+                    row[x * 4 + 3] = 255.toByte()
+                }
+                scene.put(y, 0, row)
+            }
+
+            // Typical mobile camera AE exposure in indoor light (paper ~156 -> p90 < 165, span90 < 105)
+            val poly = MatOfPoint(
+                Point(110.0, 66.0),
+                Point(518.0, 78.0),
+                Point(532.0, 408.0),
+                Point(96.0, 396.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(156.0, 154.0, 150.0, 255.0))
+            poly.release()
+
+            for (rowIdx in 0 until 9) {
+                val y = 112.0 + rowIdx * 28.0
+                Imgproc.line(scene, Point(145.0, y), Point(482.0, y), Scalar(52.0, 52.0, 56.0, 255.0), 1)
+            }
+            Imgproc.GaussianBlur(scene, scene, org.opencv.core.Size(3.0, 3.0), 0.7)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad in normal indoor AE exposure", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected full page area > 0.36, got ${result.areaFraction}", result.areaFraction > 0.36f)
+            assertTrue(
+                "Expected accurate corners near (0.17,0.14)..(0.83,0.85), got TL=${quad.topLeft}, BR=${quad.bottomRight}",
+                quad.topLeft.x in 0.13f..0.22f && quad.topLeft.y in 0.10f..0.19f &&
+                    quad.bottomRight.x in 0.78f..0.88f && quad.bottomRight.y in 0.80f..0.90f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectNormalLightingDocumentOnMediumDeskWithSmallPercentileSpan() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        // Medium desk (132, 126, 118) vs paper (196, 194, 190): bright scene with span90 < 105
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(132.0, 126.0, 118.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(118.0, 72.0),
+                Point(512.0, 86.0),
+                Point(524.0, 408.0),
+                Point(108.0, 396.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(196.0, 194.0, 190.0, 255.0))
+            poly.release()
+            for (rowIdx in 0 until 7) {
+                val y = 122.0 + rowIdx * 34.0
+                Imgproc.line(scene, Point(155.0, y), Point(470.0, y), Scalar(78.0, 78.0, 82.0, 255.0), 2)
+            }
+            Imgproc.GaussianBlur(scene, scene, org.opencv.core.Size(3.0, 3.0), 0.7)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on medium-contrast normal desk", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected area > 0.34, got ${result.areaFraction}", result.areaFraction > 0.34f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectIndoorOpenNotebookWithMediumDeskAndModeratePaperContrast() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        // Normal indoor desk where paper=152 vs desk=104 (p90 < 165 and span90 < 105)
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(104.0, 96.0, 86.0, 255.0))
+        try {
+            // Cover & opposite left page
+            Imgproc.rectangle(scene, Point(12.0, 50.0), Point(588.0, 434.0), Scalar(48.0, 50.0, 56.0, 255.0), -1)
+            val oppLeft = MatOfPoint(Point(22.0, 74.0), Point(164.0, 74.0), Point(164.0, 408.0), Point(22.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(oppLeft), Scalar(144.0, 142.0, 138.0, 255.0))
+            oppLeft.release()
+
+            // Target right page with softer spine & subtle ruled lines
+            val targetRight = MatOfPoint(Point(188.0, 74.0), Point(504.0, 74.0), Point(504.0, 408.0), Point(188.0, 408.0))
+            Imgproc.fillPoly(scene, listOf(targetRight), Scalar(156.0, 154.0, 150.0, 255.0))
+            targetRight.release()
+
+            // Binding gutter + ruled text lines
+            Imgproc.rectangle(scene, Point(166.0, 72.0), Point(188.0, 410.0), Scalar(64.0, 64.0, 68.0, 255.0), -1)
+            for (rowIdx in 0 until 6) {
+                val y = 118.0 + rowIdx * 42.0
+                Imgproc.line(scene, Point(216.0, y), Point(474.0, y), Scalar(84.0, 88.0, 96.0, 255.0), 2)
+            }
+            Imgproc.GaussianBlur(scene, scene, org.opencv.core.Size(3.0, 3.0), 0.7)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on indoor open notebook", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected right page boundary preserved (~0.294..0.788), got TL.x=${quad.topLeft.x}, TR.x=${quad.topRight.x}", quad.topLeft.x in 0.25f..0.34f && quad.topRight.x in 0.74f..0.83f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectMediumDimLowContrastShadowedPageWithoutRawFloorOverPenalty() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        // Realistic dim indoor beige table (66, 62, 56) vs paper (102, 100, 96), with shading on right half
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(66.0, 62.0, 56.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(110.0, 70.0),
+                Point(515.0, 82.0),
+                Point(530.0, 408.0),
+                Point(96.0, 396.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(102.0, 100.0, 96.0, 255.0))
+            poly.release()
+
+            val buf = ByteArray(width * height * 4)
+            scene.get(0, 0, buf)
+            for (y in 0 until height) {
+                for (x in 0 until width) {
+                    val factor = if (x < 280) 1.0 else (1.0 - ((x - 280.0) / 360.0) * 0.22)
+                    val idx = (y * width + x) * 4
+                    buf[idx] = ((buf[idx].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                    buf[idx + 1] = ((buf[idx + 1].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                    buf[idx + 2] = ((buf[idx + 2].toInt() and 0xFF) * factor).toInt().coerceIn(0, 255).toByte()
+                }
+            }
+            scene.put(0, 0, buf)
+            addSensorNoise(scene, sigma = 3.0, seed = 808)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on dim low-contrast shaded page (conf=${result.confidence})", quad)
+            assertTrue("Expected confidence >= 0.45 on dim low-contrast shaded page, got ${result.confidence}", result.confidence >= 0.45f)
+            assertTrue("Expected full page area > 0.34, got ${result.areaFraction}", result.areaFraction > 0.34f)
+        } finally {
+            scene.release()
+        }
+    }
+
+    @Test
+    fun detectDocumentWithSoftOpticalEdgeAndDarkPageBorderWithoutInwardShrink() {
+        assertTrue(OpenCvRuntime.ensureInitialized())
+
+        val width = 640
+        val height = 480
+        // Light desk (138, 128, 114) + slightly soft page edge + inner margin border frame
+        val scene = Mat(height, width, CvType.CV_8UC4, Scalar(138.0, 128.0, 114.0, 255.0))
+        try {
+            val poly = MatOfPoint(
+                Point(110.0, 68.0),
+                Point(530.0, 74.0),
+                Point(536.0, 412.0),
+                Point(104.0, 406.0),
+            )
+            Imgproc.fillPoly(scene, listOf(poly), Scalar(226.0, 224.0, 220.0, 255.0))
+            poly.release()
+            // Subtle darker margin shading + inner table border ~22px inside left/right edges
+            Imgproc.rectangle(scene, Point(136.0, 96.0), Point(504.0, 384.0), Scalar(90.0, 92.0, 96.0, 255.0), 2)
+            Imgproc.GaussianBlur(scene, scene, org.opencv.core.Size(5.0, 5.0), 1.4)
+
+            val result = OpenCvDocumentDetector().detect(scene, DetectionMode.LIVE_PREVIEW)
+            val quad = result.normalizedQuad
+            assertNotNull("Expected valid quad on bordered document with soft edge", quad)
+            quad!!
+            assertTrue("Expected confidence >= 0.45, got ${result.confidence}", result.confidence >= 0.45f)
+            // True outer page edges are 0.172 (110/640) and 0.828 (530/640); must not shrink to inner border (0.212..0.788)
+            assertTrue(
+                "Expected outer page edges (~0.172..0.828), not inner margin frame; TL.x=${quad.topLeft.x}, TR.x=${quad.topRight.x}",
+                quad.topLeft.x in 0.14f..0.195f && quad.topRight.x in 0.80f..0.86f,
+            )
+        } finally {
+            scene.release()
+        }
+    }
+
+    private fun addSensorNoise(rgbaMat: Mat, sigma: Double, seed: Int) {
+        val w = rgbaMat.cols()
+        val h = rgbaMat.rows()
+        val buf = ByteArray(w * h * 4)
+        rgbaMat.get(0, 0, buf)
+        val rng = java.util.Random(seed.toLong())
+        for (i in 0 until w * h) {
+            val n = (rng.nextGaussian() * sigma).toInt()
+            val idx = i * 4
+            buf[idx] = ((buf[idx].toInt() and 0xFF) + n).coerceIn(0, 255).toByte()
+            buf[idx + 1] = ((buf[idx + 1].toInt() and 0xFF) + n).coerceIn(0, 255).toByte()
+            buf[idx + 2] = ((buf[idx + 2].toInt() and 0xFF) + n).coerceIn(0, 255).toByte()
+        }
+        rgbaMat.put(0, 0, buf)
+    }
 }

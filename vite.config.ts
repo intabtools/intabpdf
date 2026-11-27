@@ -1,12 +1,29 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
+
+/** Moves built stylesheet links ahead of module scripts so WebView parses CSS without waiting behind JS preloads. */
+function prioritizeStylesheetInHead(): Plugin {
+  return {
+    name: 'prioritize-stylesheet-in-head',
+    enforce: 'post',
+    transformIndexHtml(html) {
+      const stylesheetRe = /<link\b[^>]*rel=["']stylesheet["'][^>]*>\s*/gi;
+      const stylesheets = html.match(stylesheetRe);
+      if (!stylesheets?.length) return html;
+      const stripped = html.replace(stylesheetRe, '');
+      const insertTarget = /(<(?:script\b[^>]*type=["']module["']|link\b[^>]*rel=["']modulepreload["']))/i;
+      if (!insertTarget.test(stripped)) return html;
+      return stripped.replace(insertTarget, `${stylesheets.join('')}$1`);
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
   const isBuild = command === 'build';
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), prioritizeStylesheetInHead()],
     base: mode === 'desktop' || mode === 'android' ? './' : '/',
     define: isBuild
       ? {

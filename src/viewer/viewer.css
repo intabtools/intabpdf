@@ -1,5 +1,30 @@
 /* Refined PDF Viewer styles matching InTabPDF.html concept art */
 
+.app.is-viewer .hdr,
+.app.is-viewer .hdr *:not(input):not(textarea),
+.viewer-shell,
+.viewer-shell .vtb,
+.viewer-shell .vtb *:not(input):not(textarea),
+.viewer-shell .thm,
+.viewer-shell .thm *,
+.viewer-permission-banner {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.app.is-viewer {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+[data-intab-select-all-excluded="true"],
+[data-intab-select-all-excluded="true"] * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  user-select: none !important;
+}
+
 .viewer-shell {
   display: flex;
   flex-direction: column;
@@ -9,6 +34,14 @@
   color: var(--text);
   overflow: hidden;
   position: relative;
+}
+
+.app.is-viewer input,
+.app.is-viewer textarea,
+.viewer-shell input,
+.viewer-shell textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Outer layout wrapper */
@@ -365,6 +398,12 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-muted);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pg-placeholder[data-label]::before {
+  content: attr(data-label);
 }
 
 /* TextLayer overlay for text selection and search highlights */
@@ -456,8 +495,26 @@
   display: contents;
 }
 
+.textLayer span[role="img"] {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
 .textLayer ::selection {
   background: rgba(0, 100, 255, 0.35);
+}
+
+/* Keep <br> line breaks inside Selection.toString() while suppressing left-edge highlight strips */
+.textLayer br::-moz-selection {
+  background: transparent;
+  color: transparent;
+}
+
+.textLayer br::selection {
+  background: transparent;
+  color: transparent;
 }
 
 .textLayer mark.search-highlight,

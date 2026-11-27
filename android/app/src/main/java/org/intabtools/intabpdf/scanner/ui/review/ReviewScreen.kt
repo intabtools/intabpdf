@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -47,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,9 +64,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import kotlin.math.abs
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -314,22 +319,50 @@ fun ReviewScreen(
             val latestSelectedIndex by rememberUpdatedState(uiState.selectedPageIndex)
             val latestPageCount by rememberUpdatedState(uiState.pages.size)
             var pendingProgrammaticPage by remember { mutableStateOf<Int?>(null) }
+            var awaitingSwipeSyncIndex by remember { mutableStateOf<Int?>(null) }
 
             LaunchedEffect(pagerState) {
-                snapshotFlow { pagerState.settledPage }
-                    .collect { settled ->
+                snapshotFlow {
+                    PagerSwipeSnapshot(
+                        currentPage = pagerState.currentPage,
+                        settledPage = pagerState.settledPage,
+                        targetPage = pagerState.targetPage,
+                        isScrollInProgress = pagerState.isScrollInProgress,
+                    )
+                }
+                    .distinctUntilChanged()
+                    .collect { snap ->
                         val count = latestPageCount
-                        if (count > 0 && pendingProgrammaticPage == null && !pagerState.isScrollInProgress) {
-                            val clamped = settled.coerceIn(0, count - 1)
-                            if (clamped != latestSelectedIndex && pagerState.currentPage == pagerState.targetPage) {
-                                onSelectPage(clamped)
-                            }
+                        if (count <= 0 || pendingProgrammaticPage != null) return@collect
+
+                        val candidate = if (!snap.isScrollInProgress && snap.currentPage == snap.targetPage) {
+                            snap.settledPage.coerceIn(0, count - 1)
+                        } else {
+                            snap.currentPage.coerceIn(0, count - 1)
+                        }
+
+                        if (candidate != latestSelectedIndex && awaitingSwipeSyncIndex != candidate) {
+                            awaitingSwipeSyncIndex = candidate
+                            onSelectPage(candidate)
                         }
                     }
             }
 
-            LaunchedEffect(uiState.selectedPageIndex, uiState.pages.size) {
+            LaunchedEffect(uiState.selectedPageIndex, uiState.pages.size, uiState.selectedPage?.pageId) {
                 val target = uiState.selectedPageIndex.coerceIn(0, uiState.pages.lastIndex)
+                val awaiting = awaitingSwipeSyncIndex
+                if (awaiting != null) {
+                    if (target == awaiting) {
+                        awaitingSwipeSyncIndex = null
+                        if (pagerState.currentPage == target || pagerState.isScrollInProgress) {
+                            return@LaunchedEffect
+                        }
+                    } else if (pagerState.isScrollInProgress) {
+                        return@LaunchedEffect
+                    } else {
+                        awaitingSwipeSyncIndex = null
+                    }
+                }
                 if (pagerState.currentPage != target) {
                     pendingProgrammaticPage = target
                     try {
@@ -858,6 +891,13 @@ private fun PagePreviewCanvas(
     }
 }
 
+private data class PagerSwipeSnapshot(
+    val currentPage: Int,
+    val settledPage: Int,
+    val targetPage: Int,
+    val isScrollInProgress: Boolean,
+)
+
 @Composable
 private fun PageThumbnailStrip(
     pages: List<ReversiblePageRecord>,
@@ -873,8 +913,20 @@ private fun PageThumbnailStrip(
 ) {
     val listState = rememberLazyListState()
     LaunchedEffect(selectedIndex, pages.size) {
-        if (selectedIndex in pages.indices) {
+        if (selectedIndex !in pages.indices) return@LaunchedEffect
+        val existingItem = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (existingItem == null) {
             listState.animateScrollToItem(selectedIndex)
+        }
+        val info = listState.layoutInfo
+        val itemInfo = info.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
+        if (itemInfo != null && info.viewportEndOffset > info.viewportStartOffset) {
+            val viewportCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+            val itemCenter = itemInfo.offset + (itemInfo.size / 2f)
+            val delta = itemCenter - viewportCenter
+            if (abs(delta) > 4f) {
+                listState.animateScrollBy(delta)
+            }
         }
     }
 
@@ -903,107 +955,14 @@ private fun PageThumbnailStrip(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             itemsIndexed(pages, key = { _, page -> page.pageId }) { idx, page ->
-                val isSelected = idx == selectedIndex
-                val renderedFile = renderedFiles[page.pageId]?.outputFile
-                val thumbFile = renderedFile ?: java.io.File(page.sourceFilePath)
-                val cacheKey = if (renderedFile != null) {
-                    "page_thumb_${page.pageId}_${renderedFile.absolutePath}_${renderedFile.lastModified()}"
-                } else {
-                    "page_thumb_src_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
-                }
-                var thumbBitmap by remember(page.pageId) {
-                    mutableStateOf(bitmapLoader.getCachedDisplayBitmap(cacheKey, 48_000L))
-                }
-                LaunchedEffect(cacheKey, page.sourceFilePath, page.quadVersion, page.rotationDegrees) {
-                    bitmapLoader.getCachedDisplayBitmap(cacheKey, 48_000L)?.let { cached ->
-                        thumbBitmap = cached
-                        return@LaunchedEffect
-                    }
-                    val loaded = bitmapLoader.loadDisplayBitmap(
-                        file = thumbFile,
-                        cacheKey = cacheKey,
-                        maxPixels = 48_000L,
-                    ) ?: if (renderedFile != null) {
-                        val fallbackKey = "page_thumb_src_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
-                        bitmapLoader.loadDisplayBitmap(
-                            file = java.io.File(page.sourceFilePath),
-                            cacheKey = fallbackKey,
-                            maxPixels = 48_000L,
-                        )
-                    } else {
-                        null
-                    }
-                    if (loaded != null) {
-                        thumbBitmap = loaded
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(width = 52.dp, height = 64.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(InTabColors.DarkBackground)
-                        .testTag("review_page_thumb_$idx")
-                        .semantics(mergeDescendants = true) {
-                            selected = isSelected
-                            contentDescription = "Page ${idx + 1}"
-                        }
-                        .clickable { onSelectPage(idx) },
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = InTabColors.DarkBackground,
-                        border = BorderStroke(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) InTabColors.BrandIndigoSoftText else InTabColors.DarkBorder,
-                        ),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            if (thumbBitmap != null) {
-                                Image(
-                                    bitmap = thumbBitmap!!.asImageBitmap(),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(2.dp)
-                                        .graphicsLayer {
-                                            if (renderedFile == null && page.rotationDegrees != 0) {
-                                                rotationZ = page.rotationDegrees.toFloat()
-                                            }
-                                        },
-                                )
-                            } else {
-                                Text(
-                                    text = "${idx + 1}",
-                                    color = InTabColors.DarkTextMuted,
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = if (isSelected) {
-                                    InTabColors.BrandIndigoLight
-                                } else {
-                                    Color.Black.copy(alpha = 0.68f)
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(2.dp),
-                            ) {
-                                Text(
-                                    text = "${idx + 1}",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                )
-                            }
-                        }
-                    }
-                }
+                PageThumbnailTile(
+                    page = page,
+                    pageIndex = idx,
+                    isSelected = idx == selectedIndex,
+                    renderedFile = renderedFiles[page.pageId]?.outputFile,
+                    bitmapLoader = bitmapLoader,
+                    onSelect = { onSelectPage(idx) },
+                )
             }
 
             item(key = "add_page_tile") {
@@ -1050,6 +1009,116 @@ private fun PageThumbnailStrip(
                 onClick = onMoveRight,
                 modifier = Modifier.testTag("review_move_right"),
             )
+        }
+    }
+}
+
+@Composable
+private fun PageThumbnailTile(
+    page: ReversiblePageRecord,
+    pageIndex: Int,
+    isSelected: Boolean,
+    renderedFile: java.io.File?,
+    bitmapLoader: ScanBitmapLoader,
+    onSelect: () -> Unit,
+) {
+    val thumbFile = renderedFile ?: java.io.File(page.sourceFilePath)
+    val cacheKey = if (renderedFile != null) {
+        "page_thumb_${page.pageId}_${renderedFile.absolutePath}_${renderedFile.lastModified()}"
+    } else {
+        "page_thumb_src_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
+    }
+    var thumbBitmap by remember(page.pageId) {
+        mutableStateOf(bitmapLoader.getCachedDisplayBitmap(cacheKey, 48_000L))
+    }
+    LaunchedEffect(cacheKey, page.sourceFilePath, page.quadVersion, page.rotationDegrees) {
+        bitmapLoader.getCachedDisplayBitmap(cacheKey, 48_000L)?.let { cached ->
+            thumbBitmap = cached
+            return@LaunchedEffect
+        }
+        val loaded = bitmapLoader.loadDisplayBitmap(
+            file = thumbFile,
+            cacheKey = cacheKey,
+            maxPixels = 48_000L,
+        ) ?: if (renderedFile != null) {
+            val fallbackKey = "page_thumb_src_${page.pageId}_${page.quadVersion}_${page.rotationDegrees}"
+            bitmapLoader.loadDisplayBitmap(
+                file = java.io.File(page.sourceFilePath),
+                cacheKey = fallbackKey,
+                maxPixels = 48_000L,
+            )
+        } else {
+            null
+        }
+        if (loaded != null) {
+            thumbBitmap = loaded
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(width = 52.dp, height = 64.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(InTabColors.DarkBackground)
+            .testTag("review_page_thumb_$pageIndex")
+            .selectable(selected = isSelected, onClick = onSelect)
+            .semantics {
+                stateDescription = if (isSelected) "Selected" else "Not selected"
+                contentDescription = "Page ${pageIndex + 1}"
+            },
+    ) {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = InTabColors.DarkBackground,
+            border = BorderStroke(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) InTabColors.BrandIndigoSoftText else InTabColors.DarkBorder,
+            ),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (thumbBitmap != null) {
+                    Image(
+                        bitmap = thumbBitmap!!.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp)
+                            .graphicsLayer {
+                                if (renderedFile == null && page.rotationDegrees != 0) {
+                                    rotationZ = page.rotationDegrees.toFloat()
+                                }
+                            },
+                    )
+                } else {
+                    Text(
+                        text = "${pageIndex + 1}",
+                        color = InTabColors.DarkTextMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (isSelected) {
+                        InTabColors.BrandIndigoLight
+                    } else {
+                        Color.Black.copy(alpha = 0.68f)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(2.dp),
+                ) {
+                    Text(
+                        text = "${pageIndex + 1}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                    )
+                }
+            }
         }
     }
 }

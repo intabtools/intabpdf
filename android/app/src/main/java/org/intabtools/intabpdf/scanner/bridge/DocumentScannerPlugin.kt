@@ -34,8 +34,17 @@ class DocumentScannerPlugin : Plugin() {
 
     override fun load() {
         super.load()
-        ScannerPaths.pruneStaleDirectory(ScannerPaths.outputDir(context))
-        ScannerPaths.pruneStaleDirectory(ScannerPaths.sessionsDir(context))
+        val appContext = context.applicationContext
+        Thread(
+            {
+                ScannerPaths.pruneStaleDirectory(ScannerPaths.outputDir(appContext))
+                ScannerPaths.pruneStaleDirectory(ScannerPaths.sessionsDir(appContext))
+            },
+            "intab-scanner-prune",
+        ).apply {
+            isDaemon = true
+            start()
+        }
     }
 
     override fun handleOnDestroy() {

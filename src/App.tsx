@@ -106,19 +106,14 @@ function ScreenAwakeSync(): null {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let raf1 = 0;
-    let raf2 = 0;
-    raf1 = window.requestAnimationFrame(() => {
-      raf2 = window.requestAnimationFrame(() => {
-        const nativeBridge = (window as Window & {
-          NativeIntent?: { notifyInitialUiReady?: () => void };
-        }).NativeIntent;
-        nativeBridge?.notifyInitialUiReady?.();
-      });
+    const rafId = window.requestAnimationFrame(() => {
+      const nativeBridge = (window as Window & {
+        NativeIntent?: { notifyInitialUiReady?: () => void };
+      }).NativeIntent;
+      nativeBridge?.notifyInitialUiReady?.();
     });
     return () => {
-      window.cancelAnimationFrame(raf1);
-      window.cancelAnimationFrame(raf2);
+      window.cancelAnimationFrame(rafId);
     };
   }, []);
 

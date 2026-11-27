@@ -378,7 +378,7 @@ export default function VisiblePage({
       )}
       {isVisible && <div ref={annotationLayerRef} className="annotationLayer" />}
       {!isVisible && !isTextLayerMounted && (
-        <span className="pg-placeholder">Page {pageNumber}</span>
+        <span className="pg-placeholder" data-label={`Page ${pageNumber}`} aria-hidden="true" />
       )}
     </div>
   );

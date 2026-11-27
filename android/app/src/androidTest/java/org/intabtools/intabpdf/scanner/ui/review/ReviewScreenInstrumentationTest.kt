@@ -289,6 +289,329 @@ class ReviewScreenInstrumentationTest {
         }
     }
 
+    @Test
+    fun swipeAndThumbnailSelectionStaySynchronizedAcrossEdits() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.CAMERA,
+        )
+
+        val images = (1..3).map { idx ->
+            writeSamplePageImage(
+                context = context,
+                name = "sync_p$idx.jpg",
+                color = Scalar(235.0, 238.0 + idx, 242.0),
+            )
+        }
+
+        try {
+            val intent = ScannerLaunchOptions(autoCaptureDefault = false)
+                .applyToIntent(Intent(context, ScannerActivity::class.java))
+
+            ActivityScenario.launch<ScannerActivity>(intent).use { scenario ->
+                scenario.onActivity { activity ->
+                    activity.sessionControllerForTest().importGalleryUris(images.map { Uri.fromFile(it) })
+                }
+                waitUntilSession(scenario) {
+                    !it.isImportingGallery &&
+                        it.route is ScannerRoute.Review &&
+                        it.pages.size == 3
+                }
+
+                val previewNode = waitForNodeByContentDescPrefix("Scanned page preview")!!
+                val previewRect = Rect().also { previewNode.getBoundsInScreen(it) }
+
+                fun assertSyncedSelection(expectedIndex: Int, expectedTotal: Int) {
+                    waitUntilSession(scenario) {
+                        it.selectedPageIndex == expectedIndex && it.pages.size == expectedTotal
+                    }
+                    assertNotNull(
+                        "Header must show Page ${expectedIndex + 1} of $expectedTotal",
+                        waitForNodeByTextOrDesc("Page ${expectedIndex + 1} of $expectedTotal"),
+                    )
+                    var lastStates = ""
+                    val deadline = SystemClock.uptimeMillis() + 5_000L
+                    var synced = false
+                    while (SystemClock.uptimeMillis() < deadline && !synced) {
+                        val parts = mutableListOf<String>()
+                        synced = true
+                        for (i in 0 until expectedTotal) {
+                            val thumb = findNode { it.contentDescription?.toString() == "Page ${i + 1}" }
+                            val parent = thumb?.parent?.also { it.refresh() }
+                            val isThumbSelected = thumb != null && (
+                                thumb.isChecked ||
+                                    parent?.isChecked == true ||
+                                    thumb.isSelected ||
+                                    parent?.isSelected == true ||
+                                    thumb.stateDescription?.toString() == "Selected" ||
+                                    parent?.stateDescription?.toString() == "Selected"
+                                )
+                            parts += "p${i + 1}=$isThumbSelected(sd=${parent?.stateDescription ?: thumb?.stateDescription})"
+                            if (thumb == null || isThumbSelected != (i == expectedIndex)) {
+                                synced = false
+                            }
+                        }
+                        lastStates = parts.joinToString()
+                        if (!synced) {
+                            Thread.sleep(100L)
+                        }
+                    }
+                    assertTrue("Thumbnail sync failed for expectedIndex=$expectedIndex: $lastStates", synced)
+                }
+
+                assertSyncedSelection(expectedIndex = 0, expectedTotal = 3)
+
+                // Swipe left (0 -> 1)
+                swipeHorizontal(previewRect, leftToRight = false)
+                assertSyncedSelection(expectedIndex = 1, expectedTotal = 3)
+
+                // Apply Gray filter to page 2 -> must remain on index 1
+                clickNodeByContentDesc("Filter: Gray")
+                waitUntilSession(scenario) { it.pages[1].selectedFilter == ScanFilter.GRAYSCALE }
+                assertSyncedSelection(expectedIndex = 1, expectedTotal = 3)
+
+                // Swipe left again (1 -> 2)
+                swipeHorizontal(previewRect, leftToRight = false)
+                assertSyncedSelection(expectedIndex = 2, expectedTotal = 3)
+
+                // Rotate page 3 -> must stay on page 3 (index 2)
+                clickNodeByContentDesc("Rotate")
+                waitUntilSession(scenario) { it.pages[2].rotationDegrees == 90 }
+                assertSyncedSelection(expectedIndex = 2, expectedTotal = 3)
+
+                // Rapid swipes right (2 -> 1 -> 0)
+                swipeHorizontal(previewRect, leftToRight = true)
+                swipeHorizontal(previewRect, leftToRight = true)
+                assertSyncedSelection(expectedIndex = 0, expectedTotal = 3)
+
+                // Tap thumbnail 2 -> preview & highlight move to index 1
+                clickNodeByContentDesc("Page 2")
+                assertSyncedSelection(expectedIndex = 1, expectedTotal = 3)
+
+                // Delete non-selected Page 1 while Page 2 is selected -> remains on original Page 2 (now index 0)
+                var page0Id = ""
+                var page1Id = ""
+                scenario.onActivity {
+                    page0Id = it.currentSessionStateForTest().pages[0].pageId
+                    page1Id = it.currentSessionStateForTest().pages[1].pageId
+                    it.sessionControllerForTest().deletePage(page0Id)
+                }
+                waitUntilSession(scenario) {
+                    it.pages.size == 2 && it.selectedPage?.pageId == page1Id
+                }
+                assertSyncedSelection(expectedIndex = 0, expectedTotal = 2)
+
+                // Reorder selected Page 1 right -> selected index moves to 1
+                clickNodeByContentDesc("Move page right")
+                waitUntilSession(scenario) {
+                    it.selectedPageIndex == 1 && it.selectedPage?.pageId == page1Id
+                }
+                assertSyncedSelection(expectedIndex = 1, expectedTotal = 2)
+
+                // Reorder selected Page 2 left -> selected index moves back to 0
+                clickNodeByContentDesc("Move page left")
+                waitUntilSession(scenario) {
+                    it.selectedPageIndex == 0 && it.selectedPage?.pageId == page1Id
+                }
+                assertSyncedSelection(expectedIndex = 0, expectedTotal = 2)
+
+                // Add a new page while on page 1 -> newly added page becomes selected (index 2 of 3)
+                scenario.onActivity {
+                    it.sessionControllerForTest().importGalleryUris(listOf(Uri.fromFile(images[0])))
+                }
+                waitUntilSession(scenario) { !it.isImportingGallery && it.pages.size == 3 && it.selectedPageIndex == 2 }
+                assertSyncedSelection(expectedIndex = 2, expectedTotal = 3)
+
+                // Delete selected last page -> clamps cleanly to index 1
+                var lastPageId = ""
+                scenario.onActivity {
+                    lastPageId = it.currentSessionStateForTest().pages[2].pageId
+                    it.sessionControllerForTest().deletePage(lastPageId)
+                }
+                waitUntilSession(scenario) { it.pages.size == 2 && it.selectedPageIndex == 1 }
+                assertSyncedSelection(expectedIndex = 1, expectedTotal = 2)
+            }
+        } finally {
+            images.forEach { it.delete() }
+        }
+    }
+
+    @Test
+    fun manyPagesLazyThumbnailStripScrollsAndStaysSynchronized() {
+        assertTrue("OpenCV failed to initialize", OpenCvRuntime.ensureInitialized())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.CAMERA,
+        )
+
+        val images = (1..10).map { idx ->
+            writeSamplePageImage(
+                context = context,
+                name = "many_p$idx.jpg",
+                color = Scalar(228.0, 232.0 + idx, 240.0),
+            )
+        }
+
+        try {
+            val intent = ScannerLaunchOptions(autoCaptureDefault = false)
+                .applyToIntent(Intent(context, ScannerActivity::class.java))
+
+            ActivityScenario.launch<ScannerActivity>(intent).use { scenario ->
+                scenario.onActivity { activity ->
+                    activity.sessionControllerForTest().importGalleryUris(images.map { Uri.fromFile(it) })
+                }
+                waitUntilSession(scenario, timeoutMs = 20_000L) {
+                    !it.isImportingGallery &&
+                        it.route is ScannerRoute.Review &&
+                        it.pages.size == 10
+                }
+
+                val screenWidth = context.resources.displayMetrics.widthPixels
+                val previewNode = waitForNodeByContentDescPrefix("Scanned page preview")!!
+                val previewRect = Rect().also { previewNode.getBoundsInScreen(it) }
+
+                fun assertLazyStripSynced(expectedIndex: Int, expectedTotal: Int) {
+                    waitUntilSession(scenario) {
+                        it.selectedPageIndex == expectedIndex && it.pages.size == expectedTotal
+                    }
+                    assertNotNull(
+                        "Header must show Page ${expectedIndex + 1} of $expectedTotal",
+                        waitForNodeByTextOrDesc("Page ${expectedIndex + 1} of $expectedTotal"),
+                    )
+                    var lastSummary = ""
+                    val deadline = SystemClock.uptimeMillis() + 5_000L
+                    var synced = false
+                    while (SystemClock.uptimeMillis() < deadline && !synced) {
+                        val selectedThumb = findNode { it.contentDescription?.toString() == "Page ${expectedIndex + 1}" }
+                        val selectedParent = selectedThumb?.parent?.also { it.refresh() }
+                        val selectedBounds = selectedThumb?.let { Rect().also { r -> it.getBoundsInScreen(r) } }
+                        val isTargetSelected = selectedThumb != null && (
+                            selectedThumb.isChecked ||
+                                selectedParent?.isChecked == true ||
+                                selectedThumb.isSelected ||
+                                selectedParent?.isSelected == true ||
+                                selectedThumb.stateDescription?.toString() == "Selected" ||
+                                selectedParent?.stateDescription?.toString() == "Selected"
+                            )
+                        val isTargetVisible = selectedBounds != null &&
+                            selectedBounds.width() > 0 &&
+                            selectedBounds.left >= 0 &&
+                            selectedBounds.right <= screenWidth
+
+                        var staleVisibleSelected = -1
+                        for (i in 0 until expectedTotal) {
+                            if (i == expectedIndex) continue
+                            val other = findNode { it.contentDescription?.toString() == "Page ${i + 1}" } ?: continue
+                            val otherParent = other.parent?.also { it.refresh() }
+                            val otherSelected = other.isChecked ||
+                                otherParent?.isChecked == true ||
+                                other.isSelected ||
+                                otherParent?.isSelected == true ||
+                                other.stateDescription?.toString() == "Selected" ||
+                                otherParent?.stateDescription?.toString() == "Selected"
+                            if (otherSelected) {
+                                staleVisibleSelected = i
+                            }
+                        }
+
+                        synced = isTargetSelected && isTargetVisible && staleVisibleSelected == -1
+                        lastSummary = "selected=$isTargetSelected visible=$isTargetVisible bounds=$selectedBounds staleOther=$staleVisibleSelected"
+                        if (!synced) {
+                            Thread.sleep(100L)
+                        }
+                    }
+                    assertTrue("LazyRow sync/scroll failed for expectedIndex=$expectedIndex: $lastSummary", synced)
+                }
+
+                // Initially page 1 is selected while page 10 is offscreen
+                assertLazyStripSynced(expectedIndex = 0, expectedTotal = 10)
+                assertNull("Page 10 thumbnail should start lazily uncomposed offscreen", findNode { it.contentDescription?.toString() == "Page 10" })
+
+                // Swipe quickly across multiple pages (0 -> 4)
+                repeat(4) {
+                    swipeHorizontal(previewRect, leftToRight = false)
+                }
+                assertLazyStripSynced(expectedIndex = 4, expectedTotal = 10)
+
+                // Jump near the end -> LazyRow scrolls Page 9 into centered visible viewport and marks it selected
+                scenario.onActivity { it.sessionControllerForTest().selectPage(8) }
+                assertLazyStripSynced(expectedIndex = 8, expectedTotal = 10)
+
+                // Swipe left to Page 10 (index 9) -> LazyRow reveals and selects Page 10
+                swipeHorizontal(previewRect, leftToRight = false)
+                assertLazyStripSynced(expectedIndex = 9, expectedTotal = 10)
+
+                // Swipe right back to Page 9 (index 8), apply B&W filter, then tap Page 8 thumbnail
+                swipeHorizontal(previewRect, leftToRight = true)
+                assertLazyStripSynced(expectedIndex = 8, expectedTotal = 10)
+                clickNodeByContentDesc("Filter: B&W")
+                waitUntilSession(scenario) { it.pages[8].selectedFilter == ScanFilter.BLACK_AND_WHITE }
+                assertLazyStripSynced(expectedIndex = 8, expectedTotal = 10)
+
+                clickNodeByContentDesc("Page 8")
+                assertLazyStripSynced(expectedIndex = 7, expectedTotal = 10)
+
+                // Jump back to Page 1 -> LazyRow scrolls back to the start cleanly
+                scenario.onActivity { it.sessionControllerForTest().selectPage(0) }
+                assertLazyStripSynced(expectedIndex = 0, expectedTotal = 10)
+            }
+        } finally {
+            images.forEach { it.delete() }
+        }
+    }
+
+    private fun swipeHorizontal(bounds: Rect, leftToRight: Boolean) {
+        val uiAuto = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val y = bounds.exactCenterY()
+        val width = bounds.width().toFloat()
+        val startX = if (leftToRight) bounds.left + width * 0.2f else bounds.right - width * 0.2f
+        val endX = if (leftToRight) bounds.right - width * 0.2f else bounds.left + width * 0.2f
+        val downTime = SystemClock.uptimeMillis()
+        val down = android.view.MotionEvent.obtain(
+            downTime,
+            downTime,
+            android.view.MotionEvent.ACTION_DOWN,
+            startX,
+            y,
+            0,
+        )
+        uiAuto.injectInputEvent(down, true)
+        down.recycle()
+
+        val steps = 8
+        for (i in 1..steps) {
+            val t = downTime + (i * 18L)
+            val fraction = i.toFloat() / steps
+            val x = startX + (endX - startX) * fraction
+            val move = android.view.MotionEvent.obtain(
+                downTime,
+                t,
+                android.view.MotionEvent.ACTION_MOVE,
+                x,
+                y,
+                0,
+            )
+            uiAuto.injectInputEvent(move, true)
+            move.recycle()
+            Thread.sleep(16L)
+        }
+
+        val up = android.view.MotionEvent.obtain(
+            downTime,
+            downTime + (steps + 1) * 18L,
+            android.view.MotionEvent.ACTION_UP,
+            endX,
+            y,
+            0,
+        )
+        uiAuto.injectInputEvent(up, true)
+        up.recycle()
+        Thread.sleep(350L)
+    }
+
     private fun waitUntilActivity(
         scenario: ActivityScenario<ScannerActivity>,
         timeoutMs: Long = 5_000L,
@@ -431,9 +754,11 @@ class ReviewScreenInstrumentationTest {
         predicate: (AccessibilityNodeInfo) -> Boolean,
     ): AccessibilityNodeInfo? {
         val queue = ArrayDeque<AccessibilityNodeInfo>()
+        root.refresh()
         queue.add(root)
         while (queue.isNotEmpty()) {
             val node = queue.removeFirst()
+            node.refresh()
             if (predicate(node)) return node
             for (i in 0 until node.childCount) {
                 node.getChild(i)?.let { queue.add(it) }

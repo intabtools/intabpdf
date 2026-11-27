@@ -122,7 +122,16 @@ export function SaveRecoveryProvider({
 
   useEffect(() => {
     if (!isAndroid) return;
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      const rafId = window.requestAnimationFrame(() => {
+        void refreshBackups();
+      });
+      return () => {
+        window.cancelAnimationFrame(rafId);
+      };
+    }
     void refreshBackups();
+    return undefined;
   }, [isAndroid, refreshBackups]);
 
   useEffect(() => {
