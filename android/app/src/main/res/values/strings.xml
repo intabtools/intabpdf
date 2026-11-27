@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">InTab PDF</string>
     <string name="title_activity_main">InTab PDF</string>
-    <string name="save_to_device_label">InTabPDF – Save to Device</string>
+    <string name="save_to_device_label">Save to Device</string>
     <string name="package_name">org.intabtools.intabpdf</string>
     <string name="custom_url_scheme">org.intabtools.intabpdf</string>
 </resources>
